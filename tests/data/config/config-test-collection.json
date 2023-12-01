@@ -1,0 +1,47 @@
+{
+    "collection_id": "foo-2023-v01",
+    "title": "Foo collection",
+    "description": "Description of Foo",
+    "instruments": [],
+    "keywords": [
+        "foo",
+        "bar",
+        "oof"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Test EO Org",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/"
+        }
+    ],
+    "input_path_parser": {
+        "classname": "RegexInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*_(?P<band>[a-zA-Z0-9\\-]+)_(?P<datetime>\\d{4}-\\d{2}-\\d{2})\\.tif$",
+            "fields": [
+                "band",
+                "datetime"
+            ]
+        }
+    },
+    "item_assets": {
+        "2m_temp": {
+            "title": "2m temperature",
+            "description": "temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temp",
+                    "description": "temperature 2m above ground (Kelvin)",
+                    "data_type": "uint16"
+                }
+            ]
+        }
+    }
+}
