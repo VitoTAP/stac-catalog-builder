@@ -9,11 +9,7 @@ _logger = logging.getLogger(__name__)
 
 
 @click.group()
-@click.option(
-    "-v", "--verbose",
-    is_flag=True,
-    help="show debug output"
-)
+@click.option("-v", "--verbose", is_flag=True, help="show debug output")
 def cli(verbose):
     log_level = logging.INFO
     if verbose:
@@ -32,29 +28,22 @@ def cli(verbose):
 
 @cli.command()
 @click.option(
-    "-g", "--glob", 
-    default="*", type=click.STRING,
-    help="glob pattern for collecting the geotiff files. Example: */*.tif"
+    "-g",
+    "--glob",
+    default="*",
+    type=click.STRING,
+    help="glob pattern for collecting the geotiff files. Example: */*.tif",
 )
 @click.option(
-    "-c", "--collection-config",
+    "-c",
+    "--collection-config",
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
-    help="Configuration file for the collection"
+    help="Configuration file for the collection",
 )
-@click.option(
-    "--overwrite",
-    is_flag=True,
-    help="Replace the entire output directory when it already exists"
-)
-@click.option(
-    "-m", "--max-files",
-    type=int,
-    default=-1,
-    help="Stop processing after this maximum number of files."
-)
-
+@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
+@click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 @click.argument(
-    "inputdir", 
+    "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
     # help="Directory where the input geotiff files are stored"
 )
@@ -73,42 +62,35 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
         input_dir=inputdir,
         output_dir=outputdir,
         overwrite=overwrite,
-        max_files=max_files
+        max_files=max_files,
     )
 
 
 @cli.command()
 @click.option(
-    "-g", "--glob", 
-    default="*", type=click.STRING,
-    help="glob pattern to collect the geotiff files. example */*.tif"
+    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
 )
 @click.option(
-    "-c", "--collection-config",
+    "-c",
+    "--collection-config",
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
-    help="Configuration file for the collection"
+    help="Configuration file for the collection",
 )
 @click.argument(
-    "inputdir", 
+    "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
     # help="Directory where the input geotiff files are stored"
 )
 def list_tiffs(collection_config, glob, inputdir):
     """Build a STAC collection from a directory of geotiff files."""
-    command_gather_inputs(
-        collection_config_path=collection_config,
-        glob=glob,
-        input_dir=inputdir
-    )
+    command_gather_inputs(collection_config_path=collection_config, glob=glob, input_dir=inputdir)
 
 
 @cli.command()
-@click.argument(
-    "collection_file",
-    type=click.Path(exists=True, dir_okay=False, file_okay=True)
-)
+@click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def show_collection(collection_file):
     from stacbuilder.builder import command_load_collection
+
     command_load_collection(collection_file)
 
 

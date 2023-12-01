@@ -43,9 +43,7 @@ class Metadata:
             if self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
                 self.bbox = self.proj_bbox
             else:
-                self.bbox = _reproject_bounding_box(
-                    self.proj_bbox, from_crs=dataset.crs, to_crs="epsg:4326"
-                )
+                self.bbox = _reproject_bounding_box(self.proj_bbox, from_crs=dataset.crs, to_crs="epsg:4326")
             self.transform = list(dataset.transform)[0:6]
             self.shape = dataset.shape
             self.tags = dataset.tags()
@@ -80,7 +78,7 @@ class Metadata:
     @property
     def item_id(self) -> str:
         return self._item_id
-    
+
     @item_id.setter
     def item_id(self, value: str) -> None:
         self._item_id = value
@@ -98,7 +96,7 @@ class Metadata:
     @property
     def version(self) -> str:
         return "1.0.0"
-    
+
     @property
     def band(self) -> str:
         return self._band
@@ -118,10 +116,10 @@ class Metadata:
     def check_datetime(self, value) -> dt.datetime:
         if isinstance(value, dt.datetime):
             return value
-        
+
         if isinstance(value, dt.date):
             return self.convert_date_to_datetime(value)
-        
+
         if isinstance(value, str):
             # if not value.endswith("Z") and not "+" in value:
             #     converted_value = value + "Z"
@@ -133,14 +131,10 @@ class Metadata:
             else:
                 return converted_value
 
-        raise TypeError(
-            f"Can not convert this time to datetime: type={type(value)}, {value=}"
-        )
+        raise TypeError(f"Can not convert this time to datetime: type={type(value)}, {value=}")
 
     def convert_date_to_datetime(self, value) -> dt.datetime:
-        return dt.datetime(
-            value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC
-        )
+        return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)
 
     @property
     def start_datetime(self) -> dt.datetime:
@@ -163,7 +157,7 @@ class Metadata:
         if not self.start_datetime:
             return None
         return self.start_datetime.year
-    
+
     @property
     def month(self) -> Optional[int]:
         if not self.start_datetime:
@@ -182,15 +176,14 @@ class Metadata:
             "end_datetime": self.end_datetime,
             "year": self.year,
             "month": self.month,
-            "_info_from_href": self._info_from_href
+            "_info_from_href": self._info_from_href,
         }
 
     def __str__(self):
         return str(self.to_dict())
 
-def _reproject_bounding_box(
-    bbox: BoundingBoxList, from_crs: str, to_crs: str
-) -> List[float]:
+
+def _reproject_bounding_box(bbox: BoundingBoxList, from_crs: str, to_crs: str) -> List[float]:
     """
     Reproject given bounding box dictionary
 
@@ -220,12 +213,8 @@ XYArray = np.ndarray
 TransformerFunction = Callable[[XYArray], XYArray]
 
 
-def _get_crs_transformer(
-    from_crs: str, to_crs: str = "EPSG:4326"
-) -> TransformerFunction:
-    transformer = pyproj.Transformer.from_crs(
-        crs_from=from_crs, crs_to=to_crs, always_xy=True
-    )
+def _get_crs_transformer(from_crs: str, to_crs: str = "EPSG:4326") -> TransformerFunction:
+    transformer = pyproj.Transformer.from_crs(crs_from=from_crs, crs_to=to_crs, always_xy=True)
     return transformer.transform
 
     # def transform_xy(xy_array: XYArray) -> XYArray:  # type: ignore[type-arg]
@@ -236,7 +225,6 @@ def _get_crs_transformer(
 
     #     array = np.array(rows)
     #     return array.reshape(xy_array.shape)
-
 
     def transform_xy(x: float, y: float) -> Tuple[float, float]:  # type: ignore[type-arg]
         # Does not work. need to transform each rows (containing x & y) into a new np.ndarray

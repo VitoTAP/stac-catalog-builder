@@ -19,3 +19,13 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+# Run isort in black-compatible mode (https://pycqa.github.io/isort/docs/configuration/black_compatibility.html)
+profile = "black"
+
+[tool.ruff]
+line-length = 120

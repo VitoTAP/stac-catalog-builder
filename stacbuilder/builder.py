@@ -4,31 +4,17 @@ import logging
 import pprint
 
 from pathlib import Path
-from  typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
 
 
-
-from pystac import (
-    Asset,
-    CatalogType,
-    Collection,
-    Extent,
-    Item,
-    MediaType,
-    SpatialExtent,
-    TemporalExtent
-)
+from pystac import Asset, CatalogType, Collection, Extent, Item, MediaType, SpatialExtent, TemporalExtent
 from pystac.layout import TemplateLayoutStrategy
 from pystac.utils import make_absolute_href, str_to_datetime
 
 from pystac.extensions.grid import GridExtension
-from pystac.extensions.item_assets import (
-    AssetDefinition,
-    ItemAssetsExtension
-)
+from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.raster import RasterExtension
-
 
 
 from stactools.core.io import ReadHrefModifier
@@ -39,28 +25,22 @@ import rasterio
 
 
 from stacbuilder.core import InputPathParser, InputPathParserFactory, NoopInputPathParser
-from stacbuilder.config import (
-    AssetConfig,
-    CollectionConfig
-)
+from stacbuilder.config import AssetConfig, CollectionConfig
 from stacbuilder.metadata import Metadata
 
 
 _logger = logging.getLogger(__name__)
 
 
-CLASSIFICATION_SCHEMA = (
-    "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
-)
+CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
 
 
 class SettingsInvalid(Exception):
     pass
 
 
-
 class STACBuilder:
-    DEFAULT_EXTENT =  Extent(
+    DEFAULT_EXTENT = Extent(
         SpatialExtent([-180.0, -90.0, 180.0, 90.0]),
         TemporalExtent(
             [
@@ -71,6 +51,7 @@ class STACBuilder:
             ]
         ),
     )
+
     def __init__(self, path_parser: Optional[InputPathParser] = None):
         self.input_dir: Path = None
         self.glob: str = "*"
@@ -97,7 +78,7 @@ class STACBuilder:
     @property
     def collection_config(self) -> CollectionConfig:
         return self._collection_config
-    
+
     @collection_config.setter
     def collection_config(self, config: CollectionConfig) -> None:
         self._collection_config = config
@@ -107,7 +88,7 @@ class STACBuilder:
         input_files = [f for f in self.input_dir.glob(self.glob) if f.is_file()]
 
         if self.max_files_to_process > 0:
-            input_files = input_files[:self.max_files_to_process]
+            input_files = input_files[: self.max_files_to_process]
 
         self._input_files = input_files
         return self._input_files
@@ -143,19 +124,19 @@ class STACBuilder:
     def _get_input_path_parser(self) -> InputPathParser:
         if not self._path_parser:
             parser_config = self._collection_config.input_path_parser
-            self._path_parser = InputPathParserFactory.from_config(parser_config) 
+            self._path_parser = InputPathParserFactory.from_config(parser_config)
         return self._path_parser
-    
+
     def get_settings_errors(self):
         errors = []
         if not self.collection_config:
             errors.append(f"collection_config is not set")
-        
+
         if not self.input_dir:
             errors.append(f"input_dir is not set")
         elif not self.input_dir.exists():
             errors.append(f"Input directory does not exist: {self.input_dir!r}")
-        
+
         if not self.glob:
             errors.append(f'glob pattern is not set, default should be "*"')
 
@@ -163,7 +144,7 @@ class STACBuilder:
             errors.append(f"output_dir is not set")
         elif self.output_dir.exists() and not self.overwrite:
             errors.append(f"Output directory already exist but overwrite is OFF (False): {self.output_dir}")
-        
+
         return errors
 
     def can_run(self) -> bool:
@@ -175,13 +156,13 @@ class STACBuilder:
             raise SettingsInvalid("\n".join(errors))
 
     def try_parse_items(self):
-        extract_href_info=self._get_input_path_parser()
+        extract_href_info = self._get_input_path_parser()
         # all_item_metadata = []
         for file in self.input_files:
             metadata = Metadata(
                 href=str(file),
                 extract_href_info=extract_href_info,
-                read_href_modifier=self._read_href_modifier, 
+                read_href_modifier=self._read_href_modifier,
             )
             yield metadata
 
@@ -260,7 +241,7 @@ class STACBuilder:
         ## )
 
         return collection
-    
+
     @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
         return self.collection_config.item_assets
@@ -269,7 +250,7 @@ class STACBuilder:
         asset_definitions = {}
         for band_name, asset_config in self.item_assets_configs.items():
             asset_definitions[band_name] = asset_config.to_asset_definition()
-        
+
         return asset_definitions
 
     def load_collection(self, path: Path) -> Collection:
@@ -292,13 +273,13 @@ class STACBuilder:
         Returns:
             Item: STAC Item object representing the forest carbon monitoring tile
         """
-        extract_href_info=self._get_input_path_parser()
+        extract_href_info = self._get_input_path_parser()
         metadata = Metadata(
-            href=str(tiff_path), 
+            href=str(tiff_path),
             extract_href_info=extract_href_info,
-            read_href_modifier=self._read_href_modifier, 
+            read_href_modifier=self._read_href_modifier,
         )
-        
+
         if not metadata.item_id:
             print("metadata.item_id not set")
             breakpoint()
@@ -321,7 +302,7 @@ class STACBuilder:
 
         # item.common_metadata.created = dt.datetime.now(tz=dt.timezone.utc)
         item.common_metadata.created = dt.datetime.utcnow()
-        
+
         # item.common_metadata.mission = constants.MISSION
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
@@ -362,10 +343,10 @@ class STACBuilder:
         tiff_path: Path,
     ):
         return rst.create_stac_item(
-                source=str(tiff_path),
-                collection=self.collection_id, 
-                collection_url=str(self.collection_file),
-            )
+            source=str(tiff_path),
+            collection=self.collection_id,
+            collection_url=str(self.collection_file),
+        )
 
     # def collect_item_metadata(self, geotiff_path: Path):
 
@@ -379,13 +360,14 @@ class STACBuilder:
     #         print(dataset)
 
 
-def _setup_builder(collection_config_path: Path,
-        glob: str,
-        input_dir: Path,
-        output_dir: Path,
-        overwrite: bool,
-        max_files_to_process: Optional[int] = -1,
-    ) -> STACBuilder:
+def _setup_builder(
+    collection_config_path: Path,
+    glob: str,
+    input_dir: Path,
+    output_dir: Path,
+    overwrite: bool,
+    max_files_to_process: Optional[int] = -1,
+) -> STACBuilder:
     """Build a STAC collection from a directory of geotiff files."""
 
     builder = STACBuilder()
@@ -393,7 +375,7 @@ def _setup_builder(collection_config_path: Path,
     conf_contents = collection_config_path.read_text()
     config = CollectionConfig(**json.loads(conf_contents))
     builder.collection_config = config
-    
+
     builder.glob = glob
     builder.input_dir = input_dir
     builder.max_files_to_process = max_files_to_process
@@ -405,13 +387,13 @@ def _setup_builder(collection_config_path: Path,
 
 
 def command_build_collection(
-        collection_config_path: Path,
-        glob: str,
-        input_dir: Path,
-        output_dir: Path,
-        overwrite: bool,
-        max_files: Optional[int] = -1,
-    ):
+    collection_config_path: Path,
+    glob: str,
+    input_dir: Path,
+    output_dir: Path,
+    overwrite: bool,
+    max_files: Optional[int] = -1,
+):
     """Build a STAC collection from a directory of geotiff files."""
     builder: STACBuilder = _setup_builder(
         collection_config_path=Path(collection_config_path).expanduser().absolute(),
@@ -425,26 +407,26 @@ def command_build_collection(
 
 
 def command_gather_inputs(
-        collection_config_path: Path,
-        glob: str,
-        input_dir: Path,
-    ):
+    collection_config_path: Path,
+    glob: str,
+    input_dir: Path,
+):
     """Build a STAC collection from a directory of geotiff files."""
-    
+
     builder: STACBuilder = _setup_builder(
         collection_config_path=Path(collection_config_path).expanduser().absolute(),
         glob=glob,
         input_dir=Path(input_dir).expanduser().absolute(),
         output_dir=Path("/tmp"),
-        overwrite=True
+        overwrite=True,
     )
 
     builder.validate_builder_settings()
     builder.collect_input_files()
-    
+
     # for f in builder.input_files:
     #     print(f)
-    
+
     for metadata in builder.try_parse_items():
         pprint.pprint(metadata.to_dict())
 
@@ -455,8 +437,8 @@ def command_gather_inputs(
 
 
 def command_load_collection(
-        path: Path,
-    ):
+    path: Path,
+):
     """Build a STAC collection from a directory of geotiff files."""
 
     builder = STACBuilder()

@@ -32,12 +32,12 @@ class InputPathParserFactory:
     # def create_parser(cls, name: str, params: Optional[Dict[str, Any]] = None):
     #     params = params or {}
     #     return cls._implementations[name](**params)
-        
+
     #     # if name in cls._implementations:
     #     #     return cls._implementations[name](**params)
     #     # else:
     #     #     return NoopInputPathParser()
-    
+
     @classmethod
     def from_config(cls, config: InputPathParserConfig):
 
@@ -52,7 +52,7 @@ class InputPathParserFactory:
         #     return cls._implementations[config.classname](**(params))
         # else:
         #     return NoopInputPathParser()
-    
+
 
 # InputPathParser: Callable[[str], Dict[str, Any]]
 
@@ -83,7 +83,6 @@ class InputPathParserFactory:
 
 # TODO: simplify, maybe with a Protocol instead of an abstract base class
 class InputPathParser(abc.ABC):
-
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
         InputPathParserFactory.register(cls)
@@ -94,10 +93,8 @@ class InputPathParser(abc.ABC):
 
 
 class NoopInputPathParser(InputPathParser):
-
     def parse(self, input_file: Path) -> Dict[str, Any]:
         return {}
-
 
 
 TypeConverter = Callable[[str], Any]
@@ -105,13 +102,12 @@ TypeConverterMapping = Dict[str, TypeConverter]
 
 
 class RegexInputPathParser(InputPathParser):
-
     def __init__(
-            self,
-            regex_pattern: Union[str, re.Pattern],
-            fields: List[str],
-            type_converters: Optional[TypeConverterMapping] = None
-        ):
+        self,
+        regex_pattern: Union[str, re.Pattern],
+        fields: List[str],
+        type_converters: Optional[TypeConverterMapping] = None,
+    ):
         self._fields = fields
         if isinstance(regex_pattern, re.Pattern):
             self._regex = regex_pattern
@@ -138,17 +134,17 @@ class RegexInputPathParser(InputPathParser):
     @property
     def fields(self):
         return self._fields
-    
+
     @property
     def regex(self):
         return self._regex
-    
+
     @property
     def type_converters(self):
         return self._type_converters
-    
-class ANINPathParser(InputPathParser):
 
+
+class ANINPathParser(InputPathParser):
     def parse(self, input_file: Path) -> Dict[str, Any]:
 
         # Example:
@@ -168,17 +164,16 @@ class ANINPathParser(InputPathParser):
         date_string = file_parts[-1]
         year = int(date_string[0:4])
         month = int(date_string[4:6])
-        day =  int(date_string[6:8])
+        day = int(date_string[6:8])
         start_datetime = dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
         end_month = calendar.monthrange(year, month)[1]
         end_datetime = dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
 
         info = {}
         info["item_id"] = root
-        info["datetime"] =  start_datetime
-        info["start_datetime"] =  start_datetime
-        info["end_datetime"] =  end_datetime
+        info["datetime"] = start_datetime
+        info["start_datetime"] = start_datetime
+        info["end_datetime"] = end_datetime
         info["band"] = band
 
         return info
-

@@ -15,7 +15,6 @@ _logger = logging.getLogger(__name__)
 
 
 class TimezoneFormatConverter:
-
     def convert_collection(self, in_path: Path, out_path: Path) -> None:
         with open(in_path, "r") as f_in:
             data = json.load(f_in)
@@ -24,7 +23,6 @@ class TimezoneFormatConverter:
 
         with open(out_path, "w") as f_out:
             json.dump(data, f_out, indent=2)
-
 
     def convert_item(self, in_path: Path, out_path: Path) -> None:
         _logger.debug(f"Converting STAC item from {in_path} to {out_path} ...")
@@ -37,13 +35,11 @@ class TimezoneFormatConverter:
             json.dump(data, f_out, indent=2)
         _logger.debug(f"DONE: converted STAC item from {in_path} to {out_path}")
 
-
     def _convert_collection_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         converted = copy.deepcopy(data)
         temporal_extent = converted["extent"]["temporal"]["interval"]
         converted["extent"]["temporal"]["interval"] = self._convert_value(temporal_extent)
         return converted
-
 
     def _convert_item_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         converted = copy.deepcopy(data)
@@ -58,7 +54,6 @@ class TimezoneFormatConverter:
 
         return converted
 
-
     def _convert_value(self, value: Any) -> Any:
         if isinstance(value, str):
             return self._convert_datetime(value)
@@ -66,7 +61,6 @@ class TimezoneFormatConverter:
             return [self._convert_value(x) for x in value]
         else:
             return value
-
 
     def _convert_datetime(self, dt_string: str) -> str:
         """Convert UTC datetime strings that encode UTC timezone with "Z"."""
@@ -76,7 +70,6 @@ class TimezoneFormatConverter:
             return dt_string
         else:
             return self.datetime_to_str_no_z(the_datetime)
-
 
     def datetime_to_str_no_z(self, timestamp: dt.datetime, timespec: str = "auto") -> str:
         """Converts a :class:`datetime.datetime` instance to an ISO8601 string in the
@@ -103,12 +96,7 @@ class TimezoneFormatConverter:
 
         return timestamp_str
 
-
-    def post_process_catalog(
-        self,
-        in_coll_path: Path,
-        converted_dir: Optional[Path] = None
-    ) -> None:
+    def post_process_catalog(self, in_coll_path: Path, converted_dir: Optional[Path] = None) -> None:
         """Run post-processing steps on the STAC catalog.
 
         This is a temporary fix until we can make openeo-geopyspark-driver's
@@ -116,8 +104,7 @@ class TimezoneFormatConverter:
         """
         if not in_coll_path.exists():
             raise FileNotFoundError(
-                'Input collection file for argument "in_coll_path" does not exist: '
-                + f"{in_coll_path=}"
+                'Input collection file for argument "in_coll_path" does not exist: ' + f"{in_coll_path=}"
             )
         if not in_coll_path.is_file():
             raise Exception(
@@ -138,16 +125,13 @@ class TimezoneFormatConverter:
         self.convert_collection(in_coll_path, collection_converted_path)
         self._post_process_item_files(in_coll_path.parent, converted_out_dir)
 
-
     def _post_process_item_files(self, collection_dir: Path, converted_dir: Path) -> None:
         """Convert each STAC item file found in the subfolders per year"""
 
         in_place = collection_dir.samefile(converted_dir)
         item_files_in = list(collection_dir.glob("*/*.json"))
         item_folders_in: List[Path] = list(set(i.parent for i in item_files_in))
-        item_folders_out = [
-            converted_dir / i.relative_to(collection_dir) for i in item_folders_in
-        ]
+        item_folders_out = [converted_dir / i.relative_to(collection_dir) for i in item_folders_in]
         print("=== item_files_in: ===")
         for f in item_files_in:
             print(f)
@@ -164,9 +148,7 @@ class TimezoneFormatConverter:
             rel_path = item_path.relative_to(collection_dir)
             out_path = converted_dir / rel_path
 
-            print(
-                f"PROGRESS: converting STAC item {i+1} of {num_files}: {item_path}"
-            )
+            print(f"PROGRESS: converting STAC item {i+1} of {num_files}: {item_path}")
             print(f"{item_path=}")
             print(f"{rel_path=}")
             print(f"{out_path=}")
