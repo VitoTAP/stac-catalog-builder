@@ -1,0 +1,10 @@
+stac-validator==3.3.*
+pystac[validation]==1.8.*
+rasterio==1.3.*
+shapely==2.0.*
+stactools==0.5.*
+pyproj==3.6.*
+click==8.1.*
+pydantic==2.5.*
+rio-stac==0.8.*
+

@@ -1,0 +1,3 @@
+-r requirements-test.txt
+hatch==1.6.*
+# zstandard

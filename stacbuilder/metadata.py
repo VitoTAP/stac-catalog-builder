@@ -1,0 +1,201 @@
+import os
+import datetime as dt
+# from datetime import datetime 
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import numpy as np
+import pyproj
+import rasterio
+import shapely
+import shapely.ops
+from pystac import Asset, MediaType
+from pystac.utils import make_absolute_href, str_to_datetime
+from shapely.geometry import box, mapping
+from stactools.core.io import ReadHrefModifier
+
+
+from stacbuilder.core import InputPathParser
+
+# from glassfapar.constants import ASSET_PROPS
+
+BoundingBoxList = List[Union[float, int]]
+
+
+class Metadata:
+    def __init__(
+        self,
+        href: str,
+        extract_href_info: InputPathParser,
+        read_href_modifier: Optional[ReadHrefModifier] = None,
+    ):
+
+        if read_href_modifier:
+            modified_href = read_href_modifier(href)
+        else:
+            modified_href = href
+        with rasterio.open(modified_href) as dataset:
+            self.proj_bbox = list(dataset.bounds)
+            self.proj_epsg = dataset.crs
+            if self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
+                self.bbox = self.proj_bbox
+            else:
+                self.bbox = _reproject_bounding_box(
+                    self.proj_bbox, from_crs=dataset.crs, to_crs="epsg:4326"
+                )
+            self.transform = list(dataset.transform)[0:6]
+            self.shape = dataset.shape
+            self.tags = dataset.tags()
+
+        self.href = href
+        self._item_id = None
+        self._start_datetime = None
+        self._end_datetime = None
+        self._band = None
+        
+        self._extract_href_info = extract_href_info
+        self.process_href_info()
+
+    def process_href_info(self):
+        href_info = self._extract_href_info.parse(self.href)
+        for key, value in href_info.items():
+            # Ignore keys that do not match an attribute.
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+    # def _derive_info_from_filename(self) -> None:
+    #     filename = os.path.basename(self.href)
+    #     self.root, _ = os.path.splitext(filename)
+    #     self._item_id = self.root
+    #     file_parts = self.root.split("_")
+    #     start_date_str = file_parts[-1][:-1]
+    #     self._start_datetime = str_to_datetime(start_date_str)
+    #     self._end_datetime = dt.datetime(self._start_datetime.year + 1, 1, 1)
+
+    @property
+    def item_id(self) -> str:
+        return self._item_id
+    
+    @item_id.setter
+    def item_id(self, value: str) -> None:
+        self._item_id = value
+
+    @property
+    def geometry(self) -> Dict[str, Any]:
+        geometry_dict: Dict[str, Any] = mapping(box(*self.bbox))
+        return geometry_dict
+
+    @property
+    def proj_geometry(self) -> Dict[str, Any]:
+        geometry_dict: Dict[str, Any] = mapping(box(*self.proj_bbox))
+        return geometry_dict
+
+    @property
+    def version(self) -> str:
+        return "1.0.0"
+    
+    @property
+    def band(self) -> str:
+        return self._band
+
+    @band.setter
+    def band(self, value: str) -> None:
+        self._band = value
+
+    @property
+    def start_datetime(self) -> dt.datetime:
+        return self._start_datetime
+
+    @start_datetime.setter
+    def start_datetime(self, value: dt.datetime) -> None:
+        self._start_datetime = value
+
+    @property
+    def end_datetime(self) -> dt.datetime:
+        return self._end_datetime
+
+    @end_datetime.setter
+    def end_datetime(self, value: dt.datetime) -> None:
+        self._end_datetime = value
+
+    @property
+    def year(self) -> int:
+        return self.start_datetime.year
+    
+    @property
+    def month(self) -> int:
+        return self.start_datetime.month
+
+    # def create_asset(self) -> Asset:
+    #     asset = Asset(href=make_absolute_href(self.href))
+    #     asset.roles = ASSET_PROPS[self.band]["roles"]
+    #     asset.title = ASSET_PROPS[self.band]["title"]
+    #     asset.description = ASSET_PROPS[self.band]["description"]
+
+    #     # TODO: set the MediaType to use in the Metadata constructor
+    #     asset.media_type = MediaType.GEOTIFF
+
+    #     extra_fields = {"eo:bands": ASSET_PROPS[self.band]["bands"]}
+    #     asset.extra_fields = extra_fields
+
+    #     return asset
+
+
+def _reproject_bounding_box(
+    bbox: BoundingBoxList, from_crs: str, to_crs: str
+) -> List[float]:
+    """
+    Reproject given bounding box dictionary
+
+    :param bbox: bbox dict with fields "west", "south", "east", "north"
+
+    :param from_crs: source CRS. Specify `None` to use the "crs" field of input bbox dict
+    :param to_crs: target CRS
+    :return: bbox dict (fields "west", "south", "east", "north", "crs")
+    """
+    if not len(bbox) == 4:
+        ValueError(f"Bounding box bbox expects exactly 4 elements. {bbox=}")
+
+    west, south, east, north = bbox
+    box = shapely.geometry.box(west, south, east, north)
+    transform = _get_crs_transformer(from_crs=from_crs, to_crs=to_crs)
+    # reprojected = shapely.transform(box, transform, include_z=False)
+    reprojected = shapely.ops.transform(transform, box)
+
+    return list(reprojected.bounds)
+
+
+# TODO: fix mypy warnings about the types for the transformer.
+# For now this will have to do:
+
+XYArray = np.ndarray
+
+TransformerFunction = Callable[[XYArray], XYArray]
+
+
+def _get_crs_transformer(
+    from_crs: str, to_crs: str = "EPSG:4326"
+) -> TransformerFunction:
+    transformer = pyproj.Transformer.from_crs(
+        crs_from=from_crs, crs_to=to_crs, always_xy=True
+    )
+    return transformer.transform
+
+    # def transform_xy(xy_array: XYArray) -> XYArray:  # type: ignore[type-arg]
+    #     # Does not work. need to transform each rows (containing x & y) into a new np.ndarray
+    #     rows = []
+    #     for i in range(xy_array.shape[0]):
+    #         rows.append(transformer.transform(xx=xy_array[i, 0], yy=xy_array[i, 1]))
+
+    #     array = np.array(rows)
+    #     return array.reshape(xy_array.shape)
+
+
+    def transform_xy(x: float, y: float) -> Tuple[float, float]:  # type: ignore[type-arg]
+        # Does not work. need to transform each rows (containing x & y) into a new np.ndarray
+        return transformer.transform(xx=x, yy=y)
+
+    print(transform_xy.__annotations__)
+    return transform_xy
+
+
+# Okay
