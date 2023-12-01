@@ -1,22 +1,26 @@
 import os
 import datetime as dt
-# from datetime import datetime 
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
+
 
 import numpy as np
 import pyproj
 import rasterio
 import shapely
 import shapely.ops
+
 from pystac import Asset, MediaType
 from pystac.utils import make_absolute_href, str_to_datetime
 from shapely.geometry import box, mapping
 from stactools.core.io import ReadHrefModifier
 
 
+from openeo.util import rfc3339
+
+
 from stacbuilder.core import InputPathParser
 
-# from glassfapar.constants import ASSET_PROPS
 
 BoundingBoxList = List[Union[float, int]]
 
@@ -47,16 +51,18 @@ class Metadata:
             self.tags = dataset.tags()
 
         self.href = href
-        self._item_id = None
+        self._item_id = Path(href).stem
+        self._datetime = dt.datetime.utcnow()
         self._start_datetime = None
         self._end_datetime = None
         self._band = None
-        
+
         self._extract_href_info = extract_href_info
         self.process_href_info()
 
     def process_href_info(self):
         href_info = self._extract_href_info.parse(self.href)
+        self._info_from_href = href_info
         for key, value in href_info.items():
             # Ignore keys that do not match an attribute.
             if hasattr(self, key):
@@ -102,12 +108,47 @@ class Metadata:
         self._band = value
 
     @property
+    def datetime(self) -> dt.datetime:
+        return self._datetime
+
+    @datetime.setter
+    def datetime(self, value) -> None:
+        self._datetime = self.check_datetime(value)
+
+    def check_datetime(self, value) -> dt.datetime:
+        if isinstance(value, dt.datetime):
+            return value
+        
+        if isinstance(value, dt.date):
+            return self.convert_date_to_datetime(value)
+        
+        if isinstance(value, str):
+            # if not value.endswith("Z") and not "+" in value:
+            #     converted_value = value + "Z"
+            # else:
+            #     converted_value = value
+            converted_value = rfc3339.parse_date_or_datetime(value)
+            if isinstance(converted_value, dt.date):
+                return self.convert_date_to_datetime(converted_value)
+            else:
+                return converted_value
+
+        raise TypeError(
+            f"Can not convert this time to datetime: type={type(value)}, {value=}"
+        )
+
+    def convert_date_to_datetime(self, value) -> dt.datetime:
+        return dt.datetime(
+            value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC
+        )
+
+    @property
     def start_datetime(self) -> dt.datetime:
         return self._start_datetime
 
     @start_datetime.setter
     def start_datetime(self, value: dt.datetime) -> None:
-        self._start_datetime = value
+        self._start_datetime = self.check_datetime(value)
 
     @property
     def end_datetime(self) -> dt.datetime:
@@ -115,30 +156,37 @@ class Metadata:
 
     @end_datetime.setter
     def end_datetime(self, value: dt.datetime) -> None:
-        self._end_datetime = value
+        self._end_datetime = self.check_datetime(value)
 
     @property
-    def year(self) -> int:
+    def year(self) -> Optional[int]:
+        if not self.start_datetime:
+            return None
         return self.start_datetime.year
     
     @property
-    def month(self) -> int:
+    def month(self) -> Optional[int]:
+        if not self.start_datetime:
+            return None
         return self.start_datetime.month
 
-    # def create_asset(self) -> Asset:
-    #     asset = Asset(href=make_absolute_href(self.href))
-    #     asset.roles = ASSET_PROPS[self.band]["roles"]
-    #     asset.title = ASSET_PROPS[self.band]["title"]
-    #     asset.description = ASSET_PROPS[self.band]["description"]
+    def to_dict(self):
+        return {
+            "itemId": self.item_id,
+            "href": self.href,
+            "geometry": self.geometry,
+            "proj_geometry": self.proj_geometry,
+            "band": self.band,
+            "datetime": self.datetime,
+            "start_datetime": self.start_datetime,
+            "end_datetime": self.end_datetime,
+            "year": self.year,
+            "month": self.month,
+            "_info_from_href": self._info_from_href
+        }
 
-    #     # TODO: set the MediaType to use in the Metadata constructor
-    #     asset.media_type = MediaType.GEOTIFF
-
-    #     extra_fields = {"eo:bands": ASSET_PROPS[self.band]["bands"]}
-    #     asset.extra_fields = extra_fields
-
-    #     return asset
-
+    def __str__(self):
+        return str(self.to_dict())
 
 def _reproject_bounding_box(
     bbox: BoundingBoxList, from_crs: str, to_crs: str

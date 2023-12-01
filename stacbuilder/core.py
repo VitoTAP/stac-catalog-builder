@@ -5,20 +5,19 @@ import re
 
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
+from stacbuilder.config import InputPathParserConfig
 
+
+class UnknownInputPathParserClass(Exception):
+    def __init__(self, classname: str, *args: object) -> None:
+        message = f"There is no implementing class for this class name: {classname}"
+        super().__init__(message, *args)
 
 
 class InputPathParserFactory:
 
     _implementations = {}
 
-    @classmethod
-    def create_parser(cls, name: str):
-        if name in cls._implementations:
-            return cls._implementations[name]()
-        else:
-            return NoopInputPathParser()
-    
     @classmethod
     def register(cls, parser_class: type):
         name = parser_class.__name__
@@ -29,6 +28,31 @@ class InputPathParserFactory:
     def implementation_names(cls):
         return sorted(cls._implementations.keys())
 
+    # @classmethod
+    # def create_parser(cls, name: str, params: Optional[Dict[str, Any]] = None):
+    #     params = params or {}
+    #     return cls._implementations[name](**params)
+        
+    #     # if name in cls._implementations:
+    #     #     return cls._implementations[name](**params)
+    #     # else:
+    #     #     return NoopInputPathParser()
+    
+    @classmethod
+    def from_config(cls, config: InputPathParserConfig):
+
+        if config.classname not in cls._implementations:
+            raise UnknownInputPathParserClass(config.classname)
+
+        params = config.parameters or {}
+        return cls._implementations[config.classname](**(params))
+
+        # if config.classname in cls._implementations:
+        #     params = config.parameters
+        #     return cls._implementations[config.classname](**(params))
+        # else:
+        #     return NoopInputPathParser()
+    
 
 # InputPathParser: Callable[[str], Dict[str, Any]]
 
@@ -94,7 +118,7 @@ class RegexInputPathParser(InputPathParser):
         else:
             self._regex = re.compile(regex_pattern)
 
-        self._converters = type_converters or {}
+        self._type_converters = type_converters or {}
 
     def parse(self, input_file: Union[Path, str]) -> Dict[str, Any]:
         data = {}
@@ -105,13 +129,24 @@ class RegexInputPathParser(InputPathParser):
             data = match.groupdict()
 
         for key, value in data.items():
-            if key in self._converters:
-                func = self._converters[key]
+            if key in self._type_converters:
+                func = self._type_converters[key]
                 data[key] = func(value)
 
         return data
 
-
+    @property
+    def fields(self):
+        return self._fields
+    
+    @property
+    def regex(self):
+        return self._regex
+    
+    @property
+    def type_converters(self):
+        return self._type_converters
+    
 class ANINPathParser(InputPathParser):
 
     def parse(self, input_file: Path) -> Dict[str, Any]:

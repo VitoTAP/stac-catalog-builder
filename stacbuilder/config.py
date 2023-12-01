@@ -9,12 +9,13 @@ from pydantic_core import ErrorDetails
 from pydantic import (
     BaseModel,
     ConfigDict,
-    Field,
     HttpUrl,
     ValidationError
 )
 from pystac import MediaType
 from pystac.provider import ProviderRole, Provider
+
+from pystac.extensions.item_assets import AssetDefinition
 
 
 DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
@@ -23,7 +24,7 @@ DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
     ProviderRole.PROCESSOR,
 }
 
-DEFAULT_INPUT_PATH_PARSER = "NoopInputPathParser"
+# DEFAULT_INPUT_PATH_PARSER = {"classname": "NoopInputPathParser"}
 
 
 # TODO: [decide]: remove or not? Doesn't look like this BaseForm is the way to go. 
@@ -64,6 +65,46 @@ class ProviderModel(BaseModel):
         return Provider(name=self.name, url=self.url.unicode_string(), roles=list(self.roles))
 
 
+class InputPathParserConfig(BaseModel):
+    classname: str
+    parameters: Optional[Dict[str, Any]] = None
+
+
+class ItemConfig(BaseModel):
+    description: str
+
+class EOBandConfig(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    description: str
+    data_type: str
+    nodata: Optional[Union[int,float]] = None
+    sampling: Optional[str] = None
+    spatial_resolution: Optional[int] = None
+
+
+class AssetConfig(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str
+    description: str
+    media_type: Optional[MediaType] = MediaType.GEOTIFF
+    roles: Optional[List[str]] = ["data"]
+    eo_bands: List[EOBandConfig]
+
+    def to_asset_definition(self) -> AssetDefinition:
+        bands = [b.model_dump() for b in self.eo_bands]
+        return AssetDefinition(
+            properties={
+                "type": self.media_type,
+                "title": self.title,
+                "description": self.description,
+                "eo:bands": bands,
+                "roles": self.roles
+            }
+        )
+
 class CollectionConfig(BaseModel):
     """Model, store configuration of a STAC collection"""
     model_config = ConfigDict(from_attributes=True)
@@ -79,9 +120,10 @@ class CollectionConfig(BaseModel):
     instruments: Optional[List[str]] = []
 
     layout_strategy_item_template: Optional[str] = "${collection}/${year}"
-    input_path_parser: Optional[str] = DEFAULT_INPUT_PATH_PARSER
+    input_path_parser: Optional[InputPathParserConfig] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
+    item_assets: Optional[Dict[str, AssetConfig]] = None 
     # TODO: links (urls)
 
 
@@ -105,7 +147,7 @@ class CollectionConfigForm:
     instruments: Optional[List[str]] = dc.field(default_factory=list)
 
     layout_strategy_item_template: Optional[str] = "${collection}/${year}"
-    input_path_parser: Optional[str] = DEFAULT_INPUT_PATH_PARSER
+    input_path_parser: Optional[Dict[str, Any]] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
     # TODO: links (urls)
@@ -140,30 +182,6 @@ class CollectionConfigForm:
     def from_json_file(cls, path: Path) -> CollectionConfig:
         contents = path.read_text()
         return cls.from_json_str(contents)
-
-
-class ItemConfig(BaseModel):
-    
-    description: str
-
-class EOBandConfig(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    name: str
-    description: str
-    data_type: str
-    nodata: Optional[Union[int,float]]
-    sampling: Optional[str]
-    spatial_resolution: Optional[int]
-
-
-class AssetConfig(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    title: str
-    description: str
-    roles: Optional[List[str]] = ["data"]
-    eo_bands: List[EOBandConfig]
 
 
 class InputsModel(BaseModel):

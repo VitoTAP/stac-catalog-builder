@@ -8,3 +8,8 @@ import pytest
 @pytest.fixture
 def data_dir():
     return Path(__file__).parent / "data"
+
+
+@pytest.fixture
+def test_output_dir():
+    return Path(__file__).parent.parent / "tmp"

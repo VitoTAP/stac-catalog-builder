@@ -56,8 +56,10 @@ conda install stactools=0.5.* openeo=0.23 stac-validator=3.3 pystac[validation]=
 
 ##### Install for using the tool but no development
 
+In a virtualenv, or alike:
+
 ```bash
-python3 -m pip install -r requirements/requirements-dev.txt
+python3 -m pip install -r requirements/requirements.txt
 python3 -m pip install .
 ```
 

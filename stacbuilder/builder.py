@@ -4,7 +4,7 @@ import logging
 import pprint
 
 from pathlib import Path
-from  typing import Callable, List, Optional, Set
+from  typing import Callable, Dict, List, Optional, Set
 
 
 
@@ -22,10 +22,12 @@ from pystac.layout import TemplateLayoutStrategy
 from pystac.utils import make_absolute_href, str_to_datetime
 
 from pystac.extensions.grid import GridExtension
-from pystac.extensions.item_assets import ItemAssetsExtension
+from pystac.extensions.item_assets import (
+    AssetDefinition,
+    ItemAssetsExtension
+)
 from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.raster import RasterExtension
-
 
 
 
@@ -37,7 +39,10 @@ import rasterio
 
 
 from stacbuilder.core import InputPathParser, InputPathParserFactory, NoopInputPathParser
-from stacbuilder.config import CollectionConfig
+from stacbuilder.config import (
+    AssetConfig,
+    CollectionConfig
+)
 from stacbuilder.metadata import Metadata
 
 
@@ -87,6 +92,7 @@ class STACBuilder:
         self.collect_input_files()
         self.create_collection()
         self.save_collection()
+        self.validate_collection()
 
     @property
     def collection_config(self) -> CollectionConfig:
@@ -115,7 +121,7 @@ class STACBuilder:
         return self._collection
 
     @property
-    def collection_href(self) -> Path:
+    def collection_file(self) -> Path:
         return self.output_dir / "collection.json"
 
     @property
@@ -136,8 +142,8 @@ class STACBuilder:
 
     def _get_input_path_parser(self) -> InputPathParser:
         if not self._path_parser:
-            class_name = self._collection_config.input_path_parser
-            self._path_parser = InputPathParserFactory.create_parser(class_name) 
+            parser_config = self._collection_config.input_path_parser
+            self._path_parser = InputPathParserFactory.from_config(parser_config) 
         return self._path_parser
     
     def get_settings_errors(self):
@@ -168,6 +174,21 @@ class STACBuilder:
         if errors:
             raise SettingsInvalid("\n".join(errors))
 
+    def try_parse_items(self):
+        extract_href_info=self._get_input_path_parser()
+        # all_item_metadata = []
+        for file in self.input_files:
+            metadata = Metadata(
+                href=str(file),
+                extract_href_info=extract_href_info,
+                read_href_modifier=self._read_href_modifier, 
+            )
+            yield metadata
+
+            # all_item_metadata.append(metadata)
+
+        # return all_item_metadata
+
     def create_collection(self):
         self.validate_builder_settings()
 
@@ -193,6 +214,7 @@ class STACBuilder:
         collection.normalize_hrefs(output_dir_str, strategy=strategy)
 
         self._collection = collection
+        return self._collection
 
     def validate_collection(self):
         return self._collection.validate_all(recursive=True)
@@ -202,9 +224,10 @@ class STACBuilder:
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
 
         # TODO: do we still need this check?
-        print(f"{self.collection_href=}")
-        assert Path(self.collection_href).exists()
+        print(f"{self.collection_file=}")
+        assert Path(self.collection_file).exists()
 
+        return self.collection_file
 
     def _create_collection(self) -> Collection:
         """Creates a STAC Collection."""
@@ -224,17 +247,8 @@ class STACBuilder:
         )
 
         item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
+        item_assets_ext.item_assets = self.get_item_assets_defs()
 
-        # band = MAP_BANDS[collection_id]
-        # item_assets = {band: constants.ITEM_ASSETS[band]}
-
-        ## item_assets = constants.ITEM_ASSETS.copy()
-        ## for band in item_assets:
-        ##     if band != MAP_BANDS[collection_id]:
-        ##         del item_assets[band]
-
-        # item_assets_ext.item_assets = item_assets
-        
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
 
@@ -246,6 +260,17 @@ class STACBuilder:
         ## )
 
         return collection
+    
+    @property
+    def item_assets_configs(self) -> Dict[str, AssetConfig]:
+        return self.collection_config.item_assets
+
+    def get_item_assets_defs(self) -> List[AssetDefinition]:
+        asset_definitions = {}
+        for band_name, asset_config in self.item_assets_configs.items():
+            asset_definitions[band_name] = asset_config.to_asset_definition()
+        
+        return asset_definitions
 
     def load_collection(self, path: Path) -> Collection:
         self._collection = Collection.from_file(path)
@@ -259,11 +284,7 @@ class STACBuilder:
     ) -> Item:
         """Create a STAC Item with one or two assets.
 
-
         Args:
-            agb_href (str): An href to a COG containing a tile of classification data.
-            include_sd (bool): Flag to add an input quality asset. Requires
-                an input quality COG to exist alongside the agb COG.
             read_href_modifier (Callable[[str], str]): An optional function to
                 modify the MTL and USGS STAC hrefs (e.g. to add a token to a url).
             raster_footprint (bool): Flag to use the footprint of valid (not nodata)
@@ -271,16 +292,22 @@ class STACBuilder:
         Returns:
             Item: STAC Item object representing the forest carbon monitoring tile
         """
+        extract_href_info=self._get_input_path_parser()
         metadata = Metadata(
             href=str(tiff_path), 
-            extract_href_info=self._get_input_path_parser(),
+            extract_href_info=extract_href_info,
             read_href_modifier=self._read_href_modifier, 
         )
+        
+        if not metadata.item_id:
+            print("metadata.item_id not set")
+            breakpoint()
+
         item = Item(
             id=metadata.item_id,
             geometry=metadata.geometry,
             bbox=metadata.bbox,
-            datetime=metadata.start_datetime,
+            datetime=metadata.datetime,
             start_datetime=metadata.start_datetime,
             end_datetime=metadata.end_datetime,
             properties={
@@ -337,7 +364,7 @@ class STACBuilder:
         return rst.create_stac_item(
                 source=str(tiff_path),
                 collection=self.collection_id, 
-                collection_url=str(self.collection_href),
+                collection_url=str(self.collection_file),
             )
 
     # def collect_item_metadata(self, geotiff_path: Path):
@@ -415,11 +442,14 @@ def command_gather_inputs(
     builder.validate_builder_settings()
     builder.collect_input_files()
     
-    for f in builder.input_files:
-        print(f)
+    # for f in builder.input_files:
+    #     print(f)
     
+    for metadata in builder.try_parse_items():
+        pprint.pprint(metadata.to_dict())
+
     if builder.input_files:
-        item = builder.get_item_from_rio_stac(builder.input_files[0])
+        item = builder.get_item_from_rio_stac(builder.input_files[-1])
         item_dict = item.to_dict(include_self_link=False)
         pprint.pprint(item_dict, indent=2)
 
