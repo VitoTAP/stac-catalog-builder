@@ -9,8 +9,10 @@ from pydantic_core import ErrorDetails
 from pydantic import BaseModel, ConfigDict, HttpUrl, ValidationError
 from pystac import MediaType
 from pystac.provider import ProviderRole, Provider
-
 from pystac.extensions.item_assets import AssetDefinition
+
+
+from openeo.util import dict_no_none
 
 
 DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
@@ -18,8 +20,6 @@ DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
     ProviderRole.LICENSOR,
     ProviderRole.PROCESSOR,
 }
-
-# DEFAULT_INPUT_PATH_PARSER = {"classname": "NoopInputPathParser"}
 
 
 # TODO: [decide]: remove or not? Doesn't look like this BaseForm is the way to go.
@@ -87,9 +87,11 @@ class AssetConfig(BaseModel):
     media_type: Optional[MediaType] = MediaType.GEOTIFF
     roles: Optional[List[str]] = ["data"]
     eo_bands: List[EOBandConfig]
+    # extra_fields = Dict[str, Any]
 
     def to_asset_definition(self) -> AssetDefinition:
-        bands = [b.model_dump() for b in self.eo_bands]
+        bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
+
         return AssetDefinition(
             properties={
                 "type": self.media_type,
@@ -120,7 +122,7 @@ class CollectionConfig(BaseModel):
     input_path_parser: Optional[InputPathParserConfig] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
-    item_assets: Optional[Dict[str, AssetConfig]] = None
+    item_assets: Optional[Dict[str, AssetConfig]] = {}
     # TODO: links (urls)
 
 

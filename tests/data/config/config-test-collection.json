@@ -21,6 +21,7 @@
             "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/"
         }
     ],
+    "layout_strategy_item_template": "${collection}/${year}",
     "input_path_parser": {
         "classname": "RegexInputPathParser",
         "parameters": {
@@ -32,13 +33,24 @@
         }
     },
     "item_assets": {
-        "2m_temp": {
+        "2m-temp-monthly": {
             "title": "2m temperature",
             "description": "temperature 2m above ground (Kelvin)",
             "eo_bands": [
                 {
                     "name": "2m_temp",
                     "description": "temperature 2m above ground (Kelvin)",
+                    "data_type": "uint16"
+                }
+            ]
+        },
+        "tot-precip-monthly": {
+            "title": "total precipitation",
+            "description": "total precipitation per month (m)",
+            "eo_bands": [
+                {
+                    "name": "tot_precip",
+                    "description": "total precipitation per month (m)",
                     "data_type": "uint16"
                 }
             ]

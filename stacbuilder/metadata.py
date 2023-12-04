@@ -50,10 +50,15 @@ class Metadata:
 
         self.href = href
         self._item_id = Path(href).stem
+        self._item_type = None
+        self._band = None
+
         self._datetime = dt.datetime.utcnow()
         self._start_datetime = None
         self._end_datetime = None
-        self._band = None
+        self._year = None
+        self._month = None
+        self._day = None
 
         self._extract_href_info = extract_href_info
         self.process_href_info()
@@ -62,18 +67,9 @@ class Metadata:
         href_info = self._extract_href_info.parse(self.href)
         self._info_from_href = href_info
         for key, value in href_info.items():
-            # Ignore keys that do not match an attribute.
+            # Ignore keys that do not match any attribute.
             if hasattr(self, key):
                 setattr(self, key, value)
-
-    # def _derive_info_from_filename(self) -> None:
-    #     filename = os.path.basename(self.href)
-    #     self.root, _ = os.path.splitext(filename)
-    #     self._item_id = self.root
-    #     file_parts = self.root.split("_")
-    #     start_date_str = file_parts[-1][:-1]
-    #     self._start_datetime = str_to_datetime(start_date_str)
-    #     self._end_datetime = dt.datetime(self._start_datetime.year + 1, 1, 1)
 
     @property
     def item_id(self) -> str:
@@ -82,6 +78,16 @@ class Metadata:
     @item_id.setter
     def item_id(self, value: str) -> None:
         self._item_id = value
+
+    @property
+    def item_type(self) -> str:
+        if not self._item_type:
+            return self.band
+        return self._item_type
+
+    @item_type.setter
+    def item_type(self, value: str) -> None:
+        self._item_type = value
 
     @property
     def geometry(self) -> Dict[str, Any]:
@@ -154,28 +160,33 @@ class Metadata:
 
     @property
     def year(self) -> Optional[int]:
-        if not self.start_datetime:
-            return None
-        return self.start_datetime.year
+        return self._year
+
+    @year.setter
+    def year(self, value: int) -> None:
+        self._year = value
 
     @property
     def month(self) -> Optional[int]:
-        if not self.start_datetime:
-            return None
-        return self.start_datetime.month
+        return self._month
+
+    @year.setter
+    def month(self, value: int) -> None:
+        self._month = value
 
     def to_dict(self):
         return {
             "itemId": self.item_id,
             "href": self.href,
-            "geometry": self.geometry,
-            "proj_geometry": self.proj_geometry,
+            "item_type": self.item_type,
             "band": self.band,
             "datetime": self.datetime,
             "start_datetime": self.start_datetime,
             "end_datetime": self.end_datetime,
             "year": self.year,
             "month": self.month,
+            "geometry": self.geometry,
+            "proj_geometry": self.proj_geometry,
             "_info_from_href": self._info_from_href,
         }
 

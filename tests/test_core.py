@@ -11,21 +11,21 @@ from stacbuilder.core import UnknownInputPathParserClass
 
 
 def test_factory():
-    expected_names = sorted(["NoopInputPathParser", "ANINPathParser", "RegexInputPathParser"])
+    expected_names = sorted(
+        ["NoopInputPathParser", "RegexInputPathParser", "ANINRegexInputPathParser", "ANINPathParser"]
+    )
     assert InputPathParserFactory.implementation_names == expected_names
 
 
 def test_regexinputpathparser():
     import datetime as dt
+
     path = "/data/foo/bar/tile9876_band-name1-567XyZ_2034-12-31T02:03:59Z.tif"
     regex = r".*/tile(?P<tile>\d+)_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}Z)\.tif$"
-    parser = RegexInputPathParser(
-        regex_pattern=regex,
-        fields=["band", "tile"]
-    )
+    parser = RegexInputPathParser(regex_pattern=regex, fields=["band", "tile"])
 
     data = parser.parse(path)
-    
+
     assert "tile" in data
     assert "band" in data
     assert "datetime" in data
@@ -37,18 +37,11 @@ def test_regexinputpathparser():
 def test_regexinputpathparser_converts_types_correctly():
     path = "/data/foo/bar/tile9876_band-name1-567XyZ_2034-12-31T02:03:59Z.tif"
     regex = r".*/tile(?P<tile>\d+)_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}Z)\.tif$"
-    converters = {
-        "tile": int,
-        "datetime": dt.datetime.fromisoformat
-    }
-    parser = RegexInputPathParser(
-        regex_pattern=regex,
-        fields=["band", "tile"],
-        type_converters=converters
-    )
-    
+    converters = {"tile": int, "datetime": dt.datetime.fromisoformat}
+    parser = RegexInputPathParser(regex_pattern=regex, fields=["band", "tile"], type_converters=converters)
+
     data = parser.parse(path)
-    
+
     assert "tile" in data
     assert "band" in data
     assert "datetime" in data
@@ -70,8 +63,8 @@ def test_construct_regexinputpathparser_from_config():
         classname="RegexInputPathParser",
         parameters={
             "regex_pattern": r".*/tile(?P<tile>\d+)_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}Z)\.tif$",
-            "fields": ["band", "tile"]
-        }
+            "fields": ["band", "tile"],
+        },
     )
 
     parser = InputPathParserFactory.from_config(config)
@@ -86,4 +79,3 @@ def test_construct_regexinputpathparser_from_config():
 #         regex_pattern=regex,
 #         fields=["band", "tile"],
 #     )
-    

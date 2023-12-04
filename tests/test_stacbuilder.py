@@ -8,17 +8,9 @@ import rasterio
 import numpy as np
 
 
-from stacbuilder.builder import (
-    STACBuilder,
-    command_build_collection,
-    command_gather_inputs
-)
-from stacbuilder.config import (
-    CollectionConfig,
-    InputPathParserConfig,
-    AssetConfig,
-    EOBandConfig
-)
+from stacbuilder.builder import STACBuilder, command_build_collection, command_list_input_files, command_list_metadata
+from stacbuilder.config import CollectionConfig, InputPathParserConfig, AssetConfig, EOBandConfig
+
 
 @pytest.fixture
 def stac_builder(data_dir, tmp_path) -> STACBuilder:
@@ -33,20 +25,23 @@ def stac_builder(data_dir, tmp_path) -> STACBuilder:
 
 @pytest.fixture
 def geotif_paths_relative() -> List[str]:
-    return sorted([
-        "2000/observations_2m-temp-monthly_2000-01-01.tif",
-        "2000/observations_2m-temp-monthly_2000-02-01.tif",
-        "2000/observations_2m-temp-monthly_2000-03-01.tif",
-        "2000/observations_tot-precip-monthly_2000-01-01.tif",
-        "2000/observations_tot-precip-monthly_2000-02-01.tif",
-        "2000/observations_tot-precip-monthly_2000-03-01.tif",
-        "2001/observations_2m-temp-monthly_2001-01-01.tif",
-        "2001/observations_2m-temp-monthly_2001-02-01.tif",
-        "2001/observations_2m-temp-monthly_2001-03-01.tif",
-        "2001/observations_tot-precip-monthly_2001-01-01.tif",
-        "2001/observations_tot-precip-monthly_2001-02-01.tif",
-        "2001/observations_tot-precip-monthly_2001-03-01.tif",
-    ])
+    return sorted(
+        [
+            "2000/observations_2m-temp-monthly_2000-01-01.tif",
+            "2000/observations_2m-temp-monthly_2000-02-01.tif",
+            "2000/observations_2m-temp-monthly_2000-03-01.tif",
+            "2000/observations_tot-precip-monthly_2000-01-01.tif",
+            "2000/observations_tot-precip-monthly_2000-02-01.tif",
+            "2000/observations_tot-precip-monthly_2000-03-01.tif",
+            "2001/observations_2m-temp-monthly_2001-01-01.tif",
+            "2001/observations_2m-temp-monthly_2001-02-01.tif",
+            "2001/observations_2m-temp-monthly_2001-03-01.tif",
+            "2001/observations_tot-precip-monthly_2001-01-01.tif",
+            "2001/observations_tot-precip-monthly_2001-02-01.tif",
+            "2001/observations_tot-precip-monthly_2001-03-01.tif",
+        ]
+    )
+
 
 @pytest.fixture
 def geotiff_paths(data_dir, geotif_paths_relative) -> List[Path]:
@@ -71,14 +66,14 @@ def create_mock_geotiff(tif_path: Path):
     x = np.linspace(-4.0, 4.0, 240)
     y = np.linspace(-3.0, 3.0, 180)
     X, Y = np.meshgrid(x, y)
-    Z1 = np.exp(-2 * np.log(2) * ((X - 0.5) ** 2 + (Y - 0.5) ** 2) / 1 ** 2)
-    Z2 = np.exp(-3 * np.log(2) * ((X + 0.5) ** 2 + (Y + 0.5) ** 2) / 2.5 ** 2)
+    Z1 = np.exp(-2 * np.log(2) * ((X - 0.5) ** 2 + (Y - 0.5) ** 2) / 1**2)
+    Z2 = np.exp(-3 * np.log(2) * ((X + 0.5) ** 2 + (Y + 0.5) ** 2) / 2.5**2)
     Z = 10.0 * (Z2 - Z1)
 
     new_dataset = rasterio.open(
         tif_path,
-        'w',
-        driver='GTiff',
+        "w",
+        driver="GTiff",
         height=Z.shape[0],
         width=Z.shape[1],
         count=1,
@@ -92,7 +87,7 @@ def create_mock_geotiff(tif_path: Path):
 
 @pytest.fixture
 def collection_test_config() -> CollectionConfig:
-    
+
     item_asset_2mtemp = AssetConfig(
         title="2m temperature",
         description="temperature 2m above ground (Kelvin)",
@@ -103,9 +98,8 @@ def collection_test_config() -> CollectionConfig:
                 description="temperature 2m above ground (Kelvin)",
                 data_type="uint16",
             )
-        ]
+        ],
     )
-
     data = {
         "collection_id": "foo-2023-v01",
         "title": "Foo collection",
@@ -117,12 +111,8 @@ def collection_test_config() -> CollectionConfig:
         "providers": [
             {
                 "name": "Test EO Org",
-                "roles": [
-                    "licensor",
-                    "processor",
-                    "producer"
-                ],
-                "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/"
+                "roles": ["licensor", "processor", "producer"],
+                "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/",
             }
         ],
         # "input_path_parser": {"classname": "ANINPathParser"}
@@ -131,23 +121,34 @@ def collection_test_config() -> CollectionConfig:
             classname="RegexInputPathParser",
             parameters={
                 "regex_pattern": r".*_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
-                "fields": ["band", "datetime"]
-            }
+                "fields": ["band", "datetime"],
+            },
         ),
+        # "item_assets": {
+        #     "2m-temp-monthly": item_asset_2mtemp
+        # }
         "item_assets": {
-            "2m_temp": item_asset_2mtemp
-        }
+            "2m-temp-monthly": {
+                "title": "2m temperature",
+                "description": "temperature 2m above ground (Kelvin)",
+                "eo_bands": [
+                    {"name": "2m_temp", "description": "temperature 2m above ground (Kelvin)", "data_type": "uint16"}
+                ],
+            },
+            "tot-precip-monthly": {
+                "title": "total precipitation",
+                "description": "total precipitation per month (m)",
+                "eo_bands": [
+                    {"name": "tot_precip", "description": "total precipitation per month (m)", "data_type": "uint16"}
+                ],
+            },
+        },
     }
     return CollectionConfig(**data)
 
 
 class TestSTACBuilder:
-
-    def test_validate_builder_settings(
-            self,
-            stac_builder: STACBuilder,
-            collection_test_config: CollectionConfig
-        ):
+    def test_validate_builder_settings(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
         stac_builder.collection_config = collection_test_config
         stac_builder.validate_builder_settings()
 
@@ -156,21 +157,14 @@ class TestSTACBuilder:
         create_geotiff_files(geotiff_paths)
 
     def test_collect_input_files(
-            self, 
-            stac_builder: STACBuilder,
-            collection_test_config: CollectionConfig,
-            geotiff_paths
-        ):
+        self, stac_builder: STACBuilder, collection_test_config: CollectionConfig, geotiff_paths
+    ):
         stac_builder.collection_config = collection_test_config
         stac_builder.collect_input_files()
 
         assert sorted(stac_builder.input_files) == sorted(geotiff_paths)
 
-    def test_create_collection(
-            self,
-            stac_builder: STACBuilder,
-            collection_test_config: CollectionConfig
-        ):
+    def test_create_collection(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
         stac_builder.collection_config = collection_test_config
         stac_builder.collect_input_files()
         assert stac_builder.collection_config == collection_test_config
@@ -179,11 +173,7 @@ class TestSTACBuilder:
         assert stac_builder.collection
         assert collection == stac_builder.collection
 
-    def test_validate_collection(
-            self,
-            stac_builder: STACBuilder,
-            collection_test_config: CollectionConfig
-        ):
+    def test_validate_collection(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
         stac_builder.collection_config = collection_test_config
         stac_builder.collect_input_files()
         assert stac_builder.collection_config == collection_test_config
@@ -194,25 +184,21 @@ class TestSTACBuilder:
 
         stac_builder.validate_collection()
 
-    def test_build_collection(
-            self,
-            stac_builder: STACBuilder,
-            collection_test_config: CollectionConfig
-        ):
+    def test_build_collection(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
         stac_builder.collection_config = collection_test_config
-        
+
         assert not stac_builder.collection_file.exists()
 
         stac_builder.build_collection()
         assert stac_builder.collection_file.exists()
-        
+
         from pystac.collection import Collection
+
         collection = Collection.from_file(stac_builder.collection_file)
         collection.validate_all()
 
 
 class TestCommandAPI:
-
     def test_command_build_collection(self, data_dir, tmp_path):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
@@ -223,14 +209,18 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
-            overwrite=True
+            overwrite=True,
         )
+        # TODO: how to verify the output? For now it's just a smoke test.
 
-    def test_command_gather_inputs(self, data_dir):
+    def command_list_input_files(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        command_gather_inputs(
-            collection_config_path=config_file,
-            glob="*/*.tif",
-            input_dir=input_dir
-        )
+        command_list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        # TODO: how to verify the output? For now it's just a smoke test.
+
+    def test_command_list_metadata(self, data_dir):
+        config_file = data_dir / "config/config-test-collection.json"
+        input_dir = data_dir / "geotiff/mock-geotiffs"
+        command_list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        # TODO: how to verify the output? For now it's just a smoke test.

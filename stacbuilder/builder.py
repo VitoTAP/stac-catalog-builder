@@ -155,7 +155,7 @@ class STACBuilder:
         if errors:
             raise SettingsInvalid("\n".join(errors))
 
-    def try_parse_items(self):
+    def try_parse_metadata(self):
         extract_href_info = self._get_input_path_parser()
         # all_item_metadata = []
         for file in self.input_files:
@@ -166,35 +166,31 @@ class STACBuilder:
             )
             yield metadata
 
-            # all_item_metadata.append(metadata)
-
-        # return all_item_metadata
+    def try_parse_items(self):
+        for file in self.input_files:
+            yield self.create_item(file)
 
     def create_collection(self):
         self.validate_builder_settings()
 
-        collection = self._create_collection()
+        self._create_collection()
 
         for file in self.input_files:
             item = self.create_item(file)
+            item.validate()
             # item = self.get_item_from_rio_stac(file)
-            collection.add_item(item)
+            self._collection.add_item(item)
 
-        collection.update_extent_from_items()
+        self._collection.update_extent_from_items()
 
-        #
-        # TODO: add layout strategy to collection config
         layout_template = self.collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
-        # strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
-        ## strategy = TemplateLayoutStrategy(item_template="${collection}")
 
         output_dir_str = str(self.output_dir)
         if output_dir_str.endswith("/"):
             output_dir_str = output_dir_str[-1]
-        collection.normalize_hrefs(output_dir_str, strategy=strategy)
+        self._collection.normalize_hrefs(output_dir_str, strategy=strategy)
 
-        self._collection = collection
         return self._collection
 
     def validate_collection(self):
@@ -213,9 +209,6 @@ class STACBuilder:
     def _create_collection(self) -> Collection:
         """Creates a STAC Collection."""
 
-        # summaries = constants.SUMMARIES
-        # summaries["eo:bands"] = ASSET_PROPS[self.band]["bands"]
-
         coll_config: CollectionConfig = self._collection_config
         collection = Collection(
             id=self.collection_id,
@@ -226,9 +219,10 @@ class STACBuilder:
             extent=self.DEFAULT_EXTENT,
             # summaries=constants.SUMMARIES,
         )
+        self._collection = collection
 
         item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
-        item_assets_ext.item_assets = self.get_item_assets_defs()
+        item_assets_ext.item_assets = self.get_item_assets_definitions()
 
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
@@ -244,12 +238,14 @@ class STACBuilder:
 
     @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
-        return self.collection_config.item_assets
+        return self.collection_config.item_assets or {}
 
-    def get_item_assets_defs(self) -> List[AssetDefinition]:
+    def get_item_assets_definitions(self) -> List[AssetDefinition]:
         asset_definitions = {}
         for band_name, asset_config in self.item_assets_configs.items():
-            asset_definitions[band_name] = asset_config.to_asset_definition()
+            asset_def: AssetDefinition = asset_config.to_asset_definition()
+            asset_def.owner = self.collection
+            asset_definitions[band_name] = asset_def
 
         return asset_definitions
 
@@ -280,11 +276,10 @@ class STACBuilder:
             read_href_modifier=self._read_href_modifier,
         )
 
-        if not metadata.item_id:
-            print("metadata.item_id not set")
-            breakpoint()
+        assert metadata.item_id is not None
 
         item = Item(
+            href=metadata.href,
             id=metadata.item_id,
             geometry=metadata.geometry,
             bbox=metadata.bbox,
@@ -297,17 +292,17 @@ class STACBuilder:
             },
         )
 
-        # item.common_metadata.description = constants.ITEM_DESCRIPTION
-        item.common_metadata.description = self.collection_description
+        description = self.item_assets_configs[metadata.item_type].description
+        item.common_metadata.description = description
+        # item.common_metadata.description = self.collection_description
 
-        # item.common_metadata.created = dt.datetime.now(tz=dt.timezone.utc)
         item.common_metadata.created = dt.datetime.utcnow()
 
         # item.common_metadata.mission = constants.MISSION
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
-        item.add_asset(metadata.band, self.create_asset(tiff_path))
+        item.add_asset(metadata.item_type, self.create_asset(metadata))
 
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg.to_epsg()
@@ -320,23 +315,30 @@ class STACBuilder:
         RasterExtension.add_to(item)
         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
 
-        item.validate()
-
         return item
 
-    def create_asset(self, tiff_path) -> Asset:
-        asset = Asset(href=make_absolute_href(tiff_path))
-        # asset.roles = ASSET_PROPS[self.band]["roles"]
-        # asset.title = ASSET_PROPS[self.band]["title"]
-        # asset.description = ASSET_PROPS[self.band]["description"]
+    def create_asset(self, metadata: Metadata) -> Asset:
+        asset_defs = self.get_item_assets_definitions()
+        asset_def: AssetDefinition = asset_defs[metadata.item_type]
+        return asset_def.create_asset(metadata.href)
 
-        # TODO: set the MediaType to use in the Metadata constructor
-        asset.media_type = self.collection_config.media_type
+        # asset = Asset(href=make_absolute_href(metadata.href))
+        # asset.title = asset_def.title
+        # asset.description = asset_def.description
+        # asset.roles = asset_def.roles
+        # asset.media_type = asset_def.media_type
 
-        # extra_fields = {"eo:bands": ASSET_PROPS[self.band]["bands"]}
-        # asset.extra_fields = extra_fields
+        # # asset.roles = ASSET_PROPS[self.band]["roles"]
+        # # asset.title = ASSET_PROPS[self.band]["title"]
+        # # asset.description = ASSET_PROPS[self.band]["description"]
 
-        return asset
+        # # TODO: set the MediaType to use in the Metadata constructor
+        # # asset.media_type = self.collection_config.media_type
+
+        # # extra_fields = {"eo:bands": ASSET_PROPS[self.band]["bands"]}
+        # # asset.extra_fields = extra_fields
+
+        # return asset
 
     def get_item_from_rio_stac(
         self,
@@ -406,7 +408,7 @@ def command_build_collection(
     builder.build_collection()
 
 
-def command_gather_inputs(
+def command_list_input_files(
     collection_config_path: Path,
     glob: str,
     input_dir: Path,
@@ -424,16 +426,71 @@ def command_gather_inputs(
     builder.validate_builder_settings()
     builder.collect_input_files()
 
-    # for f in builder.input_files:
-    #     print(f)
+    for f in builder.input_files:
+        print(f)
 
-    for metadata in builder.try_parse_items():
+
+def command_list_metadata(
+    collection_config_path: Path,
+    glob: str,
+    input_dir: Path,
+    max_files: Optional[int] = -1,
+):
+    """Build a STAC collection from a directory of geotiff files."""
+
+    builder: STACBuilder = _setup_builder(
+        collection_config_path=Path(collection_config_path).expanduser().absolute(),
+        glob=glob,
+        input_dir=Path(input_dir).expanduser().absolute(),
+        output_dir=Path("/tmp"),
+        overwrite=True,
+        max_files_to_process=max_files,
+    )
+
+    builder.validate_builder_settings()
+    builder.collect_input_files()
+
+    for metadata in builder.try_parse_metadata():
         pprint.pprint(metadata.to_dict())
+        print()
 
-    if builder.input_files:
-        item = builder.get_item_from_rio_stac(builder.input_files[-1])
-        item_dict = item.to_dict(include_self_link=False)
-        pprint.pprint(item_dict, indent=2)
+    # if builder.input_files:
+    #     item = builder.get_item_from_rio_stac(builder.input_files[-1])
+    #     item_dict = item.to_dict(include_self_link=False)
+    #     pprint.pprint(item_dict, indent=2)
+
+
+def command_list_stac_items(
+    collection_config_path: Path,
+    glob: str,
+    input_dir: Path,
+    max_files: Optional[int] = -1,
+):
+    """Build a STAC collection from a directory of geotiff files."""
+
+    builder: STACBuilder = _setup_builder(
+        collection_config_path=Path(collection_config_path).expanduser().absolute(),
+        glob=glob,
+        input_dir=Path(input_dir).expanduser().absolute(),
+        output_dir=Path("/tmp"),
+        overwrite=True,
+        max_files_to_process=max_files,
+    )
+
+    builder.validate_builder_settings()
+    builder.collect_input_files()
+
+    for item in builder.try_parse_items():
+        pprint.pprint(item.to_dict())
+        print()
+
+        # print("-"*50)
+        # print("STAC item as reported by rio stac:")
+        # print("-"*50)
+        # item = builder.get_item_from_rio_stac(item.self_href)
+        # item_dict = item.to_dict(include_self_link=False)
+        # pprint.pprint(item_dict, indent=2)
+        # print("="*50)
 
 
 def command_load_collection(

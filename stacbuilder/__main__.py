@@ -2,7 +2,12 @@ import logging
 
 import click
 
-from stacbuilder.builder import command_build_collection, command_gather_inputs
+from stacbuilder.builder import (
+    command_build_collection,
+    command_list_input_files,
+    command_list_metadata,
+    command_list_stac_items,
+)
 
 
 _logger = logging.getLogger(__name__)
@@ -83,7 +88,51 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
 )
 def list_tiffs(collection_config, glob, inputdir):
     """Build a STAC collection from a directory of geotiff files."""
-    command_gather_inputs(collection_config_path=collection_config, glob=glob, input_dir=inputdir)
+    command_list_input_files(collection_config_path=collection_config, glob=glob, input_dir=inputdir)
+
+
+@cli.command()
+@click.option(
+    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
+)
+@click.option(
+    "-c",
+    "--collection-config",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    help="Configuration file for the collection",
+)
+@click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
+@click.argument(
+    "inputdir",
+    type=click.Path(exists=True, dir_okay=True, file_okay=False),
+    # help="Directory where the input geotiff files are stored"
+)
+def list_metadata(collection_config, glob, inputdir, max_files):
+    """Build a STAC collection from a directory of geotiff files."""
+    command_list_metadata(collection_config_path=collection_config, glob=glob, input_dir=inputdir, max_files=max_files)
+
+
+@cli.command()
+@click.option(
+    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
+)
+@click.option(
+    "-c",
+    "--collection-config",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    help="Configuration file for the collection",
+)
+@click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
+@click.argument(
+    "inputdir",
+    type=click.Path(exists=True, dir_okay=True, file_okay=False),
+    # help="Directory where the input geotiff files are stored"
+)
+def list_items(collection_config, glob, inputdir, max_files):
+    """Build a STAC collection from a directory of geotiff files."""
+    command_list_stac_items(
+        collection_config_path=collection_config, glob=glob, input_dir=inputdir, max_files=max_files
+    )
 
 
 @cli.command()

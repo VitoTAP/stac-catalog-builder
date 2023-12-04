@@ -28,60 +28,15 @@ class InputPathParserFactory:
     def implementation_names(cls):
         return sorted(cls._implementations.keys())
 
-    # @classmethod
-    # def create_parser(cls, name: str, params: Optional[Dict[str, Any]] = None):
-    #     params = params or {}
-    #     return cls._implementations[name](**params)
-
-    #     # if name in cls._implementations:
-    #     #     return cls._implementations[name](**params)
-    #     # else:
-    #     #     return NoopInputPathParser()
-
     @classmethod
     def from_config(cls, config: InputPathParserConfig):
-
         if config.classname not in cls._implementations:
             raise UnknownInputPathParserClass(config.classname)
 
         params = config.parameters or {}
         return cls._implementations[config.classname](**(params))
 
-        # if config.classname in cls._implementations:
-        #     params = config.parameters
-        #     return cls._implementations[config.classname](**(params))
-        # else:
-        #     return NoopInputPathParser()
 
-
-# InputPathParser: Callable[[str], Dict[str, Any]]
-
-# # TODO: simplify, maybe with a Protocol instead of an abstract base class
-# class InputPathParser(abc):
-
-#     def __init__(self):
-#         self._input_file: Path = None
-#         self._extracted_info: Dict[str, Any] = {}
-
-#     def parse(self, input_file: Path) -> Dict[str, Any]:
-#         self._input_file = input_file
-#         self._extracted_info = {}
-#         return self._extracted_info
-
-#     @abc.abstractmethod
-#     def _parse(self):
-#         pass
-
-#     @property
-#     def input_file(self) -> Path:
-#         return self._input_file
-
-#     @property
-#     def info(self) -> Dict[str, Any]:
-#         return self._extracted_info
-
-
-# TODO: simplify, maybe with a Protocol instead of an abstract base class
 class InputPathParser(abc.ABC):
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -144,6 +99,27 @@ class RegexInputPathParser(InputPathParser):
         return self._type_converters
 
 
+class ANINRegexInputPathParser(RegexInputPathParser):
+    def __init__(self, *args, **kwargs) -> None:
+        type_converters = {
+            "year": int,
+            "month": int,
+            "day": int,
+        }
+        super().__init__(type_converters=type_converters, *args, **kwargs)
+
+    @property
+    def datetime(self):
+        fields = self._fields
+        return dt.datetime(fields["year"], fields["month"], fields["day"], 0, 0, 0, tzinfo=dt.timezone.utc)
+
+    @property
+    def fields(self):
+        fields = dict(self._fields)
+        fields[["datetime"]] = self.datetime
+        return fields
+
+
 class ANINPathParser(InputPathParser):
     def parse(self, input_file: Path) -> Dict[str, Any]:
 
@@ -159,7 +135,7 @@ class ANINPathParser(InputPathParser):
         input_file = Path(input_file)
         root = input_file.stem
         file_parts = root.split("_")
-        band = file_parts[1]
+        band = "_".join(file_parts[1:4])
 
         date_string = file_parts[-1]
         year = int(date_string[0:4])
@@ -175,5 +151,6 @@ class ANINPathParser(InputPathParser):
         info["start_datetime"] = start_datetime
         info["end_datetime"] = end_datetime
         info["band"] = band
+        info["item_type"] = band
 
         return info

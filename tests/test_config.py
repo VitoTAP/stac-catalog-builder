@@ -14,7 +14,7 @@ def provider_acme() -> ProviderModel:
     return ProviderModel(
         name="ACME org",
         url="https://www.acme-faux-organisation.foo",
-        roles=[ProviderRole.PRODUCER, ProviderRole.LICENSOR]
+        roles=[ProviderRole.PRODUCER, ProviderRole.LICENSOR],
     )
 
 
@@ -26,25 +26,20 @@ def collection_config() -> CollectionConfig:
         description="Description of the test collection",
         keywords=["keyword1", "keyword2"],
         mission=["foo-mission"],
-        platform=["bar-platform"]
+        platform=["bar-platform"],
     )
 
 
 def test_can_parse_providermodel_from_json():
-    data = {
-        "name": "Some EO org",
-        "url": "https://www.some.place.in.space.dev/",
-        "roles": ["producer", "processor"]
-    }
+    data = {"name": "Some EO org", "url": "https://www.some.place.in.space.dev/", "roles": ["producer", "processor"]}
     model = ProviderModel(**data)
-    
+
     assert model.name == "Some EO org"
     assert model.url.unicode_string() == "https://www.some.place.in.space.dev/"
-    assert model.roles == {ProviderRole.PRODUCER ,ProviderRole.PROCESSOR}
+    assert model.roles == {ProviderRole.PRODUCER, ProviderRole.PROCESSOR}
 
 
 class TestCollectionForm:
-
     def test_fill_and_validate_collection_form(self):
         # provider = ProviderModel(name="VITO", url="https://www.vito.be")
 
@@ -57,11 +52,11 @@ class TestCollectionForm:
 
         model = form.get_model()
         expected_config = CollectionConfig(
-            collection_id = "foo-2023-v01",
-            title = "Foo is a Bar",
-            description = "Description of Foo",
-            keywords = ["foo", "bar", "oof"],
-            providers = [ProviderModel(name="VITO", url="https://www.vito.be")]
+            collection_id="foo-2023-v01",
+            title="Foo is a Bar",
+            description="Description of Foo",
+            keywords=["foo", "bar", "oof"],
+            providers=[ProviderModel(name="VITO", url="https://www.vito.be")],
         )
         assert model == expected_config
 
@@ -78,25 +73,25 @@ class TestCollectionForm:
         assert form.is_valid is True
 
     @pytest.mark.parametrize(
-            "form",
-            [
-                CollectionConfigForm(),
-                CollectionConfigForm(
-                    collection_id = None,
-                    title = "Foo is a Bar",
-                    description = "Description of Foo",
-                ),
-                CollectionConfigForm(
-                    collection_id = "foo",
-                    title = None,
-                    description = "Description of Foo",
-                ),
-                CollectionConfigForm(
-                    collection_id = "foo",
-                    title = "Foo is a Bar",
-                    description = None,
-                ),
-            ]
+        "form",
+        [
+            CollectionConfigForm(),
+            CollectionConfigForm(
+                collection_id=None,
+                title="Foo is a Bar",
+                description="Description of Foo",
+            ),
+            CollectionConfigForm(
+                collection_id="foo",
+                title=None,
+                description="Description of Foo",
+            ),
+            CollectionConfigForm(
+                collection_id="foo",
+                title="Foo is a Bar",
+                description=None,
+            ),
+        ],
     )
     def test_is_valid_returns_false(self, form):
         assert form.is_valid is False
@@ -113,26 +108,21 @@ class TestCollectionForm:
 
 
 class TestCollectionConfigModel:
-
     @pytest.fixture
     def data_dict(self):
         return {
-            'collection_id': "foo-2023-v01",
-            'title': 'Foo collection',
-            'description': 'Description of Foo',
-            'instruments': [],
-            'keywords': ['foo', 'bar', 'oof'],
-            'mission': [],
-            'platform': [],
-            'providers': [
+            "collection_id": "foo-2023-v01",
+            "title": "Foo collection",
+            "description": "Description of Foo",
+            "instruments": [],
+            "keywords": ["foo", "bar", "oof"],
+            "mission": [],
+            "platform": [],
+            "providers": [
                 {
-                    'name': 'ACME-EO Company',
-                    'roles': [
-                        'licensor',
-                        'processor',
-                        'producer'
-                    ],
-                    'url': 'https://www.acme-eo.nowwhere.to.be.found.xyz/'
+                    "name": "ACME-EO Company",
+                    "roles": ["licensor", "processor", "producer"],
+                    "url": "https://www.acme-eo.nowwhere.to.be.found.xyz/",
                 }
             ],
         }
@@ -141,38 +131,35 @@ class TestCollectionConfigModel:
         provider_data = {
             "name": "Some EO org",
             "url": "https://www.some.place.in.space.dev/",
-            "roles": ["producer", "processor"]
+            "roles": ["producer", "processor"],
         }
         provider_model = ProviderModel(**provider_data)
 
         data = {
-            'collection_id': "foo-2023-v01",
-            'title': 'Foo collection',
-            'description': 'Description of Foo',
-            'instruments': [],
-            'keywords': ['foo', 'bar', 'oof'],
-            'mission': [],
-            'platform': [],
-            'providers': [provider_data],
+            "collection_id": "foo-2023-v01",
+            "title": "Foo collection",
+            "description": "Description of Foo",
+            "instruments": [],
+            "keywords": ["foo", "bar", "oof"],
+            "mission": [],
+            "platform": [],
+            "providers": [provider_data],
         }
         model = CollectionConfig(**data)
 
         assert model == CollectionConfig(
-            collection_id = "foo-2023-v01",
-            title = 'Foo collection',
-            description = 'Description of Foo',
-            instruments = [],
-            keywords = ['foo', 'bar', 'oof'],
-            mission = [],
-            platform = [],
-            providers = [
-                provider_model
-            ]
+            collection_id="foo-2023-v01",
+            title="Foo collection",
+            description="Description of Foo",
+            instruments=[],
+            keywords=["foo", "bar", "oof"],
+            mission=[],
+            platform=[],
+            providers=[provider_model],
         )
 
 
 class TestInputsForm:
-
     def test_testinputsform(self):
         form = InputsForm()
         assert form.validation_errors
