@@ -3,9 +3,9 @@ from typing import List
 
 
 import pytest
-
 import rasterio
 import numpy as np
+from pystac.collection import Collection
 
 
 from stacbuilder.builder import STACBuilder, command_build_collection, command_list_input_files, command_list_metadata
@@ -87,19 +87,6 @@ def create_mock_geotiff(tif_path: Path):
 
 @pytest.fixture
 def collection_test_config() -> CollectionConfig:
-
-    item_asset_2mtemp = AssetConfig(
-        title="2m temperature",
-        description="temperature 2m above ground (Kelvin)",
-        roles=["data"],
-        eo_bands=[
-            EOBandConfig(
-                name="2m_temp",
-                description="temperature 2m above ground (Kelvin)",
-                data_type="uint16",
-            )
-        ],
-    )
     data = {
         "collection_id": "foo-2023-v01",
         "title": "Foo collection",
@@ -115,18 +102,13 @@ def collection_test_config() -> CollectionConfig:
                 "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/",
             }
         ],
-        # "input_path_parser": {"classname": "ANINPathParser"}
-        # "input_path_parser": InputPathParserConfig(classname="ANINPathParser")
         "input_path_parser": InputPathParserConfig(
             classname="RegexInputPathParser",
             parameters={
                 "regex_pattern": r".*_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
-                "fields": ["band", "datetime"],
+                # "fields": ["band", "datetime"],
             },
         ),
-        # "item_assets": {
-        #     "2m-temp-monthly": item_asset_2mtemp
-        # }
         "item_assets": {
             "2m-temp-monthly": {
                 "title": "2m temperature",
@@ -192,8 +174,6 @@ class TestSTACBuilder:
         stac_builder.build_collection()
         assert stac_builder.collection_file.exists()
 
-        from pystac.collection import Collection
-
         collection = Collection.from_file(stac_builder.collection_file)
         collection.validate_all()
 
@@ -211,16 +191,19 @@ class TestCommandAPI:
             output_dir=output_dir,
             overwrite=True,
         )
-        # TODO: how to verify the output? For now it's just a smoke test.
+        # TODO: how to verify the output? For now this is just a smoke test.
+        #   The underlying functionality can actually be tested more directly.
 
     def command_list_input_files(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
         command_list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now it's just a smoke test.
+        # TODO: how to verify the output? For now this is just a smoke test.
+        #   The underlying functionality can actually be tested more directly.
 
     def test_command_list_metadata(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
         command_list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now it's just a smoke test.
+        # TODO: how to verify the output? For now this is just a smoke test.
+        #   The underlying functionality can actually be tested more directly.

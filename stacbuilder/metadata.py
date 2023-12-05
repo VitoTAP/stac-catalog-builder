@@ -170,9 +170,17 @@ class Metadata:
     def month(self) -> Optional[int]:
         return self._month
 
-    @year.setter
+    @month.setter
     def month(self, value: int) -> None:
         self._month = value
+
+    @property
+    def day(self) -> Optional[int]:
+        return self._day
+
+    @day.setter
+    def day(self, value: int) -> None:
+        self._day = value
 
     def to_dict(self):
         return {
@@ -185,6 +193,7 @@ class Metadata:
             "end_datetime": self.end_datetime,
             "year": self.year,
             "month": self.month,
+            "day": self.day,
             "geometry": self.geometry,
             "proj_geometry": self.proj_geometry,
             "_info_from_href": self._info_from_href,
