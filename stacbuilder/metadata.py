@@ -182,8 +182,14 @@ class Metadata:
     def day(self, value: int) -> None:
         self._day = value
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_internal=False):
+        """Convert to a dictionary for troubleshooting (output) or for other processing.
+
+        :param include_internal:
+            Include internal information for debugging, defaults to False.
+        :return: A dictionary that represents the same metadata.
+        """
+        data = {
             "itemId": self.item_id,
             "href": self.href,
             "item_type": self.item_type,
@@ -196,8 +202,12 @@ class Metadata:
             "day": self.day,
             "geometry": self.geometry,
             "proj_geometry": self.proj_geometry,
-            "_info_from_href": self._info_from_href,
         }
+        # Include internal information for debugging.
+        if include_internal:
+            data["_info_from_href"] = self._info_from_href
+
+        return data
 
     def __str__(self):
         return str(self.to_dict())

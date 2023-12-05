@@ -75,20 +75,14 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
 @click.option(
     "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
 )
-@click.option(
-    "-c",
-    "--collection-config",
-    type=click.Path(exists=True, dir_okay=False, file_okay=True),
-    help="Configuration file for the collection",
-)
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
     # help="Directory where the input geotiff files are stored"
 )
-def list_tiffs(collection_config, glob, inputdir):
-    """Build a STAC collection from a directory of geotiff files."""
-    command_list_input_files(collection_config_path=collection_config, glob=glob, input_dir=inputdir)
+def list_tiffs(glob, inputdir):
+    """List which geotiff files will be selected with this input dir and glob pattern."""
+    command_list_input_files(glob=glob, input_dir=inputdir)
 
 
 @cli.command()

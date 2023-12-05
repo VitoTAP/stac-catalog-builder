@@ -21,6 +21,9 @@ This tool has actually been developed with the FOSS alternative to Anaconda, cal
 
 Miniforge uses the open source package repository [conda-forge](https://conda-forge.org/) by default. In Anaconda you would need to specify that channel if you install it manually, but the environment file already specifies the option to use that channeL
 
+> TODO: Export env to environment.yaml file
+> TODO: There are still some problems to create an environment purely with conda (no pip). Find out why
+
 ```bash
 conda env create -f environment.yaml
 ```

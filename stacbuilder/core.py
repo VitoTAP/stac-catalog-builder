@@ -60,10 +60,8 @@ class RegexInputPathParser(InputPathParser):
     def __init__(
         self,
         regex_pattern: Union[str, re.Pattern],
-        # fields: List[str],
         type_converters: Optional[TypeConverterMapping] = None,
     ):
-        # self._fields = fields
         if isinstance(regex_pattern, re.Pattern):
             self._regex = regex_pattern
         else:
@@ -105,7 +103,7 @@ class RegexInputPathParser(InputPathParser):
         return self._type_converters
 
 
-class ANINRegexInputPathParser(RegexInputPathParser):
+class ERA5LandInputPathParser(RegexInputPathParser):
     def __init__(self, *args, **kwargs) -> None:
         type_converters = {
             "year": int,
@@ -134,8 +132,9 @@ class ANINRegexInputPathParser(RegexInputPathParser):
 class ANINPathParser(InputPathParser):
     def parse(self, input_file: Path) -> Dict[str, Any]:
 
+        #
         # Example:
-
+        #
         # filename:  reanalysis-era5-land-monthly-means_2m_temperature_monthly_19800101.tif
         # root: reanalysis-era5-land-monthly-means_2m_temperature_monthly_19800101
         # item_id is same as root

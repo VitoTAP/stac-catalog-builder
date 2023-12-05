@@ -3,13 +3,16 @@ import json
 import logging
 import pprint
 
+from itertools import islice
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional
 
+import pandas as pd
 
-from pystac import Asset, CatalogType, Collection, Extent, Item, MediaType, SpatialExtent, TemporalExtent
+from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
 from pystac.layout import TemplateLayoutStrategy
-from pystac.utils import make_absolute_href, str_to_datetime
+
+# from pystac.utils import make_absolute_href
 
 from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
@@ -19,9 +22,6 @@ from pystac.extensions.raster import RasterExtension
 
 from stactools.core.io import ReadHrefModifier
 import rio_stac.stac as rst
-import rasterio
-
-# from pytac.provider import ProviderRole
 
 
 from stacbuilder.core import InputPathParser, InputPathParserFactory, NoopInputPathParser
@@ -84,11 +84,10 @@ class STACBuilder:
         self._collection_config = config
 
     def collect_input_files(self) -> List[Path]:
-        self.validate_builder_settings()
-        input_files = [f for f in self.input_dir.glob(self.glob) if f.is_file()]
+        input_files = (f for f in self.input_dir.glob(self.glob) if f.is_file())
 
         if self.max_files_to_process > 0:
-            input_files = input_files[: self.max_files_to_process]
+            input_files = islice(input_files, self.max_files_to_process)
 
         self._input_files = input_files
         return self._input_files
@@ -157,7 +156,6 @@ class STACBuilder:
 
     def try_parse_metadata(self):
         extract_href_info = self._get_input_path_parser()
-        # all_item_metadata = []
         for file in self.input_files:
             metadata = Metadata(
                 href=str(file),
@@ -168,18 +166,27 @@ class STACBuilder:
 
     def try_parse_items(self):
         for file in self.input_files:
-            yield self.create_item(file)
+            item = self.create_item(file)
+            # Skip the yield when we found spurious file that are not items that
+            # we know from the collection configuration.
+            if item:
+                yield item
+
+    def metadata_as_dataframe(self) -> pd.DataFrame:
+        return pd.DataFrame.from_records(md.to_dict() for md in self.try_parse_metadata())
+
+    def items_as_dataframe(self) -> pd.DataFrame:
+        return pd.DataFrame.from_records(it.to_dict() for it in self.try_parse_items())
 
     def create_collection(self):
         self.validate_builder_settings()
-
         self._create_collection()
 
         for file in self.input_files:
             item = self.create_item(file)
-            item.validate()
-            # item = self.get_item_from_rio_stac(file)
-            self._collection.add_item(item)
+            if item is not None:
+                item.validate()
+                self._collection.add_item(item)
 
         self._collection.update_extent_from_items()
 
@@ -199,11 +206,6 @@ class STACBuilder:
     def save_collection(self):
         _logger.info("Saving files ...")
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
-
-        # TODO: do we still need this check?
-        print(f"{self.collection_file=}")
-        assert Path(self.collection_file).exists()
-
         return self.collection_file
 
     def _create_collection(self) -> Collection:
@@ -275,6 +277,13 @@ class STACBuilder:
             extract_href_info=extract_href_info,
             read_href_modifier=self._read_href_modifier,
         )
+
+        if metadata.item_type not in self.item_assets_configs:
+            _logger.warning(
+                "Found an unknown item type, not defined in collection configuration: "
+                f"{metadata.item_type}, returning item=None"
+            )
+            return None
 
         assert metadata.item_id is not None
 
@@ -350,33 +359,23 @@ class STACBuilder:
             collection_url=str(self.collection_file),
         )
 
-    # def collect_item_metadata(self, geotiff_path: Path):
-
-    #     import rasterio
-    #     with rasterio.open(geotiff_path) as dataset:
-    #         proj_bbox = list(dataset.bounds)
-    #         proj_epsg = dataset.crs
-    #         transform = list(dataset.transform)[0:6]
-    #         shape = dataset.shape
-    #         tags = dataset.tags()
-    #         print(dataset)
-
 
 def _setup_builder(
-    collection_config_path: Path,
-    glob: str,
     input_dir: Path,
-    output_dir: Path,
-    overwrite: bool,
+    glob: str,
+    output_dir: Optional[Path] = None,
+    overwrite: Optional[bool] = False,
+    collection_config_path: Optional[Path] = None,
     max_files_to_process: Optional[int] = -1,
 ) -> STACBuilder:
     """Build a STAC collection from a directory of geotiff files."""
 
     builder = STACBuilder()
 
-    conf_contents = collection_config_path.read_text()
-    config = CollectionConfig(**json.loads(conf_contents))
-    builder.collection_config = config
+    if collection_config_path:
+        conf_contents = collection_config_path.read_text()
+        config = CollectionConfig(**json.loads(conf_contents))
+        builder.collection_config = config
 
     builder.glob = glob
     builder.input_dir = input_dir
@@ -409,21 +408,17 @@ def command_build_collection(
 
 
 def command_list_input_files(
-    collection_config_path: Path,
     glob: str,
     input_dir: Path,
 ):
     """Build a STAC collection from a directory of geotiff files."""
 
     builder: STACBuilder = _setup_builder(
-        collection_config_path=Path(collection_config_path).expanduser().absolute(),
-        glob=glob,
         input_dir=Path(input_dir).expanduser().absolute(),
-        output_dir=Path("/tmp"),
+        glob=glob,
         overwrite=True,
     )
 
-    builder.validate_builder_settings()
     builder.collect_input_files()
 
     for f in builder.input_files:
@@ -450,14 +445,10 @@ def command_list_metadata(
     builder.validate_builder_settings()
     builder.collect_input_files()
 
+    metadata: Metadata
     for metadata in builder.try_parse_metadata():
-        pprint.pprint(metadata.to_dict())
+        pprint.pprint(metadata.to_dict(include_internal=True))
         print()
-
-    # if builder.input_files:
-    #     item = builder.get_item_from_rio_stac(builder.input_files[-1])
-    #     item_dict = item.to_dict(include_self_link=False)
-    #     pprint.pprint(item_dict, indent=2)
 
 
 def command_list_stac_items(
@@ -476,21 +467,11 @@ def command_list_stac_items(
         overwrite=True,
         max_files_to_process=max_files,
     )
-
-    builder.validate_builder_settings()
     builder.collect_input_files()
 
     for item in builder.try_parse_items():
         pprint.pprint(item.to_dict())
         print()
-
-        # print("-"*50)
-        # print("STAC item as reported by rio stac:")
-        # print("-"*50)
-        # item = builder.get_item_from_rio_stac(item.self_href)
-        # item_dict = item.to_dict(include_self_link=False)
-        # pprint.pprint(item_dict, indent=2)
-        # print("="*50)
 
 
 def command_load_collection(
