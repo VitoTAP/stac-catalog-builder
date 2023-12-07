@@ -137,5 +137,49 @@ def show_collection(collection_file):
     command_load_collection(collection_file)
 
 
+import pathlib
+from stacbuilder.verify_openeo import verify_in_openeo
+@cli.command
+@click.option(
+    "-b", "--backend-url", 
+    type=click.STRING,
+    help="URL for open-EO backend",
+    default="openeo-dev.vito.be"
+)
+@click.option(
+    "-o", "--out-dir",
+    type=click.Path(exists=False, dir_okay=True, file_okay=False),
+    help="Directory to save batch jobs outputs (GTIFF)",
+    default="."
+)
+@click.option(
+    "-n", "--dry-run",
+    is_flag=True,
+    help="Do a dry-run, don't execute the batch job"
+)
+@click.option(
+    "-v", "--verbose",
+    is_flag=True,
+    help="Make output more verbose"
+)
+@click.argument(
+    "collection_file",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+)
+def test_openeo(backend_url, out_dir, collection_file, dry_run, verbose):
+    """Test a STAC collection can be read in open-EO.
+    
+    It guesses a reasonable spatial and temporal extent based on what
+    extent the collection declares.
+    """
+    verify_in_openeo(
+        backend_url=backend_url,
+        collection_path=collection_file,
+        output_dir=out_dir,
+        dry_run=dry_run,
+        verbose=verbose
+    )
+
+
 if __name__ == "__main__":
     cli()
