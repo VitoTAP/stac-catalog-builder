@@ -8,3 +8,4 @@ click==8.1.*
 pydantic==2.5.*
 rio-stac==0.8.*
 
+#terracatalogueclient==0.1.14
