@@ -100,3 +100,11 @@ dmypy.json
 
 # LSP config files
 # pyrightconfig.json
+
+
+# If you have miscellaneous local files for development that you want to 
+# keep out of git you can put these in the folder called '.local'
+.local
+
+# Test output from generating STAC collections goes here
+tmp/

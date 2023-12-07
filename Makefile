@@ -2,33 +2,20 @@
 # Configuration
 # ========================================================
 
-# PIP_EXTRA_INDEX_URL := https://artifactory.vgt.vito.be/api/pypi/python-packages/simple
+VENV_DIR := .venv
+
+PIP_EXTRA_INDEX_URL := https://artifactory.vgt.vito.be/artifactory/api/pypi/python-openeo/simple
 
 # ========================================================
 # Variables derived from configuration
 # ========================================================
-
-PROJECT_NAME := stac-catalog-builder
-VENV_NAME := $(realpath .venv)
-# VENV_DIR := $(VIRTUALENVS_DIR)/$(VENV_NAME)
-VENV_DIR := $(VENV_NAME)
-
-
-# We don't want realpath for python3 because there are symlinks involved and 
-# then we get the executable in .pyenv/versions/<pyversion>/bin instead of the
-# one we want, inside the virtualenv.
 PYTHON := $(VENV_DIR)/bin/python3
-# PYTHON_REALPATH := $(realpath $(VENV_DIR)/bin/python3)
-PYTHON_REALPATH := $(realpath ${PYTHON})
 
 
-
-tiff_input_dir := tests/data/geotiff/mock-geotiffs
-collection_config := tests/data/config/config-test-collection.json
-output_dir := "tmp/test-output"
 
 # ========================================================
-
+# make targets
+# ========================================================
 
 default: help
 .PHONY: default
@@ -50,7 +37,6 @@ show-config:
 
 show-vars: show-config
 ## Show value of configuration variables and derived variables
-	@echo "VENV_NAME=$(VENV_NAME)"
 	@echo "VENV_DIR=$(VENV_DIR)"
 	@echo "PYTHON=$(PYTHON)"
 	@echo "PYTHON_REALPATH=$(PYTHON_REALPATH)"
@@ -58,6 +44,7 @@ show-vars: show-config
 
 
 piplist:
+## Show the list of pip packages in the virtualenv
 	$(PYTHON) -m pip list
 
 
@@ -68,12 +55,14 @@ create-venv:
 
 
 bootstrap-venv:
+## Bootrstrap the virtualenv: install or update essential packages (that should not be in requirements.txt)
 	$(PYTHON) -m pip install -U pip setuptools wheel
 .PHONY: bootstrap-venv
 
 
 update-venv: bootstrap-venv
-	$(PYTHON)  -m pip install -r requirements/requirements-dev.txt
+## Install/Update the dependencies in the virtualenv
+	$(PYTHON)  -m pip install --extra-index-url $(PIP_EXTRA_INDEX_URL) -r requirements/requirements-dev.txt
 	$(PYTHON)  -m pip install -e .
 .PHONY: update-venv
 
@@ -82,32 +71,3 @@ test:
 ## Run pytest.
 	$(PYTHON) -m pytest -ra -vv -l --ff
 
-
-list-tiffs:
-	$(PYTHON) stacbuilder \
-		-v list-tiffs \
-		-g "*/*" \
-		$(tiff_input_dir)
-
-list-metadata:
-	$(PYTHON) stacbuilder \
-		-v list-metadata \
-		-g "*/*" \
-    	-c $(collection_config) \
-		$(tiff_input_dir)
-
-list-items:
-	$(PYTHON) stacbuilder \
-		-v list-items \
-		-g "*/*" \
-    	-c $(collection_config) \
-		$(tiff_input_dir)
-
-build-collection:
-	$(PYTHON) stacbuilder \
-		-v build \
-		-g "*/*" \
-    	-c $(collection_config) \
-		--overwrite \
-		$(tiff_input_dir) \
-		$(output_dir)
