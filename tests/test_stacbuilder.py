@@ -106,7 +106,6 @@ def collection_test_config() -> CollectionConfig:
             classname="RegexInputPathParser",
             parameters={
                 "regex_pattern": r".*_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
-                # "fields": ["band", "datetime"],
             },
         ),
         "item_assets": {
@@ -136,6 +135,9 @@ class TestSTACBuilder:
 
     @pytest.mark.skip
     def test_create_tiffs(self, geotiff_paths):
+        # TODO: [refactor]: This method should not be a test but a script to generate test data.
+        #   Also, you only need to run that script one time. But now the test tiffs are
+        #   stored in git.
         create_geotiff_files(geotiff_paths)
 
     def test_collect_input_files(

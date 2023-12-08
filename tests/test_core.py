@@ -15,7 +15,13 @@ from stacbuilder.config import InputPathParserConfig
 
 def test_factory():
     expected_names = sorted(
-        ["NoopInputPathParser", "RegexInputPathParser", "ERA5LandInputPathParser", "ANINPathParser"]
+        [
+            "NoopInputPathParser",
+            "RegexInputPathParser",
+            "ERA5LandInputPathParser",
+            "ANINPathParser",
+            "LandsatNDWIInputPathParser",
+        ]
     )
     assert InputPathParserFactory.implementation_names == expected_names
 

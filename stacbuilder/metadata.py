@@ -1,17 +1,15 @@
-import os
 import datetime as dt
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 
-import numpy as np
+# import numpy as np
 import pyproj
 import rasterio
-import shapely
-import shapely.ops
 
-from pystac import Asset, MediaType
-from pystac.utils import make_absolute_href, str_to_datetime
+# import shapely
+# import shapely.ops
+
 from shapely.geometry import box, mapping
 from stactools.core.io import ReadHrefModifier
 
@@ -40,6 +38,7 @@ class Metadata:
         with rasterio.open(modified_href) as dataset:
             self.proj_bbox = list(dataset.bounds)
             self.proj_epsg = dataset.crs
+
             if self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
                 self.bbox = self.proj_bbox
             else:
@@ -47,6 +46,14 @@ class Metadata:
             self.transform = list(dataset.transform)[0:6]
             self.shape = dataset.shape
             self.tags = dataset.tags()
+
+            print(f"projected: proj_bbox={self.proj_bbox}")
+            print(f"projected CRS: {dataset.crs}")
+            print(f"{dataset.bounds=}")
+            print(f"{dataset.transform=}")
+            print(f"lat long: bbox={self.bbox}")
+            print(f"{dataset.shape=}")
+            print(f"{dataset.tags()=}")
 
         self.href = href
         self._item_id = Path(href).stem
@@ -227,41 +234,10 @@ def _reproject_bounding_box(bbox: BoundingBoxList, from_crs: str, to_crs: str) -
         ValueError(f"Bounding box bbox expects exactly 4 elements. {bbox=}")
 
     west, south, east, north = bbox
-    box = shapely.geometry.box(west, south, east, north)
-    transform = _get_crs_transformer(from_crs=from_crs, to_crs=to_crs)
-    # reprojected = shapely.transform(box, transform, include_z=False)
-    reprojected = shapely.ops.transform(transform, box)
-
-    return list(reprojected.bounds)
-
-
-# TODO: fix mypy warnings about the types for the transformer.
-# For now this will have to do:
-
-XYArray = np.ndarray
-
-TransformerFunction = Callable[[XYArray], XYArray]
-
-
-def _get_crs_transformer(from_crs: str, to_crs: str = "EPSG:4326") -> TransformerFunction:
     transformer = pyproj.Transformer.from_crs(crs_from=from_crs, crs_to=to_crs, always_xy=True)
-    return transformer.transform
+    transform = transformer.transform
 
-    # def transform_xy(xy_array: XYArray) -> XYArray:  # type: ignore[type-arg]
-    #     # Does not work. need to transform each rows (containing x & y) into a new np.ndarray
-    #     rows = []
-    #     for i in range(xy_array.shape[0]):
-    #         rows.append(transformer.transform(xx=xy_array[i, 0], yy=xy_array[i, 1]))
+    new_west, new_south = transform(west, south, errcheck=True)
+    new_east, new_north = transform(east, north, errcheck=True)
 
-    #     array = np.array(rows)
-    #     return array.reshape(xy_array.shape)
-
-    def transform_xy(x: float, y: float) -> Tuple[float, float]:  # type: ignore[type-arg]
-        # Does not work. need to transform each rows (containing x & y) into a new np.ndarray
-        return transformer.transform(xx=x, yy=y)
-
-    print(transform_xy.__annotations__)
-    return transform_xy
-
-
-# Okay
+    return [new_west, new_south, new_east, new_north]

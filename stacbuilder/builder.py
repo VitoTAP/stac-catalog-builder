@@ -7,16 +7,17 @@ from itertools import islice
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+import shapely
 import pandas as pd
+import pystac
 
+from shapely.geometry import GeometryCollection, MultiPolygon
 from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
+from pystac.errors import STACValidationError
 from pystac.layout import TemplateLayoutStrategy
-
-# from pystac.utils import make_absolute_href
-
 from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
-from pystac.extensions.projection import ItemProjectionExtension
+from pystac.extensions.projection import ItemProjectionExtension, ProjectionExtension
 from pystac.extensions.raster import RasterExtension
 
 
@@ -70,10 +71,17 @@ class STACBuilder:
 
     def build_collection(self):
         self.validate_builder_settings()
+        print("Collecting input files ...")
         self.collect_input_files()
+        print("Creating STAC collection ...")
         self.create_collection()
+        print("Saving STAC collection ...")
         self.save_collection()
+        print("Validating STAC collection ...")
         self.validate_collection()
+        print("Saving GeoJSON file with footprints of the STAC items ...")
+        self.save_footprints()
+        print("DONE")
 
     @property
     def collection_config(self) -> CollectionConfig:
@@ -190,6 +198,20 @@ class STACBuilder:
 
         self._collection.update_extent_from_items()
 
+        # Show some debug output for the projections
+        # TODO: make the logging work so we can log error warning info and debug seperate.
+        #   Need to do some setup to have logging work accros multiple python modules.
+        proj_bounds = [it.properties.get("proj:bbox") for it in self._collection.get_all_items()]
+        proj_bounds = [p for p in proj_bounds if p is not None]
+        print(f"{proj_bounds=}")
+
+        min_x = min(p[0] for p in proj_bounds)
+        min_y = min(p[1] for p in proj_bounds)
+        max_x = max(p[2] for p in proj_bounds)
+        max_y = max(p[3] for p in proj_bounds)
+        coll_proj_bbox = [min_x, min_y, max_x, max_y]
+        print(f"{coll_proj_bbox=}")
+
         layout_template = self.collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
 
@@ -201,9 +223,25 @@ class STACBuilder:
         return self._collection
 
     def validate_collection(self):
-        return self._collection.validate_all(recursive=True)
+        try:
+            num_items_validated = self._collection.validate_all(recursive=True)
+        except STACValidationError as exc:
+            print(exc)
+            raise
+        else:
+            print(f"Collection valid: number of items validated: {num_items_validated}")
 
-    def save_collection(self):
+    @property
+    def footprints_path(self) -> Path:
+        coll_path = self.collection_file
+        return coll_path.parent / "footprints.json"
+
+    def save_footprints(self) -> Path:
+        item_coll = pystac.ItemCollection(items=self._collection.get_all_items())
+        item_coll.save_object(str(self.footprints_path))
+        return self.footprints_path
+
+    def save_collection(self) -> Path:
         _logger.info("Saving files ...")
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
         return self.collection_file
@@ -221,6 +259,7 @@ class STACBuilder:
             extent=self.DEFAULT_EXTENT,
             # summaries=constants.SUMMARIES,
         )
+        # TODO: Add support for summaries.
         self._collection = collection
 
         item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
@@ -229,6 +268,7 @@ class STACBuilder:
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
 
+        # TODO: Add support for links in the collection.
         ## collection.add_links(
         ##     [
         ##         constants.PRODUCT_FACT_SHEET,
@@ -317,6 +357,7 @@ class STACBuilder:
         item_proj.epsg = metadata.proj_epsg.to_epsg()
         item_proj.bbox = metadata.proj_bbox
         item_proj.geometry = metadata.proj_geometry
+        item_proj.transform = metadata.transform
 
         # grid = GridExtension.ext(item, add_if_missing=True)
         # grid.code = f"TILE-{metadata.tile}"
@@ -430,6 +471,7 @@ def command_list_metadata(
     glob: str,
     input_dir: Path,
     max_files: Optional[int] = -1,
+    as_dataframe: bool = False,
 ):
     """Build a STAC collection from a directory of geotiff files."""
 
@@ -445,10 +487,14 @@ def command_list_metadata(
     builder.validate_builder_settings()
     builder.collect_input_files()
 
-    metadata: Metadata
-    for metadata in builder.try_parse_metadata():
-        pprint.pprint(metadata.to_dict(include_internal=True))
-        print()
+    if as_dataframe:
+        df = builder.metadata_as_dataframe()
+        print(df.to_string())
+    else:
+        metadata: Metadata
+        for metadata in builder.try_parse_metadata():
+            pprint.pprint(metadata.to_dict(include_internal=True))
+            print()
 
 
 def command_list_stac_items(
@@ -456,6 +502,7 @@ def command_list_stac_items(
     glob: str,
     input_dir: Path,
     max_files: Optional[int] = -1,
+    as_dataframe: bool = False,
 ):
     """Build a STAC collection from a directory of geotiff files."""
 
@@ -469,16 +516,62 @@ def command_list_stac_items(
     )
     builder.collect_input_files()
 
-    for item in builder.try_parse_items():
-        pprint.pprint(item.to_dict())
-        print()
+    if as_dataframe:
+        df = builder.items_as_dataframe()
+        print(df.to_string())
+    else:
+        min_west = None
+        max_east = None
+        min_south = None
+        max_north = None
+
+        items_bbox = {
+            "min_west": None,
+            "max_east": None,
+            "min_south": None,
+            "max_north": None,
+        }
+
+        for item in builder.try_parse_items():
+            pprint.pprint(item.to_dict())
+            print()
+            west, south, east, north = item.bbox
+            if min_west is None:
+                min_west = west
+                max_east = east
+                min_south = south
+                max_north = north
+            else:
+                if west < min_west:
+                    items_bbox["min_west"] = item.id
+                    min_west = west
+                if south < min_south:
+                    items_bbox["min_south"] = item.id
+                    min_south = south
+                if east < max_east:
+                    items_bbox["max_east"] = item.id
+                    max_east = east
+                if north < max_north:
+                    items_bbox["max_north"] = item.id
+                    max_north = north
+
+        print(f"Collection BBox: [{min_west=}, {min_south=}, {max_east=}, {max_north=}]")
+        print(f"{items_bbox}=]")
 
 
 def command_load_collection(
     path: Path,
 ):
-    """Build a STAC collection from a directory of geotiff files."""
-
+    """Show the STAC collection in 'path'."""
     builder = STACBuilder()
     builder.load_collection(path)
     pprint.pprint(builder.collection.to_dict(), indent=2)
+
+
+def command_validate_collection(
+    path: Path,
+):
+    """Validate a STAC collection."""
+    builder = STACBuilder()
+    builder.load_collection(path)
+    builder.validate_collection()
