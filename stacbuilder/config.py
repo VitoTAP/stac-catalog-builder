@@ -125,6 +125,8 @@ class CollectionConfig(BaseModel):
     item_assets: Optional[Dict[str, AssetConfig]] = {}
     # TODO: links (urls)
 
+    overrides: Optional[Dict[str, Any]] = None
+
 
 @dc.dataclass
 class CollectionConfigForm:
@@ -149,6 +151,11 @@ class CollectionConfigForm:
     layout_strategy_item_template: Optional[str] = "${collection}/${year}"
     input_path_parser: Optional[Dict[str, Any]] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
+
+    # Implementing item_assets would require a form for the AssetConfig.
+    # item_assets: Optional[Dict[str, AssetConfig]] = {}
+
+    overrides: Optional[Dict[str, Any]] = None
 
     # TODO: links (urls)
 

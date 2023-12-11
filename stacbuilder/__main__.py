@@ -147,9 +147,23 @@ def validate(collection_file):
     required=False,
     type=click.Path(dir_okay=True, file_okay=False),
 )
+@click.option(
+    "-c",
+    "--collection-config",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    help="Configuration file for the collection",
+)
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-def post_process(outputdir, collection_file):
-    command_post_process_collection(collection_file, outputdir)
+def post_process(
+    outputdir, 
+    collection_config, 
+    collection_file
+):
+    command_post_process_collection(
+        collection_file=collection_file,
+        collection_config_path=collection_config,
+        output_dir=outputdir
+    )
 
 
 

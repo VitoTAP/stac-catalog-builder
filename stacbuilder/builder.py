@@ -30,11 +30,11 @@ import rio_stac.stac as rst
 from stacbuilder.core import (
     InputPathParser,
     InputPathParserFactory,
-    reproject_bounding_box,
 )
 from stacbuilder.config import AssetConfig, CollectionConfig
 from stacbuilder.metadata import Metadata
 from stacbuilder.timezoneformat import TimezoneFormatConverter
+from stacbuilder.projections import reproject_bounding_box
 
 
 _logger = logging.getLogger(__name__)
@@ -93,8 +93,6 @@ class STACBuilder:
 
         self._collection_config: CollectionConfig = None
 
-        self._collection_overrrides = {}
-
         self._input_files: List[Path] = []
         self._collection: Collection = None
 
@@ -106,6 +104,10 @@ class STACBuilder:
     def output_dir(self, dir_path: Union[Path, str]) -> Path:
         self._output_dir = Path(dir_path)
     
+    @property
+    def collection_overrides(self) -> Dict[str, Any]:
+        return self.collection_config.overrides or {}
+
     def build_collection(self):
         self.validate_builder_settings()
 
@@ -123,8 +125,9 @@ class STACBuilder:
         print("Validating STAC collection ...")
         self.validate_collection(self.collection)
 
-        # self.post_process_collection(self.collection_file)
-        
+        print("Post-processing STAC collection ...")
+        self.post_process_collection(self.collection_file)
+
         # print("Saving GeoJSON file with footprints of the STAC items ...")
         # self.save_footprints()
 
@@ -212,9 +215,8 @@ class STACBuilder:
         ):
         print("Overriding components of STAC collection that we want to give some fixed value ...")
         data = self._load_collection_as_dict(collection_file)
-        overrides = self._collection_overrrides
+        overrides = self.collection_overrides
 
-        breakpoint()
         for key, new_value in overrides.items():
             key_path = key.split("/")
             deepest_key = key_path[-1]
@@ -734,8 +736,8 @@ def command_list_stac_items(
 def command_load_collection(
     collection_file: Path,
 ):
-    """Show the STAC collection in 'path'."""
-    collection = Collection.from_file(path)
+    """Show the STAC collection in 'collection_file'."""
+    collection = Collection.from_file(collection_file)
     pprint.pprint(collection.to_dict(), indent=2)
 
 
@@ -749,9 +751,15 @@ def command_validate_collection(
 
 def command_post_process_collection(
     collection_file: Path,
+    collection_config_path: Path,
     output_dir: Optional[Path] = None,
 ):
     """Validate a STAC collection."""
     builder = STACBuilder()
+    collection_config_path = Path(collection_config_path)
+    conf_contents = collection_config_path.read_text()
+    config = CollectionConfig(**json.loads(conf_contents))
+    builder.collection_config = config
+
     out_dir = Path(output_dir) if output_dir else None
     builder.post_process_collection(Path(collection_file), out_dir)

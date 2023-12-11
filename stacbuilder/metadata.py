@@ -16,7 +16,8 @@ from stactools.core.io import ReadHrefModifier
 from openeo.util import rfc3339
 
 
-from stacbuilder.core import InputPathParser, reproject_bounding_box
+from stacbuilder.core import InputPathParser
+from stacbuilder.projections import reproject_bounding_box
 
 
 BoundingBoxList = List[Union[float, int]]

@@ -1,10 +1,13 @@
 import datetime as dt
+import json
 from pprint import pprint
 from pathlib import Path
-from typing import Union
+from typing import Dict, List, Optional, Union
 from itertools import islice
 
+
 import openeo
+from openeo.rest.datacube import DataCube
 from openeo.util import rfc3339
 from openeo.rest.job import BatchJob, JobFailedException
 
@@ -26,32 +29,51 @@ def get_first_item(collection: Collection) -> Item:
     return item
 
 
+# def find_spatial_extent(collection: Collection):
+#     base_extent = collection.extent.spatial
+#     ext_list = base_extent.to_dict()["bbox"][0]
+#     west, south, east, north = ext_list
+
+#     range_x = abs(west - east)
+#     range_y = abs(north - south)
+#     avg_x = east + 0.5 * range_x
+#     avg_y = south + 0.5 * range_y
+
+#     # limit the bbox to 0.01 degrees
+#     max_range = 0.01
+#     new_range_x = min(max_range, range_x)
+#     new_range_y = min(max_range, range_y)
+
+#     new_west = (avg_x - 0.5 * new_range_x) % 360
+#     new_east = (avg_x + 0.5 * new_range_x) % 360
+#     new_west = min(new_west, new_east)
+#     new_east = max(new_west, new_east)
+
+#     new_south = (avg_y - 0.5 * new_range_y) % 360
+#     new_north = (avg_y + 0.5 * new_range_y) % 360
+#     new_south = min(new_south, new_north)
+#     new_north = max(new_south, new_north)
+
+#     return {"east": new_east, "south": new_south, "west": new_west, "north": new_north}
+
+
+def bbox_to_dict(bbox: List[float]) -> Dict[str, float]:
+    west, south, east, north = bbox[:4]
+    return spatial_dict(west, south, east, north)
+
+
+def spatial_dict(
+        west: float, south: float, east: float, north: float
+    ) -> Dict[str, float]:
+    return {
+        "west": west, "south": south,
+        "east": east, "north": north,
+    }
+
+
 def find_spatial_extent(collection: Collection):
-    base_extent = collection.extent.spatial
-    ext_list = base_extent.to_dict()["bbox"][0]
-    west, south, east, north = ext_list
-
-    range_x = abs(west - east)
-    range_y = abs(north - south)
-    avg_x = east + 0.5 * range_x
-    avg_y = south + 0.5 * range_y
-
-    # limit the bbox to 0.01 degrees
-    max_range = 0.01
-    new_range_x = min(max_range, range_x)
-    new_range_y = min(max_range, range_y)
-
-    new_west = (avg_x - 0.5 * new_range_x) % 360
-    new_east = (avg_x + 0.5 * new_range_x) % 360
-    new_west = min(new_west, new_east)
-    new_east = max(new_west, new_east)
-
-    new_south = (avg_y - 0.5 * new_range_y) % 360
-    new_north = (avg_y + 0.5 * new_range_y) % 360
-    new_south = min(new_south, new_north)
-    new_north = max(new_south, new_north)
-
-    return {"east": new_east, "south": new_south, "west": new_west, "north": new_north}
+    first_item: Item = get_first_item(collection)
+    return bbox_to_dict(first_item.bbox)
 
 
 def _dt_set_tz_utc(time: dt.datetime):
@@ -118,35 +140,37 @@ def verify_in_openeo(
         verbose = True
     connection = connect(backend_url)
 
-    job_id = "j-231206b597464ad491cad2e902971ff7"
+    # job_id = "j-231206b597464ad491cad2e902971ff7"
+    # job_id = "j-231211402f5843ab92a2a557c8cfd2cf"
     job_id = None
 
+    output_dir = Path(output_dir)
+    job_log_file = output_dir / "job-logs.json"
+   
     if job_id:
         job = connection.job(job_id=job_id)
-        print("=== logs ===")
-        for record in job.logs(level="error"):
-            print(record)
-        print("=== === ===")
+        get_logs(job, job_log_file)
 
     else:
-
         timestamp = rfc3339.utcnow()
         timestamp = timestamp.replace(":", "")
 
         collection_path = Path(collection_path).expanduser().absolute()
-        output_dir = Path(output_dir)
         if verbose:
             print(f"Collection's absolute path: {collection_path}")
             print(f"Does collection file exist? {collection_path.exists()}")
             print(f"{output_dir=}")
 
         assert collection_path.exists(), f"file should exist: {collection_path=}"
+        Collection.from_file(collection_path).validate_all()
+
         if not output_dir.exists() and not dry_run:
             print(f"Creating output_dir: {output_dir}")
             output_dir.mkdir(parents=True)
 
-        cube = create_cube(str(collection_path), connection)
+        cube: DataCube = create_cube(str(collection_path), connection)
         print(cube)
+        cube.validate()
 
         if dry_run:
             print("This is a dry run. Skipping part that submits a batch job")
@@ -157,10 +181,7 @@ def verify_in_openeo(
             job.start_and_wait()
         except JobFailedException as exc:
             print(exc)
-            print("=== logs ===")
-            for record in job.logs():
-                print(record)
-            print("=== === ===")
+            get_logs(job, job_log_file)
 
         else:
             print(job.get_results_metadata_url())
@@ -168,4 +189,15 @@ def verify_in_openeo(
             out_path = job.download_results(output_dir)
             print(f"{out_path=}")
 
-    print("DONE")
+        print("DONE")
+
+
+def get_logs(job: BatchJob, job_log_file: Optional[Path] = None) -> None:
+    print("=== logs ===")
+    for record in job.logs():
+        print(record)
+    print("=== === ===")
+
+    if job_log_file:
+        with open(job_log_file, "wt", encoding="utf8") as f_log:
+            json.dump(job.logs(), f_log, indent=2)
