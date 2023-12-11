@@ -5,7 +5,7 @@ import logging
 import shutil
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Iterable
 
 
 from openeo.util import rfc3339
@@ -96,60 +96,132 @@ class TimezoneFormatConverter:
 
         return timestamp_str
 
-    def post_process_catalog(self, in_coll_path: Path, converted_dir: Optional[Path] = None) -> None:
+    # def OLD_post_process_catalog(
+    #     self,
+    #     in_coll_path: Path,
+    #     item_glob: str, 
+    #     converted_dir: Optional[Path] = None,
+    # ) -> None:
+    #     """Run post-processing steps on the STAC catalog.
+
+    #     This is a temporary fix until we can make openeo-geopyspark-driver's
+    #     load_stac accept the UTC timestamps ending in "Z".
+    #     """
+    #     if not in_coll_path.exists():
+    #         raise FileNotFoundError(
+    #             'Input collection file for argument "in_coll_path" does not exist: '
+    #             + f"{in_coll_path=}"
+    #         )
+    #     if not in_coll_path.is_file():
+    #         raise Exception(
+    #             'Input collection file for argument "in_coll_path" must be a file, '
+    #             + f"not a directory. {in_coll_path=}"
+    #         )
+
+    #     in_place = not converted_dir
+    #     converted_out_dir: Path = converted_dir or in_coll_path.parent
+    #     if in_place:
+    #         collection_converted_path = in_coll_path
+    #     else:
+    #         collection_converted_path = converted_out_dir / in_coll_path.name
+    #         if converted_out_dir.exists():
+    #             shutil.rmtree(converted_out_dir)
+    #         converted_out_dir.mkdir(parents=True)
+
+    #     self.convert_collection(in_coll_path, collection_converted_path)
+
+    #     self._process_item_files(in_coll_path.parent, converted_out_dir, item_glob)
+
+    def process_catalog(
+        self,
+        in_coll_path: Path,
+        in_item_paths: Iterable[Path],
+        output_dir: Path,
+    ) -> None:
         """Run post-processing steps on the STAC catalog.
 
         This is a temporary fix until we can make openeo-geopyspark-driver's
         load_stac accept the UTC timestamps ending in "Z".
         """
+        in_coll_path = Path(in_coll_path)
+
         if not in_coll_path.exists():
             raise FileNotFoundError(
-                'Input collection file for argument "in_coll_path" does not exist: ' + f"{in_coll_path=}"
+                'Argument "in_coll_path": input collection does not exist: '
+                + f"{in_coll_path=}"
             )
         if not in_coll_path.is_file():
             raise Exception(
-                'Input collection file for argument "in_coll_path" must be a file, '
+                'Argument "in_coll_path": input collection must be a file, '
                 + f"not a directory. {in_coll_path=}"
             )
 
-        in_place = not converted_dir
-        converted_out_dir: Path = converted_dir or in_coll_path.parent
-        if in_place:
-            collection_converted_path = in_coll_path
-        else:
-            collection_converted_path = converted_out_dir / in_coll_path.name
-            if converted_out_dir.exists():
-                shutil.rmtree(converted_out_dir)
-            converted_out_dir.mkdir(parents=True)
+        # In this case, creating the output directory should be done by the
+        # calling code because there might be other processing as well, and
+        # otherwise a mess of duplicate code.
+        if not output_dir.exists():
+            raise FileNotFoundError(
+               'Argument "output_dir": output directory does not exist: '
+                + f"{in_coll_path=}"
+            )
+        if not output_dir.is_dir():
+            raise FileNotFoundError(
+               'Argument "output_dir": output directory must be a directory:'
+                + f"{in_coll_path=}"
+            )
 
-        self.convert_collection(in_coll_path, collection_converted_path)
-        self._post_process_item_files(in_coll_path.parent, converted_out_dir)
+        bad_items = [ip for ip in in_item_paths if not Path(ip).exists()]
+        if bad_items:
+            raise Exception(
+                "Following STAC item paths don't exist: "
+                + f"{bad_items}"
+            )
 
-    def _post_process_item_files(self, collection_dir: Path, converted_dir: Path) -> None:
-        """Convert each STAC item file found in the subfolders per year"""
-
-        in_place = collection_dir.samefile(converted_dir)
-        item_files_in = list(collection_dir.glob("*/*.json"))
-        item_folders_in: List[Path] = list(set(i.parent for i in item_files_in))
-        item_folders_out = [converted_dir / i.relative_to(collection_dir) for i in item_folders_in]
         print("=== item_files_in: ===")
-        for f in item_files_in:
+        for f in in_item_paths:
             print(f)
         print("\n")
 
-        if not in_place:
-            for folder in item_folders_out:
-                folder.mkdir(parents=True)
-
-        # json_files = list(collection_dir.glob("*/*/*.json"))
-        num_files = len(item_files_in)
-
-        for i, item_path in enumerate(item_files_in):
-            rel_path = item_path.relative_to(collection_dir)
-            out_path = converted_dir / rel_path
-
-            print(f"PROGRESS: converting STAC item {i+1} of {num_files}: {item_path}")
-            print(f"{item_path=}")
-            print(f"{rel_path=}")
-            print(f"{out_path=}")
+        out_collection_path = output_dir / in_coll_path.name
+        self.convert_collection(in_coll_path, out_collection_path)
+        
+        num_files = len(in_item_paths)
+        for i, item_path in enumerate(in_item_paths):
+            rel_path = item_path.relative_to(in_coll_path.parent)
+            out_path = output_dir / rel_path
+            print(
+                f"PROGRESS: converting STAC item {i+1} of {num_files}:\n{item_path}\nto:\n{out_path}"
+            )
             self.convert_item(item_path, out_path)
+
+    # def _process_item_files(self, collection_dir: Path, converted_dir: Path, glob_pattern: str) -> None:
+    #     """Convert each STAC item file found in the subfolders per year"""
+
+    #     in_place = collection_dir.samefile(converted_dir)
+    #     item_files_in = list(collection_dir.glob(glob_pattern))
+
+    #     item_folders_in: List[Path] = list(set(i.parent for i in item_files_in))
+    #     item_folders_out = [
+    #         converted_dir / i.relative_to(collection_dir) for i in item_folders_in
+    #     ]
+    #     print("=== item_files_in: ===")
+    #     for f in item_files_in:
+    #         print(f)
+    #     print("\n")
+
+    #     if not in_place:
+    #         for folder in item_folders_out:
+    #             folder.mkdir(parents=True)
+
+    #     num_files = len(item_files_in)
+    #     for i, item_path in enumerate(item_files_in):
+    #         rel_path = item_path.relative_to(collection_dir)
+    #         out_path = converted_dir / rel_path
+
+    #         print(
+    #             f"PROGRESS: converting STAC item {i+1} of {num_files}:\n{item_path}\nto: {out_path=}"
+    #         )
+    #         print(f"{item_path=}")
+    #         print(f"{rel_path=}")
+    #         print(f"{out_path=}")
+    #         self.convert_item(item_path, out_path)

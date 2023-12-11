@@ -157,7 +157,11 @@ class TestSTACBuilder:
         assert stac_builder.collection
         assert collection == stac_builder.collection
 
-    def test_validate_collection(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
+    def test_validate_collection(
+            self,
+            stac_builder: STACBuilder,
+            collection_test_config: CollectionConfig
+        ):
         stac_builder.collection_config = collection_test_config
         stac_builder.collect_input_files()
         assert stac_builder.collection_config == collection_test_config
@@ -166,7 +170,7 @@ class TestSTACBuilder:
         assert stac_builder.collection
         assert collection == stac_builder.collection
 
-        stac_builder.validate_collection()
+        stac_builder.validate_collection(collection)
 
     def test_build_collection(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
         stac_builder.collection_config = collection_test_config

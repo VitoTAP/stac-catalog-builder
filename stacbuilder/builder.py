@@ -2,10 +2,12 @@ import datetime as dt
 import json
 import logging
 import pprint
+import shutil
+
 
 from itertools import islice
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import shapely
 import pandas as pd
@@ -19,15 +21,20 @@ from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension, ProjectionExtension
 from pystac.extensions.raster import RasterExtension
-
+        
 
 from stactools.core.io import ReadHrefModifier
 import rio_stac.stac as rst
 
 
-from stacbuilder.core import InputPathParser, InputPathParserFactory, NoopInputPathParser
+from stacbuilder.core import (
+    InputPathParser,
+    InputPathParserFactory,
+    reproject_bounding_box,
+)
 from stacbuilder.config import AssetConfig, CollectionConfig
 from stacbuilder.metadata import Metadata
+from stacbuilder.timezoneformat import TimezoneFormatConverter
 
 
 _logger = logging.getLogger(__name__)
@@ -37,6 +44,26 @@ CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0
 
 
 class SettingsInvalid(Exception):
+    pass
+
+from enum import IntEnum, auto
+
+class ProcessingLevels(IntEnum):
+    COLLECT_INPUTS = 1
+    """Collect input files """
+
+    COLLECT_METADATA = 2
+    """Collect STAC item metadata"""
+
+    CREATE_COLLECTION = 3
+    """Create a STAC collection"""
+
+    POST_PROCESS = 4
+    """Run post processing after a STAC collection was created."""
+
+
+class InvalidOperation(Exception):
+    """Raised when some state or settings are not set, and the operation can not be executed."""
     pass
 
 
@@ -58,7 +85,7 @@ class STACBuilder:
         self.glob: str = "*"
         self.max_files_to_process: int = -1
 
-        self.output_dir: Path = None
+        self._output_dir: Path = None
         self.overwrite: bool = False
 
         self._path_parser: InputPathParser = path_parser
@@ -66,22 +93,164 @@ class STACBuilder:
 
         self._collection_config: CollectionConfig = None
 
+        self._collection_overrrides = {
+            "extent/spatial/bbox": [
+                [
+                -58.6572887,
+                24.4650791,
+                39.6002888,
+                54.7014217
+                ]
+            ],
+            "properties/proj:epsg": 3035,
+            "properties/proj:bbox": [
+                665000.0,
+                746700.0,
+                7332600.0,
+                5491700.0
+                ]
+        }
+
         self._input_files: List[Path] = []
         self._collection: Collection = None
 
+    @property
+    def output_dir(self) -> Path:
+        return self._output_dir
+
+    @output_dir.setter
+    def output_dir(self, dir_path: Union[Path, str]) -> Path:
+        self._output_dir = Path(dir_path)
+    
     def build_collection(self):
         self.validate_builder_settings()
+
+        # TODO: generalize this to "collect_metadata", even if it does not come from geotiff file directly
+        #   for example: support start from rio-stac or other basic or incomplete STAC items,
+        #   start from terracatalogueclient (HRVPP), or support netCDFs.
+        # We would have several implementation and use Dependency injection to instantiate the one we need.
         print("Collecting input files ...")
         self.collect_input_files()
+
         print("Creating STAC collection ...")
         self.create_collection()
         print("Saving STAC collection ...")
         self.save_collection()
         print("Validating STAC collection ...")
-        self.validate_collection()
-        print("Saving GeoJSON file with footprints of the STAC items ...")
-        self.save_footprints()
+        self.validate_collection(self.collection)
+
+        # self.post_process_collection(self.collection_file)
+        
+        # print("Saving GeoJSON file with footprints of the STAC items ...")
+        # self.save_footprints()
+
         print("DONE")
+
+    def post_process_collection(self, collection_file: Path, output_dir: Optional[Path] = None):
+        out_dir: Path = output_dir or collection_file.parent
+        new_coll_file, _ = self._create_post_proc_directory_structure(
+            collection_file, out_dir
+        )
+        self._convert_timezones_encoded_as_z(collection_file, out_dir)
+
+        self._override_collection_components(new_coll_file)
+        
+        # Check if the new file is still valid STAC.
+        self.validate_collection(Collection.from_file(new_coll_file))
+
+    def _create_post_proc_directory_structure(
+            self, collection_file: Path, output_dir: Optional[Path] = None
+        ):
+        in_place = False
+        if not output_dir:
+            in_place = True
+        elif output_dir.exists() and output_dir.samefile(collection_file.parent):
+            in_place = True
+
+        # converted_out_dir: Path = output_dir or collection_file.parent
+        item_paths = self.get_item_paths_for_coll_file(collection_file)
+
+        if in_place:
+            converted_out_dir = collection_file.parent
+            collection_converted_file = collection_file
+            new_item_paths = item_paths
+        else:
+            converted_out_dir = output_dir
+            collection_converted_file = output_dir / collection_file.name
+            
+            # Overwriting => remove and re-create the old directory
+            if converted_out_dir.exists():
+                shutil.rmtree(converted_out_dir)
+
+            # (re)create the entire directory structure
+            converted_out_dir.mkdir(parents=True)
+            relative_paths = [
+                ip.relative_to(collection_file.parent) for ip in item_paths
+            ]
+            new_item_paths = [output_dir / rp for rp in relative_paths]
+
+            sub_directories = set(p.parent for p in new_item_paths)
+            for sub_dir in sub_directories:
+                if not sub_dir.exists():
+                    sub_dir.mkdir(parents=True)
+
+        return collection_converted_file, new_item_paths
+
+    @staticmethod
+    def get_item_paths_for_collection(collection: Collection) -> List[Path]:
+        items = collection.get_all_items()
+        return [Path(item.self_href) for item in items]
+    
+    @classmethod
+    def get_item_paths_for_coll_file(cls, collection_file: Path) -> List[Path]:
+        collection = Collection.from_file(collection_file)
+        return cls.get_item_paths_for_collection(collection)
+    
+    @property
+    def item_paths(self) -> List[Path]:
+        return self.get_item_paths_for_collection(self.collection)
+
+    def _convert_timezones_encoded_as_z(
+            self, collection_file: Path, output_dir: Path
+        ):
+        print("Converting UTC timezones encoded as 'Z' to +00:00...")
+        conv = TimezoneFormatConverter()
+        out_dir = output_dir or collection_file.parent
+        item_paths = self.get_item_paths_for_coll_file(collection_file)
+        conv.process_catalog(
+            in_coll_path=collection_file,
+            in_item_paths=item_paths,
+            output_dir=out_dir
+        )
+
+    def _override_collection_components(
+            self, collection_file: Path
+        ):
+        print("Overriding components of STAC collection that we want to give some fixed value ...")
+        data = self._load_collection_as_dict(collection_file)
+        overrides = self._collection_overrrides
+
+        breakpoint()
+        for key, new_value in overrides.items():
+            key_path = key.split("/")
+            deepest_key = key_path[-1]
+            sub_dict = data
+
+            for sub_key in key_path[:-1]:
+                if sub_key not in sub_dict:
+                    sub_dict[sub_key] = {}
+                sub_dict = sub_dict[sub_key]
+            sub_dict[deepest_key] = new_value
+
+        self._save_collection_as_dict(data, collection_file)
+
+    def _load_collection_as_dict(self, coll_file: Path) -> dict:
+        with open(coll_file, "r") as f_in:
+            return json.load(f_in)
+
+    def _save_collection_as_dict(self, data: Dict[str, Any], coll_file: Path) -> None:
+        with open(coll_file, "w") as f_out:
+            json.dump(data, f_out, indent=2)
 
     @property
     def collection_config(self) -> CollectionConfig:
@@ -134,35 +303,40 @@ class STACBuilder:
             self._path_parser = InputPathParserFactory.from_config(parser_config)
         return self._path_parser
 
-    def get_settings_errors(self):
+    def get_settings_errors(self, level: ProcessingLevels = ProcessingLevels.POST_PROCESS):
         errors = []
-        if not self.collection_config:
-            errors.append(f"collection_config is not set")
 
-        if not self.input_dir:
-            errors.append(f"input_dir is not set")
-        elif not self.input_dir.exists():
-            errors.append(f"Input directory does not exist: {self.input_dir!r}")
+        if level >= ProcessingLevels.COLLECT_INPUTS:
+            if not self.input_dir:
+                errors.append(f"input_dir is not set")
+            elif not self.input_dir.exists():
+                errors.append(f"Input directory does not exist: {self.input_dir!r}")
 
-        if not self.glob:
-            errors.append(f'glob pattern is not set, default should be "*"')
+            if not self.glob:
+                errors.append(f'glob pattern is not set, default should be "*"')
 
-        if not self.output_dir:
-            errors.append(f"output_dir is not set")
-        elif self.output_dir.exists() and not self.overwrite:
-            errors.append(f"Output directory already exist but overwrite is OFF (False): {self.output_dir}")
+        if level >= ProcessingLevels.COLLECT_METADATA:
+            if not self.collection_config:
+                errors.append(f"collection_config is not set")
+
+        if level >= ProcessingLevels.CREATE_COLLECTION:
+            if not self.output_dir:
+                errors.append(f"output_dir is not set")
+            elif self.output_dir.exists() and not self.overwrite:
+                errors.append(f"Output directory already exist but overwrite is OFF (False): {self.output_dir}")
 
         return errors
 
-    def can_run(self) -> bool:
-        return not self.get_settings_errors()
+    def can_run(self, level: ProcessingLevels = ProcessingLevels.POST_PROCESS) -> bool:
+        return not self.get_settings_errors(level)
 
-    def validate_builder_settings(self) -> None:
-        errors = self.get_settings_errors()
+    def validate_builder_settings(self, level: ProcessingLevels = ProcessingLevels.POST_PROCESS) -> None:
+        errors = self.get_settings_errors(level)
         if errors:
             raise SettingsInvalid("\n".join(errors))
 
     def try_parse_metadata(self):
+        self.validate_builder_settings(level=ProcessingLevels.COLLECT_METADATA)
         extract_href_info = self._get_input_path_parser()
         for file in self.input_files:
             metadata = Metadata(
@@ -173,6 +347,7 @@ class STACBuilder:
             yield metadata
 
     def try_parse_items(self):
+        self.validate_builder_settings(level=ProcessingLevels.COLLECT_METADATA)
         for file in self.input_files:
             item = self.create_item(file)
             # Skip the yield when we found spurious file that are not items that
@@ -187,6 +362,7 @@ class STACBuilder:
         return pd.DataFrame.from_records(it.to_dict() for it in self.try_parse_items())
 
     def create_collection(self):
+        self.validate_builder_settings(level=ProcessingLevels.CREATE_COLLECTION)
         self.validate_builder_settings()
         self._create_collection()
 
@@ -205,12 +381,24 @@ class STACBuilder:
         proj_bounds = [p for p in proj_bounds if p is not None]
         print(f"{proj_bounds=}")
 
+        epsg_set = set(it.properties.get("proj:epsg") for it in self._collection.get_all_items())
+        epsg_set = set(p for p in epsg_set if p is not None)
+        if not len(epsg_set) == 1:
+            print(f"WARNING: Item CRSs should all be the same but different codes were found {epsg_set=}")
+        epsg = list(epsg_set)[0]
+
         min_x = min(p[0] for p in proj_bounds)
         min_y = min(p[1] for p in proj_bounds)
         max_x = max(p[2] for p in proj_bounds)
         max_y = max(p[3] for p in proj_bounds)
         coll_proj_bbox = [min_x, min_y, max_x, max_y]
         print(f"{coll_proj_bbox=}")
+
+        bbox_lat_lon = reproject_bounding_box(
+            min_x, min_y, max_x, max_y,
+            from_crs=epsg, to_crs="epsg:4326"
+        )
+        print(f"{bbox_lat_lon=}")
 
         layout_template = self.collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
@@ -222,9 +410,9 @@ class STACBuilder:
 
         return self._collection
 
-    def validate_collection(self):
+    def validate_collection(self, collection: Collection):
         try:
-            num_items_validated = self._collection.validate_all(recursive=True)
+            num_items_validated = collection.validate_all(recursive=True)
         except STACValidationError as exc:
             print(exc)
             raise
@@ -560,18 +748,26 @@ def command_list_stac_items(
 
 
 def command_load_collection(
-    path: Path,
+    collection_file: Path,
 ):
     """Show the STAC collection in 'path'."""
-    builder = STACBuilder()
-    builder.load_collection(path)
-    pprint.pprint(builder.collection.to_dict(), indent=2)
+    collection = Collection.from_file(path)
+    pprint.pprint(collection.to_dict(), indent=2)
 
 
 def command_validate_collection(
-    path: Path,
+    collection_file: Path,
+):
+    """Validate a STAC collection."""
+    collection = Collection.from_file(collection_file)
+    collection.validate_all()
+    
+
+def command_post_process_collection(
+    collection_file: Path,
+    output_dir: Optional[Path] = None,
 ):
     """Validate a STAC collection."""
     builder = STACBuilder()
-    builder.load_collection(path)
-    builder.validate_collection()
+    out_dir = Path(output_dir) if output_dir else None
+    builder.post_process_collection(Path(collection_file), out_dir)

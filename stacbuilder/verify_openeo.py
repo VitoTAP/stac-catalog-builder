@@ -27,7 +27,6 @@ def get_first_item(collection: Collection) -> Item:
 
 
 def find_spatial_extent(collection: Collection):
-    # first_item = get_first_item(collection)
     base_extent = collection.extent.spatial
     ext_list = base_extent.to_dict()["bbox"][0]
     west, south, east, north = ext_list

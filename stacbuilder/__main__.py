@@ -8,7 +8,11 @@ from stacbuilder.builder import (
     command_list_input_files,
     command_list_metadata,
     command_list_stac_items,
+    command_load_collection,
+    command_validate_collection,
+    command_post_process_collection,
 )
+
 from stacbuilder.verify_openeo import verify_in_openeo
 
 _logger = logging.getLogger(__name__)
@@ -51,12 +55,10 @@ def cli(verbose):
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
-    # help="Directory where the input geotiff files are stored"
 )
 @click.argument(
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
-    # help="Where the save the output STAC files (directory)"
 )
 def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
@@ -79,7 +81,6 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
-    # help="Directory where the input geotiff files are stored"
 )
 def list_tiffs(glob, inputdir):
     """List which geotiff files will be selected with this input dir and glob pattern."""
@@ -100,7 +101,6 @@ def list_tiffs(glob, inputdir):
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
-    # help="Directory where the input geotiff files are stored"
 )
 def list_metadata(collection_config, glob, inputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
@@ -121,7 +121,6 @@ def list_metadata(collection_config, glob, inputdir, max_files):
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
-    # help="Directory where the input geotiff files are stored"
 )
 def list_items(collection_config, glob, inputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
@@ -133,18 +132,24 @@ def list_items(collection_config, glob, inputdir, max_files):
 @cli.command()
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def show_collection(collection_file):
-    from stacbuilder.builder import command_load_collection
-
     command_load_collection(collection_file)
 
 
 @cli.command()
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
-    from stacbuilder.builder import command_validate_collection
-
     command_validate_collection(collection_file)
 
+
+@cli.command()
+@click.option(
+    "-o", "--outputdir",
+    required=False,
+    type=click.Path(dir_okay=True, file_okay=False),
+)
+@click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+def post_process(outputdir, collection_file):
+    command_post_process_collection(collection_file, outputdir)
 
 
 

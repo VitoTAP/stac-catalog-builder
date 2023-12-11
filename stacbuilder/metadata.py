@@ -13,11 +13,10 @@ import rasterio
 from shapely.geometry import box, mapping
 from stactools.core.io import ReadHrefModifier
 
-
 from openeo.util import rfc3339
 
 
-from stacbuilder.core import InputPathParser
+from stacbuilder.core import InputPathParser, reproject_bounding_box
 
 
 BoundingBoxList = List[Union[float, int]]
@@ -42,18 +41,22 @@ class Metadata:
             if self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
                 self.bbox = self.proj_bbox
             else:
-                self.bbox = _reproject_bounding_box(self.proj_bbox, from_crs=dataset.crs, to_crs="epsg:4326")
+                west, south, east, north = self.proj_bbox[:4]
+                self.bbox = reproject_bounding_box(
+                    west, south, east, north,
+                    from_crs=dataset.crs, to_crs="epsg:4326"
+                )
             self.transform = list(dataset.transform)[0:6]
             self.shape = dataset.shape
             self.tags = dataset.tags()
 
-            print(f"projected: proj_bbox={self.proj_bbox}")
-            print(f"projected CRS: {dataset.crs}")
-            print(f"{dataset.bounds=}")
-            print(f"{dataset.transform=}")
-            print(f"lat long: bbox={self.bbox}")
-            print(f"{dataset.shape=}")
-            print(f"{dataset.tags()=}")
+            # print(f"projected: proj_bbox={self.proj_bbox}")
+            # print(f"projected CRS: {dataset.crs}")
+            # print(f"{dataset.bounds=}")
+            # print(f"{dataset.transform=}")
+            # print(f"lat long: bbox={self.bbox}")
+            # print(f"{dataset.shape=}")
+            # print(f"{dataset.tags()=}")
 
         self.href = href
         self._item_id = Path(href).stem
@@ -207,6 +210,9 @@ class Metadata:
             "year": self.year,
             "month": self.month,
             "day": self.day,
+            "bbox": self.bbox,
+            "proj_epsg": self.proj_epsg,
+            "proj_bbox": self.proj_bbox,
             "geometry": self.geometry,
             "proj_geometry": self.proj_geometry,
         }
@@ -220,24 +226,24 @@ class Metadata:
         return str(self.to_dict())
 
 
-def _reproject_bounding_box(bbox: BoundingBoxList, from_crs: str, to_crs: str) -> List[float]:
-    """
-    Reproject given bounding box dictionary
+# def _reproject_bounding_box(bbox: BoundingBoxList, from_crs: str, to_crs: str) -> List[float]:
+#     """
+#     Reproject given bounding box dictionary
 
-    :param bbox: bbox dict with fields "west", "south", "east", "north"
+#     :param bbox: bbox dict with fields "west", "south", "east", "north"
 
-    :param from_crs: source CRS. Specify `None` to use the "crs" field of input bbox dict
-    :param to_crs: target CRS
-    :return: bbox dict (fields "west", "south", "east", "north", "crs")
-    """
-    if not len(bbox) == 4:
-        ValueError(f"Bounding box bbox expects exactly 4 elements. {bbox=}")
+#     :param from_crs: source CRS. Specify `None` to use the "crs" field of input bbox dict
+#     :param to_crs: target CRS
+#     :return: bbox dict (fields "west", "south", "east", "north", "crs")
+#     """
+#     if not len(bbox) == 4:
+#         ValueError(f"Bounding box bbox expects exactly 4 elements. {bbox=}")
 
-    west, south, east, north = bbox
-    transformer = pyproj.Transformer.from_crs(crs_from=from_crs, crs_to=to_crs, always_xy=True)
-    transform = transformer.transform
+#     west, south, east, north = bbox
+#     transformer = pyproj.Transformer.from_crs(crs_from=from_crs, crs_to=to_crs, always_xy=True)
+#     transform = transformer.transform
 
-    new_west, new_south = transform(west, south, errcheck=True)
-    new_east, new_north = transform(east, north, errcheck=True)
+#     new_west, new_south = transform(west, south, errcheck=True)
+#     new_east, new_north = transform(east, north, errcheck=True)
 
-    return [new_west, new_south, new_east, new_north]
+#     return [new_west, new_south, new_east, new_north]
