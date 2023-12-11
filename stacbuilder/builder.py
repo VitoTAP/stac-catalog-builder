@@ -93,23 +93,7 @@ class STACBuilder:
 
         self._collection_config: CollectionConfig = None
 
-        self._collection_overrrides = {
-            "extent/spatial/bbox": [
-                [
-                -58.6572887,
-                24.4650791,
-                39.6002888,
-                54.7014217
-                ]
-            ],
-            "properties/proj:epsg": 3035,
-            "properties/proj:bbox": [
-                665000.0,
-                746700.0,
-                7332600.0,
-                5491700.0
-                ]
-        }
+        self._collection_overrrides = {}
 
         self._input_files: List[Path] = []
         self._collection: Collection = None
