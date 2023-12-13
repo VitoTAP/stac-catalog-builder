@@ -99,7 +99,7 @@ class TimezoneFormatConverter:
     # def OLD_post_process_catalog(
     #     self,
     #     in_coll_path: Path,
-    #     item_glob: str, 
+    #     item_glob: str,
     #     converted_dir: Optional[Path] = None,
     # ) -> None:
     #     """Run post-processing steps on the STAC catalog.
@@ -146,36 +146,23 @@ class TimezoneFormatConverter:
         in_coll_path = Path(in_coll_path)
 
         if not in_coll_path.exists():
-            raise FileNotFoundError(
-                'Argument "in_coll_path": input collection does not exist: '
-                + f"{in_coll_path=}"
-            )
+            raise FileNotFoundError('Argument "in_coll_path": input collection does not exist: ' + f"{in_coll_path=}")
         if not in_coll_path.is_file():
             raise Exception(
-                'Argument "in_coll_path": input collection must be a file, '
-                + f"not a directory. {in_coll_path=}"
+                'Argument "in_coll_path": input collection must be a file, ' + f"not a directory. {in_coll_path=}"
             )
 
         # In this case, creating the output directory should be done by the
         # calling code because there might be other processing as well, and
         # otherwise a mess of duplicate code.
         if not output_dir.exists():
-            raise FileNotFoundError(
-               'Argument "output_dir": output directory does not exist: '
-                + f"{in_coll_path=}"
-            )
+            raise FileNotFoundError('Argument "output_dir": output directory does not exist: ' + f"{in_coll_path=}")
         if not output_dir.is_dir():
-            raise FileNotFoundError(
-               'Argument "output_dir": output directory must be a directory:'
-                + f"{in_coll_path=}"
-            )
+            raise FileNotFoundError('Argument "output_dir": output directory must be a directory:' + f"{in_coll_path=}")
 
         bad_items = [ip for ip in in_item_paths if not Path(ip).exists()]
         if bad_items:
-            raise Exception(
-                "Following STAC item paths don't exist: "
-                + f"{bad_items}"
-            )
+            raise Exception("Following STAC item paths don't exist: " + f"{bad_items}")
 
         print("=== item_files_in: ===")
         for f in in_item_paths:
@@ -184,14 +171,12 @@ class TimezoneFormatConverter:
 
         out_collection_path = output_dir / in_coll_path.name
         self.convert_collection(in_coll_path, out_collection_path)
-        
+
         num_files = len(in_item_paths)
         for i, item_path in enumerate(in_item_paths):
             rel_path = item_path.relative_to(in_coll_path.parent)
             out_path = output_dir / rel_path
-            print(
-                f"PROGRESS: converting STAC item {i+1} of {num_files}:\n{item_path}\nto:\n{out_path}"
-            )
+            print(f"PROGRESS: converting STAC item {i+1} of {num_files}:\n{item_path}\nto:\n{out_path}")
             self.convert_item(item_path, out_path)
 
     # def _process_item_files(self, collection_dir: Path, converted_dir: Path, glob_pattern: str) -> None:

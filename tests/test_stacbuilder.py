@@ -276,9 +276,7 @@ class TestCommandAPI:
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
-    def test_command_post_process_collection(
-            self, data_dir, tmp_path
-        ):
+    def test_command_post_process_collection(self, data_dir, tmp_path):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
@@ -294,9 +292,7 @@ class TestCommandAPI:
         post_proc_dir = tmp_path / "post-processed"
 
         command_post_process_collection(
-            collection_file=collection_file,
-            collection_config_path=config_file,
-            output_dir=post_proc_dir
+            collection_file=collection_file, collection_config_path=config_file, output_dir=post_proc_dir
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.

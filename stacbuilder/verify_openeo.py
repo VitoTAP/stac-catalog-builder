@@ -2,7 +2,7 @@ import datetime as dt
 import json
 from pprint import pprint
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from itertools import islice
 
 
@@ -29,32 +29,43 @@ def get_first_item(collection: Collection) -> Item:
     return item
 
 
-# def find_spatial_extent(collection: Collection):
-#     base_extent = collection.extent.spatial
-#     ext_list = base_extent.to_dict()["bbox"][0]
-#     west, south, east, north = ext_list
+def limit_spatial_extent_from_dict(
+    extent: Dict[str, float],
+    max_range: float,
+) -> Dict[str, float]:
+    new_west, new_south, new_east, new_north = limit_spatial_extent(*dict_to_bbox(extent), max_range=max_range)
+    return bbox_to_dict(new_west, new_south, new_east, new_north)
 
-#     range_x = abs(west - east)
-#     range_y = abs(north - south)
-#     avg_x = east + 0.5 * range_x
-#     avg_y = south + 0.5 * range_y
 
-#     # limit the bbox to 0.01 degrees
-#     max_range = 0.01
-#     new_range_x = min(max_range, range_x)
-#     new_range_y = min(max_range, range_y)
+def limit_spatial_extent(
+    west: float, south: float, east: float, north: float, max_range: float, is_degrees: bool = False
+):
+    """Creates a new bounding box that is no larger than max_range, and with the same center as the original bounds."""
+    range_x = abs(east - west)
+    range_y = abs(north - south)
+    avg_x = 0.5 * (west + east)
+    avg_y = 0.5 * (south + north)
 
-#     new_west = (avg_x - 0.5 * new_range_x) % 360
-#     new_east = (avg_x + 0.5 * new_range_x) % 360
-#     new_west = min(new_west, new_east)
-#     new_east = max(new_west, new_east)
+    new_range_x = min(max_range, range_x)
+    new_range_y = min(max_range, range_y)
 
-#     new_south = (avg_y - 0.5 * new_range_y) % 360
-#     new_north = (avg_y + 0.5 * new_range_y) % 360
-#     new_south = min(new_south, new_north)
-#     new_north = max(new_south, new_north)
+    new_west = avg_x - 0.5 * new_range_x
+    new_east = avg_x + 0.5 * new_range_x
+    if is_degrees:
+        new_west = new_west % 360
+        new_east = new_east % 360
+        new_west = min(new_west, new_east)
+        new_east = max(new_west, new_east)
 
-#     return {"east": new_east, "south": new_south, "west": new_west, "north": new_north}
+    new_south = avg_y - 0.5 * new_range_y
+    new_north = avg_y + 0.5 * new_range_y
+    if is_degrees:
+        new_south = new_south % 360
+        new_north = new_north % 360
+        new_south = min(new_south, new_north)
+        new_north = max(new_south, new_north)
+
+    return new_west, new_south, new_east, new_north
 
 
 def bbox_to_dict(bbox: List[float]) -> Dict[str, float]:
@@ -62,18 +73,24 @@ def bbox_to_dict(bbox: List[float]) -> Dict[str, float]:
     return spatial_dict(west, south, east, north)
 
 
-def spatial_dict(
-        west: float, south: float, east: float, north: float
-    ) -> Dict[str, float]:
+def dict_to_bbox(bbox_dict: Dict[str, float]) -> List[float]:
+    b = bbox_dict
+    return [b["west"], b["south"], b["east"], b["north"]]
+
+
+def spatial_dict(west: float, south: float, east: float, north: float) -> Dict[str, float]:
     return {
-        "west": west, "south": south,
-        "east": east, "north": north,
+        "west": west,
+        "south": south,
+        "east": east,
+        "north": north,
     }
 
 
-def find_spatial_extent(collection: Collection):
+def find_spatial_extent(collection: Collection, max_spatial_ext_size: float = 0.1):
     first_item: Item = get_first_item(collection)
-    return bbox_to_dict(first_item.bbox)
+    base_extent = first_item.bbox[:4]
+    return bbox_to_dict(limit_spatial_extent(*base_extent, max_range=max_spatial_ext_size))
 
 
 def _dt_set_tz_utc(time: dt.datetime):
@@ -82,42 +99,68 @@ def _dt_set_tz_utc(time: dt.datetime):
     )
 
 
-def find_temporal_extent(collection: Collection):
+def find_proj_bbox(collection: Collection) -> Tuple[Dict[str, Any], int]:
+    first_item: Item = get_first_item(collection)
+    epsg = 4326
+    bbox = first_item.properties.get("proj:bbox")
+    if bbox:
+        epsg = first_item.properties.get("proj:epsg")
+    else:
+        bbox = first_item.geometry
+
+    return bbox, epsg
+
+
+def find_temporal_extent(collection: Collection, use_full: bool = False):
     base_extent: pystac.TemporalExtent = collection.extent.temporal
     start_dt, end_dt = base_extent.intervals[0]
 
     start_dt = _dt_set_tz_utc(start_dt)
     end_dt = _dt_set_tz_utc(end_dt)
+
+    # TODO: This is not an accurate way to select a year, this won't give you calendar years
+    one_year = dt.timedelta(days=365)
+    if not use_full and end_dt - start_dt > one_year:
+        end_dt = start_dt + one_year
+
     start_dt = rfc3339.normalize(start_dt)
     end_dt = rfc3339.normalize(end_dt)
-
-    # start_dt = None
-    # end_dt = None
-    # if "start_datetime" in first_item.properties:
-    #     start_dt = first_item.properties["start_datetime"]
-    #     if "end_datetime" in first_item.properties:
-    #         end_dt = first_item.properties["end_datetime"]
-    # else:
-    #     start_dt = first_item.get_datetime()
-
-    # if not end_dt:
-    #     end_dt = start_dt + dt.timedelta(days=1)
 
     return [start_dt, end_dt]
 
 
-def create_cube(collection_path: Path, connection: openeo.Connection):
+def create_cube(
+    collection_path: Path,
+    connection: openeo.Connection,
+    bbox: Optional[Union[List[float], Dict[str, float]]] = None,
+    epsg: Optional[int] = 4326,
+    max_spatial_ext_size: float = None,
+) -> None:
     collection = Collection.from_file(collection_path)
-    extent_spatial = find_spatial_extent(collection)
-    extent_temporal = find_temporal_extent(collection)
-    print(f"{extent_spatial=}")
+    extent_temporal = find_temporal_extent(collection, use_full=True)
     print(f"{extent_temporal=}")
 
-    cube = connection.load_stac(
+    proj_bbox, proj_epsg = find_proj_bbox(collection)
+    print(f"{proj_bbox=}, {proj_epsg=}")
+
+    cube: DataCube = connection.load_stac(
         str(collection_path),
-        spatial_extent=extent_spatial,
         temporal_extent=extent_temporal,
     )
+
+    if not bbox:
+        proj_west, proj_south, proj_east, proj_north = proj_bbox[:4]
+        west, south, east, north = limit_spatial_extent(
+            proj_west, proj_south, proj_east, proj_north, max_range=max_spatial_ext_size
+        )
+        epsg = proj_epsg
+    else:
+        if isinstance(bbox, list):
+            west, south, east, north = bbox[:4]
+        else:
+            west, south, east, north = dict_to_bbox(bbox)
+    print(f"final spatial extent for filtering: {[west, south, east, north]}, {epsg=}")
+    cube = cube.filter_bbox(west=west, south=south, east=east, north=north, crs=epsg)
 
     print("cube.validate() ...")
     validation_errors = cube.validate()
@@ -133,23 +176,33 @@ def verify_in_openeo(
     collection_path: Union[str, Path],
     output_dir: Union[str, Path],
     backend_url: str = "openeo-dev.vito.be",
-    dry_run: bool = False,
-    verbose: bool = False,
+    max_spatial_ext_size: float = 0.1,
+    bbox: Optional[Union[List[float], Dict[str, float]]] = None,
+    epsg: Optional[int] = 4326,
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = False,
 ):
     if dry_run:
         verbose = True
     connection = connect(backend_url)
 
+    job_id = None
     # job_id = "j-231206b597464ad491cad2e902971ff7"
     # job_id = "j-231211402f5843ab92a2a557c8cfd2cf"
-    job_id = None
+    # job_id = "j-231212dab20845b9a6570c2c1832102c"
 
     output_dir = Path(output_dir)
     job_log_file = output_dir / "job-logs.json"
-   
+
     if job_id:
         job = connection.job(job_id=job_id)
+        print(f"=== job_id: {job_id}")
+        print(f"Job status: {job.status()}")
         get_logs(job, job_log_file)
+
+        if job.status() == "finished":
+            out_path = job.download_results(output_dir)
+            print(f"{out_path=}")
 
     else:
         timestamp = rfc3339.utcnow()
@@ -162,14 +215,18 @@ def verify_in_openeo(
             print(f"{output_dir=}")
 
         assert collection_path.exists(), f"file should exist: {collection_path=}"
+        print(f"Validating STAC collection file: {collection_path} ...")
         Collection.from_file(collection_path).validate_all()
 
         if not output_dir.exists() and not dry_run:
             print(f"Creating output_dir: {output_dir}")
             output_dir.mkdir(parents=True)
 
-        cube: DataCube = create_cube(str(collection_path), connection)
+        print(f"Creating DataCube: ...")
+        cube: DataCube = create_cube(str(collection_path), connection, bbox, epsg, max_spatial_ext_size)
         print(cube)
+
+        print(f"Validating DataCube ...")
         cube.validate()
 
         if dry_run:
@@ -193,10 +250,10 @@ def verify_in_openeo(
 
 
 def get_logs(job: BatchJob, job_log_file: Optional[Path] = None) -> None:
-    print("=== logs ===")
-    for record in job.logs():
-        print(record)
-    print("=== === ===")
+    # print("=== logs ===")
+    # for record in job.logs():
+    #     print(record)
+    # print("=== === ===")
 
     if job_log_file:
         with open(job_log_file, "wt", encoding="utf8") as f_log:

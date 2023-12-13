@@ -43,10 +43,7 @@ class Metadata:
                 self.bbox = self.proj_bbox
             else:
                 west, south, east, north = self.proj_bbox[:4]
-                self.bbox = reproject_bounding_box(
-                    west, south, east, north,
-                    from_crs=dataset.crs, to_crs="epsg:4326"
-                )
+                self.bbox = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
             self.transform = list(dataset.transform)[0:6]
             self.shape = dataset.shape
             self.tags = dataset.tags()

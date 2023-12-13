@@ -1,3 +1,4 @@
+import json
 import logging
 
 import click
@@ -143,7 +144,8 @@ def validate(collection_file):
 
 @cli.command()
 @click.option(
-    "-o", "--outputdir",
+    "-o",
+    "--outputdir",
     required=False,
     type=click.Path(dir_okay=True, file_okay=False),
 )
@@ -154,17 +156,10 @@ def validate(collection_file):
     help="Configuration file for the collection",
 )
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-def post_process(
-    outputdir, 
-    collection_config, 
-    collection_file
-):
+def post_process(outputdir, collection_config, collection_file):
     command_post_process_collection(
-        collection_file=collection_file,
-        collection_config_path=collection_config,
-        output_dir=outputdir
+        collection_file=collection_file, collection_config_path=collection_config, output_dir=outputdir
     )
-
 
 
 @cli.command
@@ -176,20 +171,35 @@ def post_process(
     help="Directory to save batch jobs outputs (GTIFF)",
     default=".",
 )
+@click.option("--bbox", type=click.STRING, default="", help="bounding box")
+@click.option("-e", "--epsg", type=int, help="CRS of bbox as an EPSG code")
+@click.option(
+    "-m", "--max-extent-size", type=float, default=0.1, help="Maximum size of the spatial extent (in degrees)"
+)
 @click.option("-n", "--dry-run", is_flag=True, help="Do a dry-run, don't execute the batch job")
 @click.option("-v", "--verbose", is_flag=True, help="Make output more verbose")
 @click.argument(
     "collection_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
 )
-def test_openeo(backend_url, out_dir, collection_file, dry_run, verbose):
+def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, dry_run, verbose):
     """Test a STAC collection can be read in open-EO.
 
     It guesses a reasonable spatial and temporal extent based on what
     extent the collection declares.
     """
+    if bbox:
+        bbox = json.loads(bbox)
+
     verify_in_openeo(
-        backend_url=backend_url, collection_path=collection_file, output_dir=out_dir, dry_run=dry_run, verbose=verbose
+        backend_url=backend_url,
+        collection_path=collection_file,
+        output_dir=out_dir,
+        bbox=bbox,
+        epsg=epsg,
+        max_spatial_ext_size=max_extent_size,
+        dry_run=dry_run,
+        verbose=verbose,
     )
 
 

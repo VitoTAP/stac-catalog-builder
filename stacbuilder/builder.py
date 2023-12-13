@@ -21,7 +21,7 @@ from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension, ProjectionExtension
 from pystac.extensions.raster import RasterExtension
-        
+
 
 from stactools.core.io import ReadHrefModifier
 import rio_stac.stac as rst
@@ -46,7 +46,9 @@ CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0
 class SettingsInvalid(Exception):
     pass
 
+
 from enum import IntEnum, auto
+
 
 class ProcessingLevels(IntEnum):
     COLLECT_INPUTS = 1
@@ -64,6 +66,7 @@ class ProcessingLevels(IntEnum):
 
 class InvalidOperation(Exception):
     """Raised when some state or settings are not set, and the operation can not be executed."""
+
     pass
 
 
@@ -103,7 +106,7 @@ class STACBuilder:
     @output_dir.setter
     def output_dir(self, dir_path: Union[Path, str]) -> Path:
         self._output_dir = Path(dir_path)
-    
+
     @property
     def collection_overrides(self) -> Dict[str, Any]:
         return self.collection_config.overrides or {}
@@ -135,19 +138,15 @@ class STACBuilder:
 
     def post_process_collection(self, collection_file: Path, output_dir: Optional[Path] = None):
         out_dir: Path = output_dir or collection_file.parent
-        new_coll_file, _ = self._create_post_proc_directory_structure(
-            collection_file, out_dir
-        )
+        new_coll_file, _ = self._create_post_proc_directory_structure(collection_file, out_dir)
         self._convert_timezones_encoded_as_z(collection_file, out_dir)
 
         self._override_collection_components(new_coll_file)
-        
+
         # Check if the new file is still valid STAC.
         self.validate_collection(Collection.from_file(new_coll_file))
 
-    def _create_post_proc_directory_structure(
-            self, collection_file: Path, output_dir: Optional[Path] = None
-        ):
+    def _create_post_proc_directory_structure(self, collection_file: Path, output_dir: Optional[Path] = None):
         in_place = False
         if not output_dir:
             in_place = True
@@ -164,16 +163,14 @@ class STACBuilder:
         else:
             converted_out_dir = output_dir
             collection_converted_file = output_dir / collection_file.name
-            
+
             # Overwriting => remove and re-create the old directory
             if converted_out_dir.exists():
                 shutil.rmtree(converted_out_dir)
 
             # (re)create the entire directory structure
             converted_out_dir.mkdir(parents=True)
-            relative_paths = [
-                ip.relative_to(collection_file.parent) for ip in item_paths
-            ]
+            relative_paths = [ip.relative_to(collection_file.parent) for ip in item_paths]
             new_item_paths = [output_dir / rp for rp in relative_paths]
 
             sub_directories = set(p.parent for p in new_item_paths)
@@ -187,32 +184,24 @@ class STACBuilder:
     def get_item_paths_for_collection(collection: Collection) -> List[Path]:
         items = collection.get_all_items()
         return [Path(item.self_href) for item in items]
-    
+
     @classmethod
     def get_item_paths_for_coll_file(cls, collection_file: Path) -> List[Path]:
         collection = Collection.from_file(collection_file)
         return cls.get_item_paths_for_collection(collection)
-    
+
     @property
     def item_paths(self) -> List[Path]:
         return self.get_item_paths_for_collection(self.collection)
 
-    def _convert_timezones_encoded_as_z(
-            self, collection_file: Path, output_dir: Path
-        ):
+    def _convert_timezones_encoded_as_z(self, collection_file: Path, output_dir: Path):
         print("Converting UTC timezones encoded as 'Z' to +00:00...")
         conv = TimezoneFormatConverter()
         out_dir = output_dir or collection_file.parent
         item_paths = self.get_item_paths_for_coll_file(collection_file)
-        conv.process_catalog(
-            in_coll_path=collection_file,
-            in_item_paths=item_paths,
-            output_dir=out_dir
-        )
+        conv.process_catalog(in_coll_path=collection_file, in_item_paths=item_paths, output_dir=out_dir)
 
-    def _override_collection_components(
-            self, collection_file: Path
-        ):
+    def _override_collection_components(self, collection_file: Path):
         print("Overriding components of STAC collection that we want to give some fixed value ...")
         data = self._load_collection_as_dict(collection_file)
         overrides = self.collection_overrides
@@ -380,10 +369,7 @@ class STACBuilder:
         coll_proj_bbox = [min_x, min_y, max_x, max_y]
         print(f"{coll_proj_bbox=}")
 
-        bbox_lat_lon = reproject_bounding_box(
-            min_x, min_y, max_x, max_y,
-            from_crs=epsg, to_crs="epsg:4326"
-        )
+        bbox_lat_lon = reproject_bounding_box(min_x, min_y, max_x, max_y, from_crs=epsg, to_crs="epsg:4326")
         print(f"{bbox_lat_lon=}")
 
         layout_template = self.collection_config.layout_strategy_item_template
@@ -627,12 +613,16 @@ def command_list_input_files(
     input_dir: Path,
 ):
     """Build a STAC collection from a directory of geotiff files."""
+    breakpoint()
+    # builder: STACBuilder = _setup_builder(
+    #     input_dir=Path(input_dir).expanduser().absolute(),
+    #     glob=glob,
+    #     overwrite=True,
+    # )
 
-    builder: STACBuilder = _setup_builder(
-        input_dir=Path(input_dir).expanduser().absolute(),
-        glob=glob,
-        overwrite=True,
-    )
+    builder = STACBuilder()
+    builder.glob = glob
+    builder.input_dir = Path(input_dir).expanduser().absolute()
 
     builder.collect_input_files()
 
@@ -747,7 +737,7 @@ def command_validate_collection(
     """Validate a STAC collection."""
     collection = Collection.from_file(collection_file)
     collection.validate_all()
-    
+
 
 def command_post_process_collection(
     collection_file: Path,

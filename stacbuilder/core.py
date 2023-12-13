@@ -1,6 +1,6 @@
 # TODO: rename and restructure: this module contains mostly InputPathParsers.
-#   It was named core because a lot of other modules will import from here 
-#   and we need to prevent circular imports; but that doesn't say what it 
+#   It was named core because a lot of other modules will import from here
+#   and we need to prevent circular imports; but that doesn't say what it
 #   really does anymore.
 
 import abc

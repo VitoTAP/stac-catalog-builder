@@ -4,10 +4,8 @@ import pyproj
 
 
 def reproject_bounding_box(
-        west: float, south: float, east: float, north: float,
-        from_crs: str, 
-        to_crs: str
-    ) -> List[float]:
+    west: float, south: float, east: float, north: float, from_crs: str, to_crs: str
+) -> List[float]:
     """
     Reproject given bounding box dictionary
 
