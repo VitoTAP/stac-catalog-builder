@@ -108,7 +108,7 @@ TIFF_INPUT_DIR := /data/MTDA/PEOPLE_EA/Landsat_three-annual_NDWI_v1/
 # ------------------------------------------------------------------------------
 # GLOB_PATTERN
 # ------------------------------------------------------------------------------
-# Glob pattern to find the GeoTIFF files.
+# Glob pattern to find the GeoTIFF files inside TIFF_INPUT_DIR.
 GLOB_PATTERN := */*.tif
 
 
@@ -147,7 +147,7 @@ TEST_OUTPUT_DIR := $(OUT_DIR_ROOT)/STAC_wip/$(CATALOG_VERSION)
 
 
 # The normal way to configure the PUBLISH_DIR and PUBLISH_DIR_ROOT
-# In the template file it is set to a differnt safe value that is inside the local git repo.
+# In the template file it is set to a different safe value that is inside the local git repo.
 # PUBLISH_DIR_ROOT := /data/users/Public/johan.schreurs/PEOPLE_EA/STAC-for-review
 
 # Use this pattern with PUBLISH_DIR_ROOT set to an absolute path (not derived from other variable) 
@@ -164,7 +164,7 @@ PUBLISH_DIR_ROOT := $(OUT_DIR_ROOT)/STAC_publish
 PUBLISH_DIR := $(OUT_DIR_ROOT)/STAC_publish/$(CATALOG_VERSION)
 
 
-TEST_OPENEO_DIR = $(OUT_DIR_ROOT)/openeo
+TEST_OPENEO_DIR = $(OUT_DIR_ROOT)/openeo-test-out
 
 
 # ==============================================================================
@@ -192,6 +192,7 @@ show-config:
 	@echo "TIFF_INPUT_DIR=$(TIFF_INPUT_DIR)"
 	@echo "GLOB_PATTERN=$(GLOB_PATTERN)"
 	@echo "TEST_OUTPUT_DIR=$(TEST_OUTPUT_DIR)"
+	@echo "TEST_OPENEO_DIR=$(TEST_OPENEO_DIR)"
 	@echo "PUBLISH_DIR=$(PUBLISH_DIR)"
 .PHONY: show-config
 
@@ -255,6 +256,17 @@ validate:
 	$(PYTHON) stacbuilder validate "$(TEST_OUTPUT_DIR)/collection.json"
 
 
+# .PHONY: test-openeo
+# test-openeo:
+# ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+# 	$(PYTHON) stacbuilder test-openeo \
+# 	-v \
+# 	-b $(OPENEO_BACKEND_URL) \
+# 	-o $(TEST_OPENEO_DIR) \
+# 	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
+# 	--epsg=3035 \
+# 	"$(PUBLISH_DIR)/collection.json"
+
 .PHONY: test-openeo
 test-openeo:
 ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
@@ -262,8 +274,6 @@ test-openeo:
 	-v \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
-	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
-	--epsg=3035 \
 	"$(PUBLISH_DIR)/collection.json"
 
 
@@ -276,9 +286,21 @@ test-openeo-dryrun:
 	--dry-run \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
-	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
-	--epsg=3035 \
 	"$(PUBLISH_DIR)/collection.json"
+
+
+# .PHONY: test-openeo-dryrun
+# test-openeo-dryrun:
+# ## Dry-run show what extent / config would be uses to test the STAC collection 
+# ## in open-EO with load_stac by downloading a small part of it.
+# 	$(PYTHON) stacbuilder test-openeo \
+# 	-v \
+# 	--dry-run \
+# 	-b $(OPENEO_BACKEND_URL) \
+# 	-o $(TEST_OPENEO_DIR) \
+# 	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
+# 	--epsg=3035 \
+# 	"$(PUBLISH_DIR)/collection.json"
 
 
 $(PUBLISH_DIR):

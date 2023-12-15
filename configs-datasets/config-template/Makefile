@@ -109,7 +109,7 @@ TIFF_INPUT_DIR := /data/MTDA/PEOPLE_EA/PEOPLE_INCA_cfactor/
 # ------------------------------------------------------------------------------
 # GLOB_PATTERN
 # ------------------------------------------------------------------------------
-# Glob pattern to find the GeoTIFF files.
+# Glob pattern to find the GeoTIFF files inside TIFF_INPUT_DIR.
 GLOB_PATTERN := "*.tif"
 
 
@@ -122,7 +122,7 @@ GLOB_PATTERN := "*.tif"
 # a subfolder with a simple version number.
 # This is not a hard requirement but often very handy when you are trying to
 # correct problems.
-CATALOG_VERSION := v0.3
+CATALOG_VERSION := v0.1
 
 # ------------------------------------------------------------------------------
 # OUT_DIR_ROOT
@@ -147,7 +147,7 @@ TEST_OUTPUT_DIR := $(OUT_DIR_ROOT)/STAC_wip/$(CATALOG_VERSION)
 
 
 # The normal way to configure the PUBLISH_DIR and PUBLISH_DIR_ROOT
-# In the template file it is set to a differnt safe value that is inside the local git repo.
+# In the template file it is set to a different safe value that is inside the local git repo.
 # PUBLISH_DIR_ROOT := /data/users/Public/johan.schreurs/PEOPLE_EA/STAC-for-review
 
 # Use this pattern with PUBLISH_DIR_ROOT set to an absolute path (not derived from other variable) 
@@ -164,7 +164,7 @@ PUBLISH_DIR_ROOT := $(OUT_DIR_ROOT)/STAC_publish
 PUBLISH_DIR := $(OUT_DIR_ROOT)/STAC_publish/$(CATALOG_VERSION)
 
 
-TEST_OPENEO_DIR = $(OUT_DIR_ROOT)/openeo
+TEST_OPENEO_DIR = $(OUT_DIR_ROOT)/openeo-test-out
 
 
 # ==============================================================================
@@ -192,6 +192,7 @@ show-config:
 	@echo "TIFF_INPUT_DIR=$(TIFF_INPUT_DIR)"
 	@echo "GLOB_PATTERN=$(GLOB_PATTERN)"
 	@echo "TEST_OUTPUT_DIR=$(TEST_OUTPUT_DIR)"
+	@echo "TEST_OPENEO_DIR=$(TEST_OPENEO_DIR)"
 	@echo "PUBLISH_DIR=$(PUBLISH_DIR)"
 .PHONY: show-config
 

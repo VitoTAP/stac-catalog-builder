@@ -99,13 +99,24 @@ def list_tiffs(glob, inputdir):
     help="Configuration file for the collection",
 )
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
+@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
 )
-def list_metadata(collection_config, glob, inputdir, max_files):
-    """Build a STAC collection from a directory of geotiff files."""
-    command_list_metadata(collection_config_path=collection_config, glob=glob, input_dir=inputdir, max_files=max_files)
+def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
+    """List intermediary metadata per GeoTIFFs.
+
+    You can optionally save the metadata as a shapefile and geoparquet so you
+    can inspect the bounding boxes as well as the data.
+    """
+    command_list_metadata(
+        collection_config_path=collection_config,
+        glob=glob,
+        input_dir=inputdir,
+        max_files=max_files,
+        save_dataframe=save_dataframe,
+    )
 
 
 @cli.command()
@@ -119,26 +130,41 @@ def list_metadata(collection_config, glob, inputdir, max_files):
     help="Configuration file for the collection",
 )
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
+@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
 )
-def list_items(collection_config, glob, inputdir, max_files):
-    """Build a STAC collection from a directory of geotiff files."""
+def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
+    """List generated STAC items.
+
+    You can optionally save the metadata as a shapefile and geoparquet so you
+    can inspect the bounding boxes as well as the data.
+    """
     command_list_stac_items(
-        collection_config_path=collection_config, glob=glob, input_dir=inputdir, max_files=max_files
+        collection_config_path=collection_config,
+        glob=glob,
+        input_dir=inputdir,
+        max_files=max_files,
+        save_dataframe=save_dataframe,
     )
 
 
 @cli.command()
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def show_collection(collection_file):
+    """Read the STAC collection file and display its contents.
+
+    You can use this to see if it can be loaded.
+    """
     command_load_collection(collection_file)
 
 
 @cli.command()
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
+    """Run STAC validation on the collection file."""
+
     command_validate_collection(collection_file)
 
 
@@ -157,6 +183,13 @@ def validate(collection_file):
 )
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def post_process(outputdir, collection_config, collection_file):
+    """Run only the postprocessing.
+
+    Optionally saves the postprocessing result as a separate collection so you
+    can re-run easily.
+    You make have to do that many times when debugging postpreocessing
+    and waiting for collections to be build is annoying.
+    """
     command_post_process_collection(
         collection_file=collection_file, collection_config_path=collection_config, output_dir=outputdir
     )
@@ -183,7 +216,7 @@ def post_process(outputdir, collection_config, collection_file):
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
 )
 def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, dry_run, verbose):
-    """Test a STAC collection can be read in open-EO.
+    """Test STAC collection via load_stac in open-EO.
 
     It guesses a reasonable spatial and temporal extent based on what
     extent the collection declares.

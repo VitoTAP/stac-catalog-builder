@@ -160,6 +160,10 @@ class STACBuilder:
         # print("Saving GeoJSON file with footprints of the STAC items ...")
         # self.save_footprints()
 
+        df = self.get_stac_items_as_geodataframe()
+        out_dir = Path("tmp/visualization") / self.collection_id
+        _save_geodataframe(df, out_dir, "stac_items")
+
         print("DONE")
 
     def post_process_collection(self, collection_file: Path, output_dir: Optional[Path] = None):
@@ -361,25 +365,50 @@ class STACBuilder:
             if item:
                 yield item
 
-    def metadata_as_dataframe(self) -> pd.DataFrame:
-        """Parse the dataset to a pandas dataframe containing the attributes
-        of Metadata, for inspection and troubleshooting.
-        """
-        return pd.DataFrame.from_records(md.to_dict() for md in self.try_parse_metadata())
+    # def metadata_as_dataframe(self) -> pd.DataFrame:
+    #     """Parse the dataset to a pandas dataframe containing the attributes
+    #     of Metadata, for inspection and troubleshooting.
+    #     """
+    #     return pd.DataFrame.from_records(md.to_dict() for md in self.try_parse_metadata())
 
-    def metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
-        """Parse the dataset to a pandas dataframe containing the attributes
-        of Metadata, for inspection and troubleshooting.
-        """
-        meta_list = list(self.try_parse_metadata())
-        epsg = meta_list[0].proj_epsg
-        return gpd.GeoDataFrame(meta_list, crs=epsg)
+    # def metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
+    #     """Parse the dataset to a pandas dataframe containing the attributes
+    #     of Metadata, for inspection and troubleshooting.
+    #     """
+    #     meta_list = list(self.try_parse_metadata())
+    #     epsg = meta_list[0].proj_epsg
+    #     return gpd.GeoDataFrame(meta_list, crs=epsg)
 
-    def items_as_dataframe(self) -> pd.DataFrame:
-        """Parse the dataset to a pandas dataframe containing the attributes of
-        pystac.Item, for inspection and troubleshooting.
-        """
-        return pd.DataFrame.from_records(it.to_dict() for it in self.try_parse_items())
+    # def items_as_dataframe(self) -> pd.DataFrame:
+    #     """Parse the dataset to a pandas dataframe containing the attributes of
+    #     pystac.Item, for inspection and troubleshooting.
+    #     """
+    #     return pd.DataFrame.from_records(it.to_dict() for it in self.try_parse_items())
+
+    def convert_fields_to_string(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out_records = [dict(rec) for rec in records]
+        for rec in out_records:
+            for key, val in rec.items():
+                if isinstance(val, dt.datetime):
+                    rec[key] = val.isoformat()
+                elif isinstance(val, list):
+                    rec[key] = json.dumps(val)
+        return out_records
+
+    def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
+        item_list = list(self.get_stac_items())
+        if not item_list:
+            raise InvalidOperation("There are no STAC items. Can not create a GeoDataFrame")
+
+        epsg = item_list[0].properties.get("proj:epsg", 4326)
+        records = self.convert_fields_to_string(i.to_dict() for i in item_list)
+        shapes = [shape(item.geometry) for item in item_list]
+        return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
+
+    def get_stac_items(self) -> Iterable[pystac.Item]:
+        if not self.collection:
+            return []
+        return self.collection.get_all_items()
 
     def create_collection(self):
         """Create a empty pystac.Collection for the dataset."""
@@ -1261,7 +1290,7 @@ class CommandNewPipeline:
         glob: str,
         input_dir: Path,
         max_files: Optional[int] = -1,
-        as_dataframe: bool = True,
+        save_dataframe: bool = True,
     ):
         """Build a STAC collection from a directory of geotiff files."""
 
@@ -1272,22 +1301,14 @@ class CommandNewPipeline:
 
         pipeline = GeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
-        if as_dataframe:
+        for meta in pipeline.get_metadata():
+            pprint.pprint(meta.to_dict(include_internal=True))
+            print()
+
+        if save_dataframe:
             df = pipeline.get_metadata_as_geodataframe()
-            out_dir = Path("tmp/visualization")
+            out_dir = Path("tmp/visualization") / coll_cfg.collection_id
             _save_geodataframe(df, out_dir, "metadata_table")
-
-            # shp_dir = out_dir / "shp"
-            # if not shp_dir.exists():
-            #     shp_dir.mkdir(parents=True)
-            # df.to_csv(out_dir / "metadata_table.csv", sep="|")
-            # df.to_file(out_dir / "shp/metadata_table.shp")
-            # df.to_parquet(out_dir / "metadata_table.parquet")
-
-        else:
-            for meta in pipeline.get_metadata():
-                pprint.pprint(meta.to_dict(include_internal=True))
-                print()
 
     @staticmethod
     def command_list_stac_items(
@@ -1295,7 +1316,7 @@ class CommandNewPipeline:
         glob: str,
         input_dir: Path,
         max_files: Optional[int] = -1,
-        as_dataframe: bool = True,
+        save_dataframe: bool = True,
     ):
         """Build a STAC collection from a directory of geotiff files."""
 
@@ -1306,13 +1327,13 @@ class CommandNewPipeline:
 
         pipeline = GeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
-        if as_dataframe:
+        for item in pipeline.get_stac_items():
+            pprint.pprint(item.to_dict())
+
+        if save_dataframe:
             df = pipeline.get_stac_items_as_geodataframe()
-            out_dir = Path("tmp/visualization")
+            out_dir = Path("tmp/visualization") / coll_cfg.collection_id
             _save_geodataframe(df, out_dir, "stac_items")
-        else:
-            for item in pipeline.get_stac_items():
-                pprint.pprint(item.to_dict())
 
 
 def _save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
@@ -1320,9 +1341,18 @@ def _save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) ->
     if not shp_dir.exists():
         shp_dir.mkdir(parents=True)
 
-    gdf.to_csv(out_dir / f"{table_name}.csv", sep="|")
-    gdf.to_file(out_dir / f"shp/{table_name}.shp")
-    gdf.to_parquet(out_dir / f"{table_name}.parquet")
+    csv_path = out_dir / f"{table_name}.csv"
+    shapefile_path = out_dir / f"shp/{table_name}.shp"
+    parquet_path = out_dir / f"{table_name}.parquet"
+
+    print(f"Saving pipe-separated CSV file to: {csv_path}")
+    gdf.to_csv(csv_path, sep="|")
+
+    print(f"Saving shapefile to: {shapefile_path }")
+    gdf.to_file(shapefile_path)
+
+    print(f"Saving geoparquet to: {parquet_path}")
+    gdf.to_parquet(parquet_path)
 
 
 # Switch to the new commands, comment out to use the old commands again.
