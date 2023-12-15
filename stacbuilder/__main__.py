@@ -138,6 +138,14 @@ def show_collection(collection_file):
 
 @cli.command()
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+def show_footprints(collection_file):
+    from stacbuilder.builder import command_save_footprint
+
+    command_save_footprint(collection_file)
+
+
+@cli.command()
+@click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
     command_validate_collection(collection_file)
 

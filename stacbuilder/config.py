@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Set, Union
 
 
+import numpy as np
 from pydantic_core import ErrorDetails
 from pydantic import BaseModel, ConfigDict, HttpUrl, ValidationError
 from pystac import MediaType
@@ -74,7 +75,10 @@ class EOBandConfig(BaseModel):
     name: str
     description: str
     data_type: str
-    nodata: Optional[Union[int, float]] = None
+
+    # TODO: how do we store NaN in JSON?
+    nodata: Optional[Union[int, float, str]] = None
+
     sampling: Optional[str] = None
     spatial_resolution: Optional[int] = None
 
@@ -126,6 +130,16 @@ class CollectionConfig(BaseModel):
     # TODO: links (urls)
 
     overrides: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_json_str(cls, json_str: str) -> "CollectionConfig":
+        return CollectionConfig.model_validate_json(json_str)
+
+    @classmethod
+    def from_json_file(cls, path: str | Path) -> "CollectionConfig":
+        cfg_path = Path(path)
+        contents = cfg_path.read_text()
+        return cls.from_json_str(contents)
 
 
 @dc.dataclass

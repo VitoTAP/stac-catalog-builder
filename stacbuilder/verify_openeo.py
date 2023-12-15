@@ -137,7 +137,7 @@ def create_cube(
     max_spatial_ext_size: float = None,
 ) -> None:
     collection = Collection.from_file(collection_path)
-    extent_temporal = find_temporal_extent(collection, use_full=True)
+    extent_temporal = find_temporal_extent(collection, use_full=False)
     print(f"{extent_temporal=}")
 
     proj_bbox, proj_epsg = find_proj_bbox(collection)

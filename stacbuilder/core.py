@@ -78,12 +78,13 @@ class RegexInputPathParser(InputPathParser):
         self._fixed_values = fixed_values or {}
 
         self._data = None
+        self._path = None
 
     def parse(self, input_file: Union[Path, str]) -> Dict[str, Any]:
         data = {}
-        input_file_str = str(input_file)
+        self._path = str(input_file)
 
-        match = self._regex.search(input_file_str)
+        match = self._regex.search(self._path)
         if match:
             data = match.groupdict()
 
@@ -100,9 +101,9 @@ class RegexInputPathParser(InputPathParser):
 
         import pprint
 
-        # print(f"{input_file=}")
-        # pprint.pprint(self._data)
-        # print()
+        print(f"{input_file=}")
+        pprint.pprint(self._data)
+        print()
 
         return self._data
 
@@ -145,6 +146,52 @@ class LandsatNDWIInputPathParser(RegexInputPathParser):
         year = start_dt.year
         # month = start_dt.month
         # end_month = calendar.monthrange(year, month)[1]
+        return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
+
+
+class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
+    def __init__(self, *args, **kwargs) -> None:
+        type_converters = {
+            "year": int,
+            "month": int,
+            "day": int,
+        }
+        regex_pattern = ".*/PEOPLE_INCA_c-factor_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2}).*\\.tif$"
+        fixed_values = {"band": "cfactor"}
+        super().__init__(
+            regex_pattern=regex_pattern, type_converters=type_converters, fixed_values=fixed_values, *args, **kwargs
+        )
+
+    def _post_process_data(self):
+        start_dt = self._get_start_datetime()
+        self._data["datetime"] = start_dt
+        self._data["start_datetime"] = start_dt
+        self._data["end_datetime"] = self._get_end_datetime()
+
+    def _get_start_datetime(self):
+        year = self._data.get("year")
+        month = self._data.get("month")
+        day = self._data.get("day")
+        print(f"DEBUG: {year=}, {month=}, {day=}, {self._data=}, {self._path=}")
+
+        if not (year and month and day):
+            print(
+                "WARNING: Could not find all date fields: "
+                + f"{year=}, {month=}, {day=}, {self._data=},\n{self._path=}\n{self._regex.pattern=}"
+            )
+            return None
+
+        return dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
+
+    def _get_end_datetime(self):
+        start_dt = self._get_start_datetime()
+        if not start_dt:
+            print(
+                "WARNING: Could not determine start_datetime: " + f"{self._data=}, {self._path=}, {self._regex.pattern}"
+            )
+            return None
+
+        year = start_dt.year
         return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
 
 

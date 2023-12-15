@@ -21,6 +21,7 @@ def test_factory():
             "ERA5LandInputPathParser",
             "ANINPathParser",
             "LandsatNDWIInputPathParser",
+            "PeopleEAIncaCFactorInputPathParser",
         ]
     )
     assert InputPathParserFactory.implementation_names == expected_names
