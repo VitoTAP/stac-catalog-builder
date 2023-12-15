@@ -1,0 +1,40 @@
+{
+    "collection_id": "REPLACE_THIS--COLLECTION_ID",
+    "title": "REPLACE_THIS--COLLECTION_TITLE",
+    "description": "REPLACE_THIS--COLLECTION_DESCRIPTION",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/{year}",
+    "input_path_parser": {
+        "classname": "RegexInputPathParser"
+    },
+    "item_assets": {
+        "cfactor": {
+            "title": "REPLACE_THIS--BAND_NAME",
+            "description": "REPLACE_THIS--BAND_NAME",
+            "eo_bands": [
+                {
+                    "name": "REPLACE_THIS--BAND_NAME",
+                    "description": "REPLACE_THIS--BAND_DESCRIPTION",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 100
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}

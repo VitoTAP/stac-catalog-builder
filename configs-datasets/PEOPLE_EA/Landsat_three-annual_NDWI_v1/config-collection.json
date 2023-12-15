@@ -1,0 +1,60 @@
+{
+    "collection_id": "Landsat_three-annual_NDWI_v1",
+    "title": "Landsat_three-annual_NDWI_v1",
+    "description": "Landsat three-annual NDWI v1",
+    "instruments": [],
+    "keywords": ["PEOPLE_EA"],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/${year}",
+    "input_path_parser": {
+        "classname": "LandsatNDWIInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/NDWI_(?P<year>\\d{4})_(?P<tile_row>\\d+)_(?P<tile_col>\\d+).tif$",
+            "fixed_values": {
+                "band": "NDWI"
+            }
+        }
+    },
+    "item_assets": {
+        "NDWI": {
+            "title": "Landsat NDWI",
+            "description": "Landsat NDWI",
+            "eo_bands": [
+                {
+                    "name": "NDWI",
+                    "description": "NDWI",
+                    "data_type": "float32"
+                }
+            ]
+        }
+    },
+    "overrides": {
+        "extent/spatial/bbox": [
+            [
+            -58.6572887,
+            24.4650791,
+            39.6002888,
+            54.7014217
+            ]
+        ],
+        "properties/proj:epsg": 3035,
+        "properties/proj:bbox": [
+            665000.0,
+            746700.0,
+            7332600.0,
+            5491700.0
+            ]
+    }
+}

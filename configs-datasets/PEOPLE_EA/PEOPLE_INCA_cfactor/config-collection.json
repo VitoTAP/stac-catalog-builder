@@ -1,0 +1,40 @@
+{
+    "collection_id": "PEOPLE_INCA_cfactor",
+    "title": "PEOPLE_INCA_cfactor",
+    "description": "PEOPLE_INCA_cfactor",
+    "instruments": [],
+    "keywords": ["PEOPLE_EA"],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "PeopleEAIncaCFactorInputPathParser"
+    },
+    "item_assets": {
+        "cfactor": {
+            "title": "c-factor",
+            "description": "c-factor",
+            "eo_bands": [
+                {
+                    "name": "cfactor",
+                    "description": "c-factor",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 100
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
