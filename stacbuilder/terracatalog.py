@@ -248,11 +248,10 @@ def main():
     collections = list(catalogue.get_collections())
     coll = collections[0]
     pprint(dir(coll))
-    breakpoint()
+
     list_products(catalogue, coll)
 
     # df = collections_to_dataframe(catalogue)
-    # breakpoint()
 
     # pprint(df)
 

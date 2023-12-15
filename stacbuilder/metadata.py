@@ -25,7 +25,6 @@ class Metadata:
         extract_href_info: InputPathParser,
         read_href_modifier: Optional[ReadHrefModifier] = None,
     ):
-        # breakpoint()
         if read_href_modifier:
             modified_href = read_href_modifier(href)
         else:
