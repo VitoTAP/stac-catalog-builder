@@ -4,7 +4,7 @@ from typing import List
 import pytest
 
 
-from stacbuilder.core import (
+from stacbuilder.pathparsers import (
     InputPathParserFactory,
     RegexInputPathParser,
     ERA5LandInputPathParser,

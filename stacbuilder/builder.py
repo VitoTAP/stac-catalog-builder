@@ -26,7 +26,7 @@ from stactools.core.io import ReadHrefModifier
 import rio_stac.stac as rst
 
 
-from stacbuilder.core import (
+from stacbuilder.pathparsers import (
     InputPathParser,
     InputPathParserFactory,
 )
@@ -50,6 +50,13 @@ from enum import IntEnum, auto
 
 
 class ProcessingLevels(IntEnum):
+    """How far in the processing pipeline you want to go.
+    For checking whether all settings are set, because not every step needs
+    every parameter (input dir, glob, output dir, collection config, etc. ).
+
+    TODO: Find a better solution for validating the parameters. This is clunky.
+    """
+
     COLLECT_INPUTS = 1
     """Collect input files """
 
@@ -73,6 +80,7 @@ class STACBuilder:
     """Builds a STAC collections for a dataset of GeoTIFF files in a directory.
 
     At present: only for a file system, not object storage (yet).
+    Working on a more flexible solution.
     """
 
     DEFAULT_EXTENT = Extent(
@@ -808,10 +816,10 @@ class GeoTiffToSTACItem:
 
         description = self.item_assets_configs[metadata.item_type].description
         item.common_metadata.description = description
-        # item.common_metadata.description = self.collection_description
 
         item.common_metadata.created = dt.datetime.utcnow()
 
+        # TODO: support optional parts: these fields are recommended but they are also not always relevant or present.
         # item.common_metadata.mission = constants.MISSION
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
@@ -824,6 +832,8 @@ class GeoTiffToSTACItem:
         item_proj.geometry = metadata.proj_geometry
         item_proj.transform = metadata.transform
 
+        # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
+        #    that is not alwyas the case.
         # grid = GridExtension.ext(item, add_if_missing=True)
         # grid.code = f"TILE-{metadata.tile}"
 

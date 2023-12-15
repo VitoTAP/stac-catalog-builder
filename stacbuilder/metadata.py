@@ -11,7 +11,7 @@ from stactools.core.io import ReadHrefModifier
 from openeo.util import rfc3339, normalize_crs
 
 
-from stacbuilder.core import InputPathParser
+from stacbuilder.pathparsers import InputPathParser
 from stacbuilder.projections import reproject_bounding_box
 
 
