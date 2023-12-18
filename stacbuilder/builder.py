@@ -602,6 +602,7 @@ class STACBuilder:
         item_proj.bbox = metadata.proj_bbox
         item_proj.geometry = metadata.proj_geometry
         item_proj.transform = metadata.transform
+        item_proj.shape = metadata.shape
 
         # grid = GridExtension.ext(item, add_if_missing=True)
         # grid.code = f"TILE-{metadata.tile}"
