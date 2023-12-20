@@ -105,7 +105,6 @@ dependencies:
       - six==1.16.0
       - sniffio==1.3.0
       - snuggs==1.4.7
-      - stac-catalog-builder==0.0.1
       - stac-validator==3.3.2
       - stactools==0.5.3
       - tomli-w==1.0.0
