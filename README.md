@@ -124,6 +124,104 @@ It is a JSON file containing some variables that we need to know to ba able to b
 
 This file is loaded and validated through Pydantic.
 
+Below some explanation of the items in the config file.
+Since the JSON format doesn't support comments, I'm commenting it here instead, in the README.
+
+The code that defines these configurations is located in: [./stacbuilder/config.py](./stacbuilder/config.py)
+Each configuration is a subclass of Pydantic BaseModel.
+These models can also be nested. You will find CollectionConfig uses other models as the contents of some of its fields.
+
+
+Collection configuration file: corresponds to class `CollectionConfig`.
+
+```JSON
+{
+    "collection_id": "your-collection-id",
+    "title": "Title for your collection",
+    "description": "Description for your collection",
+
+    // instruments is a list of strings
+    "instruments": [],
+
+    // keywords is a list of strings
+    "keywords": [],
+
+    // keywords is a list of strings
+    "mission": [],
+
+    // platform is a list of strings
+    "platform": [],
+
+    // providers is defined as a list of ProviderModels, see. the class definition: ProviderModels
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+
+    // layout_strategy is something from pystac that automatically creates 
+    // subfolders for the STAC items JSON files.
+    "layout_strategy_item_template": "${collection}/{year}",
+
+    // We extract some metadata from the geotiff's file path using a subclass of InputPathParser.
+    // Path parsers are defined in stacbuilder/pathparsers.py
+    //
+    // You probably will need to write a subclass to customize for your particular
+    // needs, unless it happens to fit a simple existing case.
+    //
+    // Below you fill in the class name to use.
+    // For how the tool finds the right class:
+    //  see the classes InputPathParserFactory and InputPathParser.
+    //
+    // While it is technically also possible to define parameters that would be
+    // passed to the constructor, at present, it is just easier to just write a
+    // subclass specifically for the collection and give that a no-arguments constructor.
+    "input_path_parser": {
+        "classname": "RegexInputPathParser"
+    },
+    
+
+    //
+    // `item_assets` defines what assets STAC Items have and what bands the assets contain.
+    //
+    // This is a dictionary that maps the asset type to an asset definition
+    // Asset definition are defined by the class `AssetConfig`.
+    // We assume each file is an asset, but depending on the file name it could
+    // be a different type of item, therefore "item_type".
+    // if there is only on type of item, make your InputPathParser return a fixed value for 
+    "item_assets": {
+        "some_item_type": {
+            "title": "REPLACE_THIS--BAND_NAME",
+            "description": "REPLACE_THIS--BAND_NAME",
+            "eo_bands": [
+                {
+                    "name": "REPLACE_THIS--BAND_NAME",
+                    "description": "REPLACE_THIS--BAND_DESCRIPTION",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 100
+                }
+            ]
+        }
+    },
+
+    // See .stacbuilder/config.py,  class: CollectionConfig
+    // This dictionary allows us to fill in or overwrite some fields with values
+    // that we just want to give a fixed value. This is done at the very end of
+    // the process in a post-processing step.
+    "overrides": {}
+}
+```
+
+
+
+
 #### 2. `Makefile`
 
 See: [configs-datasets/config-template/Makefile](configs-datasets/config-template/Makefile)

@@ -1,8 +1,15 @@
-import abc
+"""
+Model classes for the configuration of a STAC collection and all its components.
+
+These are Pydantic model classes.
+
+You can ignore the Form classes.
+That idea didn't go very far and is likely to be removed at this point.
+"""
+
 import dataclasses as dc
-import json
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 
 import numpy as np
@@ -126,9 +133,16 @@ class CollectionConfig(BaseModel):
     input_path_parser: Optional[InputPathParserConfig] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
+    # Defines Items with their assets and what bands the assets contain.
     item_assets: Optional[Dict[str, AssetConfig]] = {}
+
     # TODO: links (urls)
 
+    # A set of specific fields we want to give a fixed value at the end.
+    # So this could override values that were generated.
+    # For example I have used to to correct the collection's extent as a
+    # temporary fix when there was something wrong, and to add a projected BBox as well.
+    # This is done at the very end in the post-processing step of the builder.
     overrides: Optional[Dict[str, Any]] = None
 
     @classmethod
