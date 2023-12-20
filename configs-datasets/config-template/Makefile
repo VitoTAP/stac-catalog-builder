@@ -32,11 +32,10 @@ STACBLD_PYTHON_BIN := /home/johan.schreurs/mambaforge/envs/mf_stac-catalog-build
 
 # It is best to set STACBLD_PYTHON_BIN, but we can fall back to a local
 # virtualenv if there is one.
-# However, on Terrascope it is very difficult to create correct virtualenvs,
-# because the OS is so old, and everything works against normal approaches
-# such as using pyenv for newer, separate Python versions.
-# (Also OpenSSL is too old)
-# Using conda is the only way on Terrascope
+# However, on Terrascope it is very difficult to create working virtualenvs,
+# because some Python packages depend on OS-packges, and the yum package repo
+# does not have up to date versions of those depencies.
+# Using conda is the only way on Terrascope.
 VENV_DIR = .venv
 
 ifdef STACBLD_PYTHON_BIN
