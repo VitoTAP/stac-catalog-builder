@@ -6,7 +6,7 @@
 
 VENV_DIR := .venv
 
-PIP_EXTRA_INDEX_URL := https://artifactory.vgt.vito.be/artifactory/api/pypi/python-openeo/simple
+PIP_EXTRA_INDEX_URL := https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple
 
 # ========================================================
 # Variables derived from configuration
