@@ -10,7 +10,7 @@
 #
 # Settings about the input:
 # - DATASET_NAME
-# - 
+# -
 #
 # Settings about the output:
 # - OUT_DIR_ROOT
@@ -27,7 +27,7 @@
 # This is necessary because of the inflexible difficult setup on Terrascope
 # Watch out: on Terrascope the command `python`is really an alias to the
 # OS's python which is v3.6 and you should not use that one.
-STACBLD_PYTHON_BIN := /home/johan.schreurs/mambaforge/envs/mf_stac-catalog-builder/bin/python3
+STACBLD_PYTHON_BIN := /home/johan.schreurs/mambaforge/envs/stac-catalog-builder/bin/python3
 
 
 # It is best to set STACBLD_PYTHON_BIN, but we can fall back to a local
@@ -49,7 +49,7 @@ endif
 # WORKSPACE
 # ------------------------------------------------------------------------------
 # Your root folder for saving STAC files or other data.
-# 
+#
 # Some settings for other paths are derived from WORKSPACE.
 #
 # This is not the final output but a place to generate and review before you
@@ -73,12 +73,13 @@ MK_PATH = $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_PARENT = $(dir $(realpath $(MK_PATH)))
 WORKSPACE = $(realpath  $(MK_PARENT)../)
 
+
 # ------------------------------------------------------------------------------
 # DATASET_NAME
 # ------------------------------------------------------------------------------
 # Just the name of you collection.
 #
-# Typically the name of the folder where you read the input files. 
+# Typically the name of the folder where you read the input files.
 # ------------------------------------------------------------------------------
 DATASET_NAME := PEOPLE_INCA_cfactor
 
@@ -116,8 +117,8 @@ GLOB_PATTERN := "*.tif"
 # CATALOG_VERSION
 # ------------------------------------------------------------------------------
 # Name for a version subfolder for the version/revision of the STAC collection.
-# 
-# To be able to compare with the previously generated STAC, you may want to have 
+#
+# To be able to compare with the previously generated STAC, you may want to have
 # a subfolder with a simple version number.
 # This is not a hard requirement but often very handy when you are trying to
 # correct problems.
@@ -131,11 +132,11 @@ CATALOG_VERSION := v0.3
 OUT_DIR_ROOT := $(WORKSPACE)/${DATASET_NAME}
 
 # ------------------------------------------------------------------------------
-# OPENEO_BACKEND_URL 
+# OPENEO_BACKEND_URL
 # ------------------------------------------------------------------------------
 # URL for the open-EO backend to use when testing the STAC collection in
-# open-EO (via the python client) 
-OPENEO_BACKEND_URL = openeo-dev.vito.be
+# open-EO (via the python client)
+OPENEO_BACKEND_URL := openeo-dev.vito.be
 
 
 #
@@ -149,7 +150,7 @@ TEST_OUTPUT_DIR := $(OUT_DIR_ROOT)/STAC_wip/$(CATALOG_VERSION)
 # In the template file it is set to a different safe value that is inside the local git repo.
 # PUBLISH_DIR_ROOT := /data/users/Public/johan.schreurs/PEOPLE_EA/STAC-for-review
 
-# Use this pattern with PUBLISH_DIR_ROOT set to an absolute path (not derived from other variable) 
+# Use this pattern with PUBLISH_DIR_ROOT set to an absolute path (not derived from other variable)
 # PUBLISH_DIR := $(PUBLISH_DIR_ROOT)/${DATASET_NAME}/$(CATALOG_VERSION)
 
 
@@ -163,7 +164,22 @@ PUBLISH_DIR_ROOT := $(OUT_DIR_ROOT)/STAC_publish
 PUBLISH_DIR := $(OUT_DIR_ROOT)/STAC_publish/$(CATALOG_VERSION)
 
 
-TEST_OPENEO_DIR = $(OUT_DIR_ROOT)/openeo-test-out
+TEST_OPENEO_DIR := $(OUT_DIR_ROOT)/openeo-test-out
+
+
+#
+# MAX_TIFF_FILES allows to limit the number of files to process for a quicker test.
+# Set the environment variable MAX_TIFF_FILES to an integer.
+#
+# In bash you can do that on a one-line command for a single run, for example:
+#
+# 	MAX_TIFF_FILES=4 make -F <path to this file>  build-collection
+#
+# The default of -1 means: ignore this optiona and process all values.
+#
+ifndef MAX_TIFF_FILES
+	MAX_TIFF_FILES := -1
+endif
 
 
 # ==============================================================================
@@ -205,6 +221,7 @@ build-collection:
 		-g "$(GLOB_PATTERN)" \
 		-c $(COLLECTION_CONFIG) \
 		--overwrite \
+		--max-files $(MAX_TIFF_FILES) \
 		$(TIFF_INPUT_DIR) \
 		$(TEST_OUTPUT_DIR)
 
@@ -216,8 +233,8 @@ list-tiffs:
 	$(PYTHON) stacbuilder \
 		-v list-tiffs \
 		-g "$(GLOB_PATTERN)" \
+		--max-files $(MAX_TIFF_FILES) \
 		$(TIFF_INPUT_DIR)
-
 
 
 .PHONY: list-metadata
@@ -226,7 +243,7 @@ list-metadata:
 	$(PYTHON) stacbuilder \
 		-v list-metadata \
 		-g "$(GLOB_PATTERN)" \
-		-m 20 \
+		--max-files $(MAX_TIFF_FILES) \
 		-c $(COLLECTION_CONFIG) \
 		--save-dataframe \
 		$(TIFF_INPUT_DIR)
@@ -239,6 +256,7 @@ list-items:
 	$(PYTHON) stacbuilder \
 		-v list-items \
 		-g "$(GLOB_PATTERN)" \
+		--max-files $(MAX_TIFF_FILES) \
 		-c $(COLLECTION_CONFIG) \
 		--save-dataframe \
 		$(TIFF_INPUT_DIR)
@@ -270,7 +288,7 @@ test-openeo:
 
 .PHONY: test-openeo-dryrun
 test-openeo-dryrun:
-## Dry-run show what extent / config would be uses to test the STAC collection 
+## Dry-run show what extent / config would be uses to test the STAC collection
 ## in open-EO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
 	-v \
@@ -328,4 +346,3 @@ clean-publish:
 ## misconfigured directory. But this is temporary, until we have a more robust
 ## way to to let you check and confirm you really want to really delete the files.
 	echo rm -r $(PUBLISH_DIR)
-

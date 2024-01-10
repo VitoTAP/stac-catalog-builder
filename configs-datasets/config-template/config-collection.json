@@ -22,9 +22,9 @@
         "classname": "RegexInputPathParser"
     },
     "item_assets": {
-        "cfactor": {
+        "REPLACE_THIS--BAND_NAME": {
             "title": "REPLACE_THIS--BAND_NAME",
-            "description": "REPLACE_THIS--BAND_NAME",
+            "description": "REPLACE_THIS--BAND_DESCRIPTIOn",
             "eo_bands": [
                 {
                     "name": "REPLACE_THIS--BAND_NAME",
