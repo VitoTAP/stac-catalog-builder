@@ -17,7 +17,7 @@ Either of three methods should work:
 
 - A) Use the `conda-environment.yaml` file to create a conda environment.
 - B) Create the conda environment manually and install each dependency.
-    You can follow the packages in requirements/requirements.txt. 
+    You can follow the packages in requirements/requirements.txt.
 - C) Create a virtualenv and use the requirements file to install the dependencies.
 
 For Terrascope, conda is the easiest way. Otherwise you will need to deal with outdated dependencies such as openssl. Some of these are not Python packages so you cannot isolate those with a virtualenv, but in a conda env you can often install a newer version independent of the operating systems's libraries.
@@ -66,10 +66,29 @@ See [`./requirements/requirements.txt`](./requirements/requirements.txt) for the
 
 ```bash
 # TODO: still issues installing some of the dependencies via conda, find out why
-conda install stactools=0.5.* openeo=0.23 stac-validator=3.3 pystac[validation]=1.8 rasterio=1.3 shapely=2.0 pyproj=3.6 click=8.1
+conda install stactools=0.5.* openeo=0.26 stac-validator=3.3 pystac[validation]=1.8 rasterio=1.3 shapely=2.0 pyproj=3.6 click=8.1
 ```
 
-- [ ] TODO: **update documentation**: I found out that some of the dependencies these are only available in pip, not in conda. So there are always a few left we need to pip-install.
+- [ ] TODO: **Verify updated documentation**: I found out that some of the dependencies are only available in pip, not in conda. So there are always a few left we need to pip-install. Are there other packages that only are available via pip/pypi?
+
+> ### NOTE
+>
+> The reason why the above command did not work is that I was using the conda-forge channel (via Miniforge) and those versions are not yet available on that channel.
+> Also openeo is not available on conda-forge, only on the regular conda channel.
+> I will have to test this in a regular conda install.
+>
+> Highest versions available in conda-forge (d.d. 2024-01-09):
+>
+> package | version on conda-forge | desired version
+> --- | --- | ---
+> pystac | 1.6.1 | 1.8
+> stac-validator | 3.2.0 | 3.3
+> stactools | 0.4.2 | 0.5
+> shapely | 1.8.5 | 2.0
+> pyproj | 3.4.0 | 3.6
+> click  | 8.1.3 | 8.1
+> openeo | N/A on conda-forge | 0.26
+
 
 
 ##### Installation for Using the STAC Builder Tool Only, no Development
@@ -118,7 +137,7 @@ The configuration consists of two files:
 
 See: [config-collection.json](configs-datasets/config-template/config-collection.json)
 
-This is the actual configuration file. 
+This is the actual configuration file.
 
 It is a JSON file containing some variables that we need to know to ba able to build the collection, for example, the collection ID, title, description. et cetera.
 
@@ -134,7 +153,7 @@ These models can also be nested. You will find CollectionConfig uses other model
 
 Collection configuration file: corresponds to class `CollectionConfig`.
 
-```JSON
+```yaml
 {
     "collection_id": "your-collection-id",
     "title": "Title for your collection",
@@ -165,7 +184,7 @@ Collection configuration file: corresponds to class `CollectionConfig`.
         }
     ],
 
-    // layout_strategy is something from pystac that automatically creates 
+    // layout_strategy is something from pystac that automatically creates
     // subfolders for the STAC items JSON files.
     "layout_strategy_item_template": "${collection}/{year}",
 
@@ -185,7 +204,7 @@ Collection configuration file: corresponds to class `CollectionConfig`.
     "input_path_parser": {
         "classname": "RegexInputPathParser"
     },
-    
+
 
     //
     // `item_assets` defines what assets STAC Items have and what bands the assets contain.
@@ -194,7 +213,7 @@ Collection configuration file: corresponds to class `CollectionConfig`.
     // Asset definition are defined by the class `AssetConfig`.
     // We assume each file is an asset, but depending on the file name it could
     // be a different type of item, therefore "item_type".
-    // if there is only on type of item, make your InputPathParser return a fixed value for 
+    // if there is only on type of item, make your InputPathParser return a fixed value for
     "item_assets": {
         "some_item_type": {
             "title": "REPLACE_THIS--BAND_NAME",
@@ -244,13 +263,13 @@ Output:
 
 ```shell
 $ make --dry-run -f configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/Makefile build-collection
-/home/johan.schreurs/mambaforge/envs/mf_stac-catalog-builder/bin/python3 stacbuilder \
+/home/demo-user/mambaforge/envs/stac-catalog-builder/bin/python3 stacbuilder \
         -v build \
         -g "*/*.tif" \
-        -c /data/users/Public/johan.schreurs/codebases/vito-git-repo/STAC-catalog-builder/configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/config-collection.json \
+        -c /home/demo-user/stac-catalog-builder/configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/config-collection.json \
         --overwrite \
         /data/MTDA/PEOPLE_EA/Landsat_three-annual_NDWI_v1/ \
-        /data/users/Public/johan.schreurs/codebases/vito-git-repo/STAC-catalog-builder/configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/STAC_wip/v0.4
+        /home/demo-user/stac-catalog-builder/configs-datasets/configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/STAC_wip/v0.4
 ```
 
 I tried to make the Makefile reasonably self-documenting.
@@ -274,7 +293,7 @@ In that case you need to point `make` to the Makefile with the `-f <path to make
 Example: `-f <path to makefile>`
 
 ```shell
-# run this at the root of the git repo 
+# run this at the root of the git repo
 make -f configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/Makefile
 ```
 
@@ -293,10 +312,10 @@ The configuration parameters are set up a the top of the Makefile and they are m
 Set this to the path of your python executable so make uses the correct python.
 This is not the nicest solution, but necessary for now to get things to work.
 
-Example: 
+Example:
 
 ```make
-STACBLD_PYTHON_BIN := /home/johan.schreurs/mambaforge/envs/mf_stac-catalog-builder/bin/python3
+STACBLD_PYTHON_BIN := /home/johan.schreurs/mambaforge/envs/stac-catalog-builder/bin/python3
 ```
 
 CAVEAT: on Terrascope the command `python` is really an alias to the system's Python.
@@ -306,7 +325,7 @@ Always use something more specific such as the absolute path or `python3`, `pyth
 
 `DATASET_NAME`: Just the name of you collection.
 
-Example: 
+Example:
 
 ```make
 DATASET_NAME :=  Landsat_three-annual_NDWI_v1
@@ -353,7 +372,7 @@ in order to have a setup that runs immediately.
 
 ## Stacbuilder commands and options
 
-There are two ways to run it: 
+There are two ways to run it:
 
 - A) Run the python file: __main__.py
 - B) Run it as a module
@@ -399,7 +418,7 @@ Commands:
 
 ```
 
-The main command is off course `build`. 
+The main command is off course `build`.
 The other commands are meant for troubleshooting and show you what metadata or stac items the tool would generate (So these commands don't a STAC collection).
 
 Another useful one is `test-openeo`, because for our purposes, the goal is that it works with load_stac in open-EO.
