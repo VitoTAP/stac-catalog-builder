@@ -36,8 +36,7 @@ def show_collections(catalogue: tcc.Catalogue):
 
 
 def collections_to_dataframe(catalogue: tcc.Catalogue) -> pd.DataFrame:
-
-    catalogue = Catalogue()
+    catalogue = tcc.Catalogue()
     collections = list(catalogue.get_collections())
     for c in collections:
         print(f"{c.id} - {c.properties['title']}")
@@ -118,7 +117,6 @@ def create_stac_collection(collection_info: tcc.Collection):
 
 
 def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | None, dt.datetime | None]:
-
     acquisitionInformation = collection.properties["acquisitionInformation"]
     pprint(acquisitionInformation)
     for info in acquisitionInformation:
@@ -140,7 +138,7 @@ def list_products(catalogue, collection: tcc.Collection):
     pprint(f"product count for coll_id{collection.id}: {num_prods}")
 
     dt_start, dt_end = get_coll_temporal_extent(collection)
-    duration = dt_end - dt_start
+    # duration = dt_end - dt_start
 
     dt_range_years = pd.date_range(dt_start, dt_end, freq="YS")
     dt_range_months = pd.date_range(dt_start, dt_end, freq="MS")
@@ -181,7 +179,6 @@ def list_products(catalogue, collection: tcc.Collection):
 
 
 def create_stac_item(product: tcc.Product) -> pystac.Item:
-
     data_links = product.properties.get("links", {}).get("data", [])
     href = data_links[0].get("href") if data_links else None
     title = product.title

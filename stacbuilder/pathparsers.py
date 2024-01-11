@@ -21,7 +21,6 @@ class UnknownInputPathParserClass(Exception):
 
 
 class InputPathParserFactory:
-
     _implementations = {}
 
     @classmethod
@@ -100,7 +99,6 @@ class RegexInputPathParser(InputPathParser):
         for key, value in self._fixed_values.items():
             data[key] = value
 
-
         # print(f"{self.__class__.__name__}.parse:: before postprocessing self._data: ")
         # pprint.pprint(self._data)
         # print()
@@ -151,8 +149,6 @@ class LandsatNDWIInputPathParser(RegexInputPathParser):
     def _get_end_datetime(self):
         start_dt = self._get_start_datetime()
         year = start_dt.year
-        # month = start_dt.month
-        # end_month = calendar.monthrange(year, month)[1]
         return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
 
 
@@ -230,7 +226,6 @@ class ERA5LandInputPathParser(RegexInputPathParser):
 
 class ANINPathParser(InputPathParser):
     def parse(self, input_file: Path) -> Dict[str, Any]:
-
         #
         # Example:
         #

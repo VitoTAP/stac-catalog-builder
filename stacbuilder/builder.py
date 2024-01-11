@@ -4,6 +4,7 @@ import logging
 import pprint
 import shutil
 import tempfile
+from enum import IntEnum
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Union, Protocol
@@ -23,6 +24,7 @@ from pystac.layout import TemplateLayoutStrategy
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 
 from pystac.extensions.projection import ItemProjectionExtension
+
 # TODO: add the GridExtension support again
 # from pystac.extensions.projection import ProjectionExtension
 from pystac.extensions.raster import RasterExtension
@@ -48,9 +50,6 @@ CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0
 
 class SettingsInvalid(Exception):
     pass
-
-
-from enum import IntEnum
 
 
 class ProcessingLevels(IntEnum):
@@ -655,14 +654,10 @@ class FileCollector(IDataCollector):
     """Collects geotiff files that match a glob, in a directory."""
 
     def __init__(
-            self,
-            input_dir: Optional[Path] = None,
-            glob: Optional[str] = "*",
-            max_files: Optional[int] = -1
-        ) -> None:
-
+        self, input_dir: Optional[Path] = None, glob: Optional[str] = "*", max_files: Optional[int] = -1
+    ) -> None:
         #
-        # Settings
+        # Settings: these are just data, not components we delegate work to.
         #
         # These are public members, or should have a public property.
         self.input_dir: Path = input_dir
@@ -670,11 +665,7 @@ class FileCollector(IDataCollector):
         self.max_files: int = max_files
         self._unify_not_set_to_defaults()
 
-        #
-        # Internal state below
-        #
-
-        # The result:
+        # The result
         self._input_files: List[Path] = None
 
     def _unify_not_set_to_defaults(self):
@@ -761,31 +752,6 @@ class ISTACItemCollector(IDataCollector):
         return self._metadata_list or []
 
 
-# TODO: we can probably eliminate this one.
-# class MapGeoTiffToMetaData:
-#     """Takes a path to a GeoTIFF and extract the Metadata for that file.
-
-#     Like a node in a pipeline.
-#     Intention is to be able to use generators with this processor, to
-#     parse large datasets more efficiently.
-#     """
-
-#     def __init__(self, path_parser: InputPathParser) -> None:
-#         self._path_parser = path_parser
-
-#     def map(self, file: Path) -> Metadata:
-#         """Extract the metadata for the specified GeoTIFF path."""
-#         return Metadata(
-#             href=str(file),
-#             extract_href_info=self._path_parser,
-#             read_href_modifier=None,
-#         )
-
-#     def map_all(self, files: Iterable[Path]) -> Iterable[Metadata]:
-#         """Return generator the converts all files to Metadata objects"""
-#         return (self.map(file) for file in files)
-
-
 class IMapMetadataToSTACItem(Protocol):
     """Like a mapping, converts intermediate Metadata objects STAC Items."""
 
@@ -799,35 +765,17 @@ class IMapMetadataToSTACItem(Protocol):
 
 
 class MapMetadataToSTACItem(IMapMetadataToSTACItem):
-
-    # def __init__(self, collection_config: CollectionConfig) -> None:
-    #     super().__init__()
-    #     self._collection_config = collection_config
+    """Converts Metadata objects to STAC Items."""
 
     def __init__(self, item_assets_configs: Dict[str, AssetConfig]) -> None:
         super().__init__()
+
+        # Settings: these are just data, not components we delegate work to.
         self._item_assets_configs: item_assets_configs = item_assets_configs
 
-    # @property
-    # def collection_config(self) -> CollectionConfig:
-    #     return self._collection_config
-
-    # @property
-    # def item_assets_configs(self) -> Dict[str, AssetConfig]:
-    #     return self.collection_config.item_assets or {}
-
     @property
-    def item_assets_configs(self) ->  Dict[str, AssetConfig]:
+    def item_assets_configs(self) -> Dict[str, AssetConfig]:
         return self._item_assets_configs
-
-    def get_item_assets_definitions(self) -> List[AssetDefinition]:
-        asset_definitions = {}
-        for band_name, asset_config in self.item_assets_configs.items():
-            asset_def: AssetDefinition = asset_config.to_asset_definition()
-            # asset_def.owner = self.collection
-            asset_definitions[band_name] = asset_def
-
-        return asset_definitions
 
     def map(self, metadata: Metadata) -> Item:
         if metadata.item_type not in self.item_assets_configs:
@@ -850,18 +798,20 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
                 # "product_tile": metadata.tile,
             },
         )
+        # TODO: support optional parts: store the tile ID if dataset uses that.
+        #   We would need a way to customize extracting that tile ID for the specific dataset.
 
         description = self.item_assets_configs[metadata.item_type].description
         item.common_metadata.description = description
-        # item.common_metadata.description = self.collection_description
 
         item.common_metadata.created = dt.datetime.utcnow()
 
+        # TODO: support optional parts: these fields are recommended but they are also not always relevant or present.
         # item.common_metadata.mission = constants.MISSION
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
-        item.add_asset(metadata.item_type, self.create_asset(metadata))
+        item.add_asset(metadata.item_type, self._create_asset(metadata))
 
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg
@@ -870,6 +820,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         item_proj.transform = metadata.transform
         item_proj.shape = metadata.shape
 
+        # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
+        #    that is not always the case.
         # grid = GridExtension.ext(item, add_if_missing=True)
         # grid.code = f"TILE-{metadata.tile}"
 
@@ -878,8 +830,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return item
 
-    def create_asset(self, metadata: Metadata) -> Asset:
-        asset_defs = self.get_item_assets_definitions()
+    def _create_asset(self, metadata: Metadata) -> Asset:
+        asset_defs = self._get_item_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.item_type]
         return asset_def.create_asset(metadata.href)
 
@@ -901,15 +853,23 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         # return asset
 
+    def _get_item_assets_definitions(self) -> List[AssetDefinition]:
+        """Create AssetDefinitions, according to the config in self.item_assets_configs"""
+        asset_definitions = {}
+        for band_name, asset_config in self.item_assets_configs.items():
+            asset_def: AssetDefinition = asset_config.to_asset_definition()
+            # TODO: check wether we do need to store the collection as the owner here.
+            # asset_def.owner = self.collection
+            asset_definitions[band_name] = asset_def
+
+        return asset_definitions
+
 
 class MapGeoTiffToSTACItem:
     """Like a mapping, extract STAC Items from each file."""
 
-    def __init__(
-            self,
-            path_parser: InputPathParser,
-            map_metadata_to_stac_item: IMapMetadataToSTACItem
-        ) -> None:
+    def __init__(self, path_parser: InputPathParser, map_metadata_to_stac_item: IMapMetadataToSTACItem) -> None:
+        # Store dependencies: components that have to be provided to constructor
         self._path_parser = path_parser
         self._metadata_to_stac_item = map_metadata_to_stac_item
 
@@ -931,157 +891,6 @@ class MapGeoTiffToSTACItem:
         return (self.to_stac_item(file) for file in files)
 
 
-# TODO: not yet used, might want to remove it ASAP so we can simplify the code.
-# class GeoTiffMetadataCollector(IMetadataCollector):
-#     """Collects Metadata objects for GeoTIFF files.
-
-#     This is closer to the original design and a bit simpler to implement,
-#     but not as efficient or flexible.
-#     Probably won't keep this class.
-#     """
-
-#     def __init__(self, file_collector: FileCollector, path_parser: InputPathParser):
-#         super().__init__()
-
-#         # Components we depend on: store injected dependencies.
-#         self._file_collector = file_collector
-#         self._path_parser = path_parser
-
-#         # Create internal components.
-#         self._processor = MapGeoTiffToMetaData(path_parser)
-
-#     def can_run(self):
-#         """Check if we are ready to run: have the components we depend on been set up or not."""
-#         if not isinstance(self._file_collector, FileCollector):
-#             return False
-#         if not isinstance(self._path_parser, InputPathParser):
-#             return False
-#         return True
-
-#     def pre_run_check(self):
-#         """Raise an error if it can not run due to an incorrect set up."""
-#         if not self.can_run():
-#             raise InvalidOperation(
-#                 f"Can not run, set up is not correct for {self.__class__.__name__}"
-#                 + "check _file_collector and _path_parser"
-#             )
-
-#     @property
-#     def input_files(self):
-#         """Get the collected input files."""
-#         return self._file_collector.input_files
-
-#     def collect(self):
-#         self.pre_run_check()
-#         self.reset()
-#         self._file_collector.collect()
-#         self._metadata_list = []
-
-#         for file in self.input_files:
-#             metadata = self._processor.map(file)
-#             self._metadata_list.append(metadata)
-
-
-# class GeoTiffToSTACItem:
-#     """Takes a path to a GeoTIFF and extract the STAC Item for that file.
-
-#     Like a node in a pipeline.
-#     Intention is to be able to use generators with this processor, to
-#     parse large datasets more efficiently.
-#     """
-
-#     def __init__(
-#         self, file_collector: FileCollector, path_parser: InputPathParser, item_assets_configs: Dict[str, AssetConfig]
-#     ) -> None:
-#         # Components we depend on: store injected dependencies.
-#         self._file_collector = file_collector
-#         self._path_parser = path_parser
-#         self._item_assets_configs = item_assets_configs
-
-#     # def setup(self, collection_config: CollectionConfig, file_coll_cfg: FileCollectorConfig):
-#     #     """Set up the object with new components, as specified in the configuration objects."""
-#     #     # TODO: move this kind of setup / pipeline creation (factories) to pipeline class.
-#     #     self._path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
-#     #     self._file_collector = FileCollector()
-#     #     self._file_collector.setup(file_coll_cfg)
-
-#     def process(self, file: Path) -> Metadata:
-#         """Create a STAC item for the specified GeoTIFF path."""
-#         metadata = Metadata(
-#             href=str(file),
-#             extract_href_info=self._path_parser,
-#             read_href_modifier=None,
-#         )
-
-#         if metadata.item_type not in self._item_assets_configs:
-#             _logger.warning(
-#                 "Found an unknown item type, not defined in collection configuration: "
-#                 f"{metadata.item_type}, returning item=None"
-#             )
-#             return None
-
-#         assert metadata.item_id is not None
-
-#         item = Item(
-#             href=metadata.href,
-#             id=metadata.item_id,
-#             geometry=metadata.geometry,
-#             bbox=metadata.bbox,
-#             datetime=metadata.datetime,
-#             start_datetime=metadata.start_datetime,
-#             end_datetime=metadata.end_datetime,
-#             properties={
-#                 "product_version": metadata.version,
-#                 # "product_tile": metadata.tile,
-#             },
-#         )
-#         # TODO: support optional parts: store the tile ID if dataset uses that.
-#         #   We would need a way to customize extracting that tile ID for the specific dataset.
-
-#         description = self._item_assets_configs[metadata.item_type].description
-#         item.common_metadata.description = description
-
-#         item.common_metadata.created = dt.datetime.utcnow()
-
-#         # TODO: support optional parts: these fields are recommended but they are also not always relevant or present.
-#         # item.common_metadata.mission = constants.MISSION
-#         # item.common_metadata.platform = constants.PLATFORM
-#         # item.common_metadata.instruments = constants.INSTRUMENTS
-
-#         item.add_asset(metadata.item_type, self._create_asset(metadata))
-
-#         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-#         item_proj.epsg = metadata.proj_epsg
-#         item_proj.bbox = metadata.proj_bbox
-#         item_proj.geometry = metadata.proj_geometry
-#         item_proj.transform = metadata.transform
-
-#         # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
-#         #    that is not always the case.
-#         # grid = GridExtension.ext(item, add_if_missing=True)
-#         # grid.code = f"TILE-{metadata.tile}"
-
-#         RasterExtension.add_to(item)
-#         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
-
-#         return item
-
-#     def _create_asset(self, metadata: Metadata) -> Asset:
-#         asset_defs = self._get_item_assets_definitions()
-#         asset_def: AssetDefinition = asset_defs[metadata.item_type]
-#         return asset_def.create_asset(metadata.href)
-
-#     def _get_item_assets_definitions(self) -> List[AssetDefinition]:
-#         asset_definitions = {}
-#         for band_name, asset_config in self._item_assets_configs.items():
-#             asset_def: AssetDefinition = asset_config.to_asset_definition()
-#             # TODO: check wether we do need to store the collection as the owner here.
-#             # asset_def.owner = self.collection
-#             asset_definitions[band_name] = asset_def
-
-#         return asset_definitions
-
-
 class STACCollectionBuilder:
     """Creates a collector from collected STAC Items."""
 
@@ -1097,29 +906,16 @@ class STACCollectionBuilder:
         ),
     )
 
-    def __init__(
-        self,
-        collection_config: CollectionConfig,
-        # item_assets_configs: Dict[str, AssetConfig],
-        # stac_items_collector: ISTACItemCollector,
-        # map_metadata_to_stac_item: IMapMetadataToSTACItem,
-        output_dir: Path,
-        overwrite: bool = False
-    ) -> None:
+    def __init__(self, collection_config: CollectionConfig, output_dir: Path, overwrite: bool = False) -> None:
+        # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
-        # Components we depend on: store injected dependencies.
-        # self._item_assets_configs: Dict[str, AssetConfig] = collection_config.item_assets_configs
-        # self._stac_items_collector: ISTACItemCollector = stac_items_collector
-        # self._map_metadata_to_stac_item = map_metadata_to_stac_item
-
-        # settings: not components, just direct variables
         self._output_dir = Path(output_dir)
         self._overwrite_output = overwrite
 
-        # internal temporary state
+        # Internal temporary state
         self._stac_items: List[Item] = None
 
-        # result
+        # The result
         self._collection: Collection = None
 
     @property
@@ -1243,14 +1039,13 @@ class STACCollectionBuilder:
 
         self._collection = collection
 
-
     def _get_item_assets_definitions(self) -> List[AssetDefinition]:
         asset_definitions = {}
         asset_configs = self._collection_config.item_assets
 
         for band_name, asset_config in asset_configs.items():
             asset_def: AssetDefinition = asset_config.to_asset_definition()
-            # TODO: check wether we do need to store the collection as the owner here.
+            # TODO: check whether we do need to store the collection as the owner here.
             asset_def.owner = self.collection
             asset_definitions[band_name] = asset_def
 
@@ -1265,25 +1060,22 @@ class GeoTiffPipeline:
         collection_config: CollectionConfig,
         file_collector: FileCollector,
         path_parser: InputPathParser,
-        # item_assets_configs: Dict[str, AssetConfig],
         output_dir: Path,
         overwrite: bool = False,
     ) -> None:
+        # Settings: these are just data, not components we delegate work to.
+        self._collection_config = collection_config
+        # TODO: eliminate self.output_dir and self.overwrite
+        self._output_dir: Path = output_dir or Path(tempfile.gettempdir())
+        self._overwrite: bool = overwrite
+
         # Store dependencies: components that have to be provided to constructor
         self._file_collector = file_collector
         self._path_parser = path_parser
-        # self._item_assets_configs = item_assets_configs
-        self._collection_config = collection_config
 
-        # components we set up internally
-        # self._stac_item_processor: GeoTiffToSTACItem = None
+        # Components / dependencies that we set up internally
         self._map_meta_to_stac_item: MapMetadataToSTACItem = None
         self._collection_builder: STACCollectionBuilder = None
-
-        # settings, not components
-        # TODO: eliminate self.output_dir and self.overwrite
-        self.output_dir: Path = output_dir or Path(tempfile.gettempdir())
-        self.overwrite: bool = overwrite
 
         # result
         self._collection: Optional[Collection] = None
@@ -1330,63 +1122,53 @@ class GeoTiffPipeline:
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
     ) -> None:
-
+        # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
+        self._output_dir = output_dir or Path(tempfile.gettempdir())
+        self._overwrite = overwrite
+
+        # Store dependencies: components that have to be provided to constructor
         self._file_collector = FileCollector.from_config(file_coll_cfg)
         self._path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
 
-        self.output_dir = output_dir or Path(tempfile.gettempdir())
-        self.overwrite = overwrite
         self._setup_interals()
-
 
     def _setup_interals(self) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
         if self._collection_builder:
-            # It has already been set up => ignore
+            # It has already been set up => skip it.
+            # TODO: eliminate this issue or log a warning.
+            # TODO: fix logging, currently no longer works.
             return
 
-        # self._stac_item_processor = GeoTiffToSTACItem(
-        #     file_collector=self._file_collector,
-        #     path_parser=self._path_parser,
-        #     item_assets_configs=self.item_assets_configs,
-        # )
-        self._map_meta_to_stac_item = MapMetadataToSTACItem(
-            item_assets_configs=self.item_assets_configs
-        )
+        self._map_meta_to_stac_item = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
         self._collection_builder = STACCollectionBuilder(
-            collection_config=self._collection_config,
-            output_dir=self.output_dir,
-            overwrite=self.overwrite
+            collection_config=self._collection_config, output_dir=self._output_dir, overwrite=self._overwrite
         )
 
     def get_collection(self) -> Optional[Collection]:
         return self._collection
 
-    def collect_input_files(self) -> Iterable[Path]:
+    def get_input_files(self) -> Iterable[Path]:
         """Collect the input files for processing."""
         self._file_collector.collect()
         for file in self._file_collector.input_files:
             yield file
 
-    def collect_metadata(self) -> Iterable[Metadata]:
+    def get_metadata(self) -> Iterable[Metadata]:
         """Generate the intermediate metadata objects, from the input files."""
-        self._file_collector.collect()
-        for file in self.collect_input_files():
+        for file in self.get_input_files():
             yield Metadata(
                 href=str(file),
                 extract_href_info=self._path_parser,
                 read_href_modifier=None,
             )
 
-
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
         self._setup_interals()
 
-        self._file_collector.collect()
-        for file in self.collect_input_files():
-            # yield self._stac_item_processor.process(file)
+        for file in self.get_input_files():
             metadata = Metadata(
                 href=str(file),
                 extract_href_info=self._path_parser,
@@ -1394,10 +1176,9 @@ class GeoTiffPipeline:
             )
             yield self._map_meta_to_stac_item.map(metadata)
 
-
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the intermediate metadata."""
-        meta_list = list(self.collect_metadata())
+        meta_list = list(self.get_metadata())
         if not meta_list:
             raise InvalidOperation("There are no STAC items. Can not create a GeoDataFrame")
 
@@ -1409,7 +1190,7 @@ class GeoTiffPipeline:
 
     def get_metadata_as_dataframe(self) -> pd.DataFrame:
         """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        return pd.DataFrame.from_records(md.to_dict() for md in self.collect_metadata())
+        return pd.DataFrame.from_records(md.to_dict() for md in self.get_metadata())
 
     def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the STAC Items."""
@@ -1420,6 +1201,7 @@ class GeoTiffPipeline:
         epsg = item_list[0].properties.get("proj:epsg", 4326)
         records = convert_fields_to_string(i.to_dict() for i in item_list)
         shapes = [shape(item.geometry) for item in item_list]
+
         return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
 
     def get_stac_items_as_dataframe(self) -> pd.DataFrame:
@@ -1429,11 +1211,6 @@ class GeoTiffPipeline:
     def build_collection(self):
         """Build the entire STAC collection."""
         self._setup_interals()
-
-        # # TODO: eliminate self.output_dir and self.overwrite
-        # self._collection_builder.output_dir: Path = self.output_dir
-        # self._collection_builder.overwrite: bool = self.overwrite
-
         self._collection = self._collection_builder.build_collection(self.collect_stac_items())
 
 
@@ -1677,7 +1454,6 @@ class CommandsNewPipeline:
         #     out_dir = Path("tmp/visualization") / coll_cfg.collection_id
         #     _save_geodataframe(df, out_dir, "metadata_table")
 
-
     @staticmethod
     def command_list_input_files(
         glob: str,
@@ -1710,7 +1486,7 @@ class CommandsNewPipeline:
         file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
         pipeline = GeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
-        for meta in pipeline.collect_metadata():
+        for meta in pipeline.get_metadata():
             pprint.pprint(meta.to_dict(include_internal=True))
             print()
 
@@ -1735,14 +1511,11 @@ class CommandsNewPipeline:
         file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
 
         pipeline = GeoTiffPipeline.from_config(
-            collection_config=coll_cfg,
-            file_coll_cfg=file_coll_cfg,
-            output_dir=None,
-            overwrite=False
+            collection_config=coll_cfg, file_coll_cfg=file_coll_cfg, output_dir=None, overwrite=False
         )
 
         stac_items = list(pipeline.collect_stac_items())
-        files = list(pipeline.collect_input_files())
+        files = list(pipeline.get_input_files())
         num_itemst = len(stac_items)
         for i, item in enumerate(stac_items):
             if item:
@@ -1750,8 +1523,8 @@ class CommandsNewPipeline:
             else:
                 file = files[i]
                 print(
-                    f"Received None for a STAC Item {i+1} of {num_itemst}. " +
-                    f"Item could not be generated for file: {file}"
+                    f"Received None for a STAC Item {i+1} of {num_itemst}. "
+                    + f"Item could not be generated for file: {file}"
                 )
 
         if save_dataframe:
