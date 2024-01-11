@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
 
-import numpy as np
 from pydantic_core import ErrorDetails
 from pydantic import BaseModel, ConfigDict, HttpUrl, ValidationError
 from pystac import MediaType

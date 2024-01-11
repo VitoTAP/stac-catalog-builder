@@ -2,10 +2,9 @@ import copy
 import datetime as dt
 import json
 import logging
-import shutil
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Iterable
+from typing import Any, Dict, Iterable
 
 
 from openeo.util import rfc3339

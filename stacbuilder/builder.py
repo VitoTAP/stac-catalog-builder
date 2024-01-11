@@ -1,4 +1,3 @@
-import abc
 import datetime as dt
 import json
 import logging
@@ -29,7 +28,6 @@ from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.raster import RasterExtension
 
 
-from stactools.core.io import ReadHrefModifier
 import rio_stac.stac as rst
 
 
@@ -313,20 +311,20 @@ class STACBuilder:
 
         if level >= ProcessingLevels.COLLECT_INPUTS:
             if not self.input_dir:
-                errors.append(f"input_dir is not set")
+                errors.append("input_dir is not set")
             elif not self.input_dir.exists():
                 errors.append(f"Input directory does not exist: {self.input_dir!r}")
 
             if not self.glob:
-                errors.append(f'glob pattern is not set, default should be "*"')
+                errors.append('glob pattern is not set, default should be "*"')
 
         if level >= ProcessingLevels.COLLECT_METADATA:
             if not self.collection_config:
-                errors.append(f"collection_config is not set")
+                errors.append("collection_config is not set")
 
         if level >= ProcessingLevels.CREATE_COLLECTION:
             if not self.output_dir:
-                errors.append(f"output_dir is not set")
+                errors.append("output_dir is not set")
             elif self.output_dir.exists() and not self.overwrite:
                 errors.append(f"Output directory already exist but overwrite is OFF (False): {self.output_dir}")
 

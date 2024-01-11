@@ -16,7 +16,7 @@ from stacbuilder.builder import (
     command_validate_collection,
     command_post_process_collection,
 )
-from stacbuilder.config import CollectionConfig, InputPathParserConfig, AssetConfig, EOBandConfig
+from stacbuilder.config import CollectionConfig, InputPathParserConfig
 
 
 @pytest.fixture

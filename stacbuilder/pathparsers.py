@@ -8,7 +8,7 @@ import calendar
 import datetime as dt
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 
 from stacbuilder.config import InputPathParserConfig

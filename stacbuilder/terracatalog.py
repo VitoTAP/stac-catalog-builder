@@ -1,7 +1,7 @@
 import datetime as dt
 from itertools import chain
 from pprint import pprint
-from typing import Any, Dict, List, Tuple, Union, Optional
+from typing import Any, Dict, List, Tuple
 
 
 import pandas as pd
@@ -26,11 +26,11 @@ def show_collections(catalogue: tcc.Catalogue):
     print("-" * 50)
     pprint(dir(col))
     print("=" * 50)
-    print(f"=== geometry:  ===")
+    print("=== geometry:  ===")
     pprint(col.geometry)
-    print(f"=== geojson:  ===")
+    print("=== geojson:  ===")
     pprint(col.geojson)
-    print(f"=== bbox:  ===")
+    print("=== bbox:  ===")
     pprint(col.bbox)
     print("=" * 50)
 

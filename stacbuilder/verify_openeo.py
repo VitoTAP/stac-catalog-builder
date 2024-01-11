@@ -3,7 +3,6 @@ import json
 from pprint import pprint
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-from itertools import islice
 
 
 import openeo
@@ -222,11 +221,11 @@ def verify_in_openeo(
             print(f"Creating output_dir: {output_dir}")
             output_dir.mkdir(parents=True)
 
-        print(f"Creating DataCube: ...")
+        print("Creating DataCube: ...")
         cube: DataCube = create_cube(str(collection_path), connection, bbox, epsg, max_spatial_ext_size)
         print(cube)
 
-        print(f"Validating DataCube ...")
+        print("Validating DataCube ...")
         cube.validate()
 
         if dry_run:
