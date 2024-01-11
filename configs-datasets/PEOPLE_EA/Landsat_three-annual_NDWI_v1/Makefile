@@ -225,6 +225,20 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
+.PHONY: build-collection
+newpipe-build-collection:
+## Build the STAC collection
+	$(PYTHON) stacbuilder \
+		-v build-newpipe \
+		-g "$(GLOB_PATTERN)" \
+		-c $(COLLECTION_CONFIG) \
+		--overwrite \
+		--max-files $(MAX_TIFF_FILES) \
+		$(TIFF_INPUT_DIR) \
+		$(TEST_OUTPUT_DIR)
+
+
+
 
 .PHONY: list-tiffs
 list-tiffs:

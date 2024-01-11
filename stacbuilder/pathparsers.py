@@ -81,6 +81,10 @@ class RegexInputPathParser(InputPathParser):
         self._path = None
 
     def parse(self, input_file: Union[Path, str]) -> Dict[str, Any]:
+        # import pprint
+        # print(f"{self.__class__.__name__}.parse:: {input_file=}")
+        # print(f"{self.__class__.__name__}.parse:: {self._regex.pattern=}")
+
         data = {}
         self._path = str(input_file)
 
@@ -96,14 +100,17 @@ class RegexInputPathParser(InputPathParser):
         for key, value in self._fixed_values.items():
             data[key] = value
 
+
+        # print(f"{self.__class__.__name__}.parse:: before postprocessing self._data: ")
+        # pprint.pprint(self._data)
+        # print()
+
         self._data = data
         self._post_process_data()
 
-        import pprint
-
-        print(f"{input_file=}")
-        pprint.pprint(self._data)
-        print()
+        # print(f"{self.__class__.__name__}.parse:: after postprocessing self._data: ")
+        # pprint.pprint(self._data)
+        # print()
 
         return self._data
 

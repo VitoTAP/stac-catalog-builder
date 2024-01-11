@@ -10,10 +10,8 @@ from pystac.collection import Collection
 
 from stacbuilder.builder import (
     STACBuilder,
+    CommandsNewPipeline,
     command_build_collection,
-    command_list_input_files,
-    command_list_metadata,
-    command_list_stac_items,
     command_load_collection,
     command_validate_collection,
     command_post_process_collection,
@@ -224,21 +222,21 @@ class TestCommandAPI:
     def command_list_input_files(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        command_list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        CommandsNewPipeline.command_list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
     def test_command_list_metadata(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        command_list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        CommandsNewPipeline.command_list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
     def test_command_list_items(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        command_list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        CommandsNewPipeline.command_list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
