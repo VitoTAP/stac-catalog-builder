@@ -23,6 +23,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra"
+testpaths = [
+    "tests",
+]
+
 [tool.black]
 line-length = 120
 

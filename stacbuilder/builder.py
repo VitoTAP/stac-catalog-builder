@@ -29,10 +29,10 @@ from pystac.extensions.projection import ItemProjectionExtension
 # from pystac.extensions.projection import ProjectionExtension
 from pystac.extensions.raster import RasterExtension
 
-
 import rio_stac.stac as rst
 
 
+from stacbuilder.exceptions import SettingsInvalid, InvalidOperation
 from stacbuilder.pathparsers import (
     InputPathParser,
     InputPathParserFactory,
@@ -46,10 +46,6 @@ _logger = logging.getLogger(__name__)
 
 
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
-
-
-class SettingsInvalid(Exception):
-    pass
 
 
 class ProcessingLevels(IntEnum):
@@ -71,12 +67,6 @@ class ProcessingLevels(IntEnum):
 
     POST_PROCESS = 4
     """Run post processing after a STAC collection was created."""
-
-
-class InvalidOperation(Exception):
-    """Raised when some state or settings are not set, and the operation can not be executed."""
-
-    pass
 
 
 class STACBuilder:
@@ -698,7 +688,7 @@ class FileCollector(IDataCollector):
         if self.max_files > 0:
             input_files = islice(input_files, self.max_files)
 
-        self._input_files = input_files
+        self._input_files = list(input_files)
 
     def has_collected(self) -> bool:
         return self._input_files is not None
@@ -779,10 +769,12 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
     def map(self, metadata: Metadata) -> Item:
         if metadata.item_type not in self.item_assets_configs:
-            _logger.warning(
+            error_msg = (
                 "Found an unknown item type, not defined in collection configuration: "
-                f"{metadata.item_type}, returning item=None"
+                + f"{metadata.item_type}, returning item=None, "
+                + f"{metadata.href=}"
             )
+            _logger.warning(error_msg)
             return None
 
         item = Item(
@@ -918,6 +910,10 @@ class STACCollectionBuilder:
         # The result
         self._collection: Collection = None
 
+    def reset(self):
+        self._collection = None
+        self._stac_items = None
+
     @property
     def output_dir(self) -> Path:
         """The directory where we should save "collection.json.
@@ -971,6 +967,7 @@ class STACCollectionBuilder:
         for item in self._stac_items:
             # for asset in item.assets:
             #     asset.owner = self._collection
+            assert item is not None
             self._collection.add_item(item)
 
         self._collection.update_extent_from_items()
@@ -1052,8 +1049,122 @@ class STACCollectionBuilder:
         return asset_definitions
 
 
+class PostProcessSTACCollectionFile:
+    def __init__(self, collection_overrides: Optional[Dict[str, Any]]) -> None:
+        # Settings
+        self._collection_overrides = collection_overrides or {}
+
+    @property
+    def collection_overrides(self) -> Optional[Dict[str, Any]]:
+        return self._collection_overrides
+
+    def process_collection(self, collection_file: Path, output_dir: Optional[Path] = None):
+        out_dir: Path = output_dir or collection_file.parent
+        new_coll_file, _ = self._create_post_proc_directory_structure(collection_file, out_dir)
+        self._convert_timezones_encoded_as_z(collection_file, out_dir)
+
+        if self.collection_overrides:
+            self._override_collection_components(new_coll_file)
+
+        # Check if the new file is still valid STAC.
+        self._validate_collection(Collection.from_file(new_coll_file))
+
+    @classmethod
+    def _create_post_proc_directory_structure(cls, collection_file: Path, output_dir: Optional[Path] = None):
+        in_place = False
+        if not output_dir:
+            in_place = True
+        elif output_dir.exists() and output_dir.samefile(collection_file.parent):
+            in_place = True
+
+        # converted_out_dir: Path = output_dir or collection_file.parent
+        item_paths = cls.get_item_paths_for_coll_file(collection_file)
+
+        if in_place:
+            converted_out_dir = collection_file.parent
+            collection_converted_file = collection_file
+            new_item_paths = item_paths
+        else:
+            converted_out_dir = output_dir
+            collection_converted_file = output_dir / collection_file.name
+
+            # Overwriting => remove and re-create the old directory
+            if converted_out_dir.exists():
+                shutil.rmtree(converted_out_dir)
+
+            # (re)create the entire directory structure
+            converted_out_dir.mkdir(parents=True)
+            relative_paths = [ip.relative_to(collection_file.parent) for ip in item_paths]
+            new_item_paths = [output_dir / rp for rp in relative_paths]
+
+            sub_directories = set(p.parent for p in new_item_paths)
+            for sub_dir in sub_directories:
+                if not sub_dir.exists():
+                    sub_dir.mkdir(parents=True)
+
+        return collection_converted_file, new_item_paths
+
+    @staticmethod
+    def get_item_paths_for_collection(collection: Collection) -> List[Path]:
+        items = collection.get_all_items()
+        return [Path(item.self_href) for item in items]
+
+    @classmethod
+    def get_item_paths_for_coll_file(cls, collection_file: Path) -> List[Path]:
+        collection = Collection.from_file(collection_file)
+        return cls.get_item_paths_for_collection(collection)
+
+    @classmethod
+    def _convert_timezones_encoded_as_z(cls, collection_file: Path, output_dir: Path):
+        print("Converting UeTC timezones encoded as 'Z' to +00:00...")
+        conv = TimezoneFormatConverter()
+        out_dir = output_dir or collection_file.parent
+        item_paths = cls.get_item_paths_for_coll_file(collection_file)
+        conv.process_catalog(in_coll_path=collection_file, in_item_paths=item_paths, output_dir=out_dir)
+
+    def _override_collection_components(self, collection_file: Path):
+        print("Overriding components of STAC collection that we want to give some fixed value ...")
+        data = self._load_collection_as_dict(collection_file)
+        overrides = self.collection_overrides
+
+        for key, new_value in overrides.items():
+            key_path = key.split("/")
+            deepest_key = key_path[-1]
+            sub_dict = data
+
+            for sub_key in key_path[:-1]:
+                if sub_key not in sub_dict:
+                    sub_dict[sub_key] = {}
+                sub_dict = sub_dict[sub_key]
+            sub_dict[deepest_key] = new_value
+
+        self._save_collection_as_dict(data, collection_file)
+
+    def _validate_collection(self, collection: Collection):
+        """Run STAC validation on the collection."""
+        try:
+            num_items_validated = collection.validate_all(recursive=True)
+        except STACValidationError as exc:
+            print(exc)
+            raise
+        else:
+            print(f"Collection valid: number of items validated: {num_items_validated}")
+
+    @staticmethod
+    def _load_collection_as_dict(coll_file: Path) -> dict:
+        with open(coll_file, "r") as f_in:
+            return json.load(f_in)
+
+    @staticmethod
+    def _save_collection_as_dict(data: Dict[str, Any], coll_file: Path) -> None:
+        with open(coll_file, "w") as f_out:
+            json.dump(data, f_out, indent=2)
+
+
 class GeoTiffPipeline:
     """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
+
+    # TODO: split up for reuse: want 2 pipelines, 1 for geotiffs and 1 that converts OSCARS metadata
 
     def __init__(
         self,
@@ -1081,8 +1192,39 @@ class GeoTiffPipeline:
         self._collection: Optional[Collection] = None
 
     @property
+    def collection(self) -> Collection | None:
+        return self._collection
+
+    @property
+    def collection_file(self) -> Collection | None:
+        if not self.collection:
+            return None
+
+        return Path(self.collection.self_href)
+
+    @property
+    def collection_config(self) -> CollectionConfig:
+        return self._collection_config
+
+    @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
         return self._collection_config.item_assets or {}
+
+    @property
+    def collection_builder(self) -> STACCollectionBuilder:
+        return self._collection_builder
+
+    @property
+    def file_collector(self) -> FileCollector:
+        return self._file_collector
+
+    @property
+    def path_parser(self) -> InputPathParser:
+        return self._path_parser
+
+    @property
+    def map_meta_to_stac_item(self) -> MapGeoTiffToSTACItem:
+        return self._map_meta_to_stac_item
 
     @staticmethod
     def from_config(
@@ -1123,13 +1265,23 @@ class GeoTiffPipeline:
         overwrite: Optional[bool] = False,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
+        if collection_config is None:
+            raise ValueError('Argument "input_path_parser" can not be None, must be a CollectionConfig instance.')
+
+        if file_coll_cfg is None:
+            raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
+
         self._collection_config = collection_config
         self._output_dir = output_dir or Path(tempfile.gettempdir())
         self._overwrite = overwrite
 
         # Store dependencies: components that have to be provided to constructor
         self._file_collector = FileCollector.from_config(file_coll_cfg)
-        self._path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
+
+        if collection_config.input_path_parser:
+            self._path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
+        else:
+            self._path_parser = None
 
         self._setup_interals()
 
@@ -1146,12 +1298,15 @@ class GeoTiffPipeline:
             collection_config=self._collection_config, output_dir=self._output_dir, overwrite=self._overwrite
         )
 
-    def get_collection(self) -> Optional[Collection]:
-        return self._collection
+    def reset(self) -> None:
+        self._file_collector.reset()
+        self._collection_builder.reset()
 
     def get_input_files(self) -> Iterable[Path]:
         """Collect the input files for processing."""
-        self._file_collector.collect()
+        if not self._file_collector.has_collected():
+            self._file_collector.collect()
+
         for file in self._file_collector.input_files:
             yield file
 
@@ -1174,7 +1329,11 @@ class GeoTiffPipeline:
                 extract_href_info=self._path_parser,
                 read_href_modifier=None,
             )
-            yield self._map_meta_to_stac_item.map(metadata)
+            stac_item = self._map_meta_to_stac_item.map(metadata)
+            # Ignore it when the file was not a known type, for example it is
+            # not a GeoTIFF or it is not one of the assets or bands we want to include.
+            if stac_item:
+                yield stac_item
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the intermediate metadata."""
@@ -1211,7 +1370,12 @@ class GeoTiffPipeline:
     def build_collection(self):
         """Build the entire STAC collection."""
         self._setup_interals()
-        self._collection = self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection = self._collection_builder.collection
+
+        coll_file = self._collection_builder.collection_file
+        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        post_processor.process_collection(coll_file)
 
 
 # ##############################################################################
@@ -1268,7 +1432,7 @@ def _setup_builder(
     return builder
 
 
-def command_build_collection(
+def old_command_build_collection(
     collection_config_path: Path,
     glob: str,
     input_dir: Path,
@@ -1286,103 +1450,6 @@ def command_build_collection(
         max_files_to_process=max_files,
     )
     builder.build_collection()
-
-
-def old_command_list_metadata(
-    collection_config_path: Path,
-    glob: str,
-    input_dir: Path,
-    max_files: Optional[int] = -1,
-    as_dataframe: bool = False,
-):
-    """Build a STAC collection from a directory of geotiff files."""
-
-    builder: STACBuilder = _setup_builder(
-        collection_config_path=Path(collection_config_path).expanduser().absolute(),
-        glob=glob,
-        input_dir=Path(input_dir).expanduser().absolute(),
-        output_dir=Path("/tmp"),
-        overwrite=True,
-        max_files_to_process=max_files,
-    )
-
-    builder.validate_builder_settings()
-    builder.collect_input_files()
-
-    if as_dataframe:
-        df: gpd.GeoDataFrame = builder.metadata_as_geodataframe()
-        print(df.to_string())
-        out_dir = Path("metadata_table")
-        df.to_csv(out_dir / "metadata_table.csv", sep="|")
-        df.to_file(out_dir / "shp/metadata_table.shp")
-        df.to_parquet(out_dir / "metadata_table.parquet")
-    else:
-        metadata: Metadata
-        for metadata in builder.try_parse_metadata():
-            pprint.pprint(metadata.to_dict(include_internal=True))
-            print()
-
-
-def old_command_list_stac_items(
-    collection_config_path: Path,
-    glob: str,
-    input_dir: Path,
-    max_files: Optional[int] = -1,
-    as_dataframe: bool = False,
-):
-    """Build a STAC collection from a directory of geotiff files."""
-
-    builder: STACBuilder = _setup_builder(
-        collection_config_path=Path(collection_config_path).expanduser().absolute(),
-        glob=glob,
-        input_dir=Path(input_dir).expanduser().absolute(),
-        output_dir=Path("/tmp"),
-        overwrite=True,
-        max_files_to_process=max_files,
-    )
-    builder.collect_input_files()
-
-    if as_dataframe:
-        df = builder.items_as_dataframe()
-        df.to_csv("stac_items_table.csv", sep="|")
-    else:
-        min_west = None
-        max_east = None
-        min_south = None
-        max_north = None
-
-        items_bbox = {
-            "min_west": None,
-            "max_east": None,
-            "min_south": None,
-            "max_north": None,
-        }
-
-        for item in builder.try_parse_items():
-            pprint.pprint(item.to_dict())
-            print()
-            west, south, east, north = item.bbox
-            if min_west is None:
-                min_west = west
-                max_east = east
-                min_south = south
-                max_north = north
-            else:
-                if west < min_west:
-                    items_bbox["min_west"] = item.id
-                    min_west = west
-                if south < min_south:
-                    items_bbox["min_south"] = item.id
-                    min_south = south
-                if east < max_east:
-                    items_bbox["max_east"] = item.id
-                    max_east = east
-                if north < max_north:
-                    items_bbox["max_north"] = item.id
-                    max_north = north
-
-        print(f"Collection BBox: [{min_west=}, {min_south=}, {max_east=}, {max_north=}]")
-        print(f"{items_bbox}=]")
 
 
 def command_load_collection(
@@ -1428,7 +1495,7 @@ class CommandsNewPipeline:
     """
 
     @staticmethod
-    def command_build_collection_newpipe(
+    def command_build_collection(
         collection_config_path: Path,
         glob: str,
         input_dir: Path,

@@ -40,7 +40,7 @@ class Metadata:
             elif hasattr(dataset.crs, "to_epsg"):
                 self.proj_epsg = dataset.crs.to_epsg()
 
-            if self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
+            if not self.proj_epsg or self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
                 self.bbox = self.proj_bbox
             else:
                 west, south, east, north = self.proj_bbox[:4]
@@ -49,15 +49,15 @@ class Metadata:
             self.shape = dataset.shape
             self.tags = dataset.tags()
 
-            print(f"{href=}")
-            print(f"{modified_href=}")
-            print(f"projected: proj_bbox={self.proj_bbox}")
-            print(f"projected CRS: {dataset.crs}")
-            print(f"{dataset.bounds=}")
-            print(f"{dataset.transform=}")
-            print(f"lat long: bbox={self.bbox}")
-            # print(f"{dataset.shape=}")
-            # print(f"{dataset.tags()=}")
+            # print(f"{href=}")
+            # print(f"{modified_href=}")
+            # print(f"projected: proj_bbox={self.proj_bbox}")
+            # print(f"projected CRS: {dataset.crs}")
+            # print(f"{dataset.bounds=}")
+            # print(f"{dataset.transform=}")
+            # print(f"lat long: bbox={self.bbox}")
+            # # print(f"{dataset.shape=}")
+            # # print(f"{dataset.tags()=}")
 
         self.href = href
         self._item_id = Path(href).stem

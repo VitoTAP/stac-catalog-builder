@@ -6,12 +6,16 @@
 import abc
 import calendar
 import datetime as dt
+import logging
 import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
 
 from stacbuilder.config import InputPathParserConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class UnknownInputPathParserClass(Exception):
@@ -90,6 +94,10 @@ class RegexInputPathParser(InputPathParser):
         match = self._regex.search(self._path)
         if match:
             data = match.groupdict()
+        else:
+            logger.warning(
+                f"No data could be extracted from this path: {self._path}, " + f"regex pattern={self._regex.pattern}"
+            )
 
         for key, value in data.items():
             if key in self._type_converters:
@@ -225,6 +233,7 @@ class ERA5LandInputPathParser(RegexInputPathParser):
 
 
 class ANINPathParser(InputPathParser):
+    # TODO: Seems like this is deprecated, check and remove it.
     def parse(self, input_file: Path) -> Dict[str, Any]:
         #
         # Example:

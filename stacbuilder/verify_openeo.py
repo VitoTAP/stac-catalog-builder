@@ -15,6 +15,9 @@ import pystac
 from pystac import Collection, Item
 
 
+DEFAULT_BACKEND = "openeo-dev.vito.be"
+
+
 def connect(backend_url):
     connection: openeo.Connection = openeo.connect(backend_url)
     connection.authenticate_oidc()
@@ -118,9 +121,10 @@ def find_temporal_extent(collection: Collection, use_full: bool = False):
     end_dt = _dt_set_tz_utc(end_dt)
 
     # TODO: This is not an accurate way to select a year, this won't give you calendar years
-    one_year = dt.timedelta(days=365)
-    if not use_full and end_dt - start_dt > one_year:
-        end_dt = start_dt + one_year
+    # one_year = dt.timedelta(days=365)
+    one_month = dt.timedelta(days=31)
+    if not use_full and end_dt - start_dt > one_month:
+        end_dt = start_dt + one_month
 
     start_dt = rfc3339.normalize(start_dt)
     end_dt = rfc3339.normalize(end_dt)
@@ -128,18 +132,35 @@ def find_temporal_extent(collection: Collection, use_full: bool = False):
     return [start_dt, end_dt]
 
 
-def create_cube(
+def create_cube_OLD(
     collection_path: Path,
     connection: openeo.Connection,
     bbox: Optional[Union[List[float], Dict[str, float]]] = None,
     epsg: Optional[int] = 4326,
+    start_datetime: Optional[dt.datetime] = None,
+    end_datetime: Optional[dt.datetime] = None,
     max_spatial_ext_size: float = None,
 ) -> None:
     collection = Collection.from_file(collection_path)
-    extent_temporal = find_temporal_extent(collection, use_full=False)
-    print(f"{extent_temporal=}")
 
-    proj_bbox, proj_epsg = find_proj_bbox(collection)
+    if start_datetime or end_datetime:
+        if not (start_datetime and end_datetime):
+            raise ValueError(
+                "If you want to specify a temporal extent then you must provide "
+                + "a value for both start_datetime and end_datetime."
+                + f"{start_datetime=}, {end_datetime=}"
+            )
+        extent_temporal = [start_datetime, end_datetime]
+    else:
+        extent_temporal = find_temporal_extent(collection, use_full=False)
+
+    if bbox:
+        proj_bbox = bbox
+        proj_epsg = epsg
+    else:
+        proj_bbox, proj_epsg = find_proj_bbox(collection)
+
+    print(f"{extent_temporal=}")
     print(f"{proj_bbox=}, {proj_epsg=}")
 
     cube: DataCube = connection.load_stac(
@@ -171,24 +192,206 @@ def create_cube(
     return cube
 
 
+def create_cube(
+    collection_path: Path,
+    connection: openeo.Connection,
+    extent_temporal,
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+    epsg: int,
+) -> None:
+    print("===create_cube:: Most important arguments: ===")
+    print(f"{extent_temporal=}")
+    print(f"{west=}")
+    print(f"{south=}")
+    print(f"{east=}")
+    print(f"{north=}")
+    print(f"{epsg=}")
+    print("=== --- ===\n")
+
+    cube: DataCube = connection.load_stac(
+        str(collection_path),
+        temporal_extent=extent_temporal,
+    )
+
+    # if isinstance(bbox, list):
+    #     west, south, east, north = bbox[:4]
+    # else:
+    #     west, south, east, north = dict_to_bbox(bbox)
+
+    print(f"final spatial extent for filtering: {[west, south, east, north]}, {epsg=}")
+    cube = cube.filter_bbox(west=west, south=south, east=east, north=north, crs=epsg)
+
+    print("cube.validate() ...")
+    validation_errors = cube.validate()
+    if validation_errors:
+        print("Validation failed:")
+        pprint(validation_errors)
+        raise Exception("Validation failed")
+
+    return cube
+
+
 def verify_in_openeo(
     collection_path: Union[str, Path],
     output_dir: Union[str, Path],
-    backend_url: str = "openeo-dev.vito.be",
+    backend_url: Optional[str] = None,
     max_spatial_ext_size: float = 0.1,
     bbox: Optional[Union[List[float], Dict[str, float]]] = None,
     epsg: Optional[int] = 4326,
+    start_datetime: Optional[dt.datetime] = None,
+    end_datetime: Optional[dt.datetime] = None,
     dry_run: Optional[bool] = False,
     verbose: Optional[bool] = False,
 ):
     if dry_run:
         verbose = True
+
+    backend_url = backend_url or DEFAULT_BACKEND
+
+    print("===verify_in_openeo:: Most important arguments: ===")
+    print(f"{max_spatial_ext_size=}")
+    print(f"{bbox=}")
+    print(f"{epsg=}")
+    print(f"{start_datetime=}")
+    print(f"{end_datetime=}")
+    print("=== --- ===\n")
+
+    coll_path = Path(collection_path)
+    coll_dir: Path = coll_path.parent
+    print(f"PROGRESS: Counting files in collection directory: {coll_dir}")
+    print("    This may take long if there are very many files.")
+    print(
+        "    If this already takes long, then you should definitely LIMIT your spatial and temporal extent to keep the test on open-EO short enough"
+    )
+    print("    Counting in progress ...")
+    # files_in_collection = [f for f in coll_dir.rglob("*") if f.is_file()]
+    # num_files = len(files_in_collection)
+    num_files = 100_000
+    print(f"DONE counting: Found {num_files} files.")
+
+    extent_temporal = None
+    proj_bbox = None
+    proj_epsg = None
+    print(f"PROGRESS: Reading the collection from file: {collection_path}")
+    print(
+        "    If this step takes too long that means your collection contains too many items and it needs to be divided up in to a catalog with smaller collections."
+    )
+    print("    Loading collection in progress: ...")
+    collection = Collection.from_file(collection_path)
+
+    if start_datetime or end_datetime:
+        if not (start_datetime and end_datetime):
+            raise ValueError(
+                "If you want to specify a temporal extent then you must provide "
+                + "a value for both start_datetime and end_datetime."
+                + f"{start_datetime=}, {end_datetime=}"
+            )
+        extent_temporal = [start_datetime, end_datetime]
+    else:
+        extent_temporal = find_temporal_extent(collection, use_full=False)
+    print(f"{extent_temporal=}")
+
+    if bbox:
+        proj_epsg = epsg
+        if isinstance(bbox, list):
+            west, south, east, north = bbox[:4]
+        else:
+            west, south, east, north = dict_to_bbox(bbox)
+    else:
+        proj_bbox, proj_epsg = find_proj_bbox(collection)
+        west, south, east, north = proj_bbox[:4]
+
+    west, south, east, north = limit_spatial_extent(west, south, east, north, max_range=max_spatial_ext_size)
+    print(f"final spatial extent for filtering: {[west, south, east, north]}, {proj_epsg=}")
+
+    abort = False
+    if num_files > 1000:
+        if not extent_temporal:
+            abort = True
+        else:
+            dt_start, dt_end = extent_temporal
+            one_month = dt.timedelta(days=31)
+            if dt_end - dt_start > one_month:
+                abort = True
+
+    if abort:
+        print(
+            "This STAC collection has a large number of items and the "
+            + "spatial/temporal extents are probably too large for a reasonable test\n."
+            + "Please try again with a smaller extent (temporal and/or spatial)"
+        )
+        print("ABORTED")
+        return
+
     connection = connect(backend_url)
 
-    job_id = None
-    # job_id = "j-231206b597464ad491cad2e902971ff7"
-    # job_id = "j-231211402f5843ab92a2a557c8cfd2cf"
-    # job_id = "j-231212dab20845b9a6570c2c1832102c"
+    output_dir = Path(output_dir)
+    job_log_file = output_dir / "job-logs.json"
+
+    timestamp = rfc3339.utcnow()
+    timestamp = timestamp.replace(":", "")
+
+    collection_path = Path(collection_path).expanduser().absolute()
+    if verbose:
+        print(f"Collection's absolute path: {collection_path}")
+        print(f"Does collection file exist? {collection_path.exists()}")
+        print(f"{output_dir=}")
+
+    assert collection_path.exists(), f"file should exist: {collection_path=}"
+    # print(f"Validating STAC collection file: {collection_path} ...")
+    # Collection.from_file(collection_path).validate_all()
+
+    if not output_dir.exists() and not dry_run:
+        print(f"Creating output_dir: {output_dir}")
+        output_dir.mkdir(parents=True)
+
+    print("PROGRESS: Creating DataCube: ...")
+    cube: DataCube = create_cube(
+        collection_path=str(collection_path),
+        connection=connection,
+        extent_temporal=extent_temporal,
+        west=west,
+        south=south,
+        east=east,
+        north=north,
+        epsg=proj_epsg,
+    )
+    print(cube)
+
+    print("PROGRESS: Validating DataCube ...")
+    cube.validate()
+
+    if dry_run:
+        print("DONE: This is a dry run. Skipping part that submits a batch job")
+        return
+
+    job: BatchJob = cube.create_job()
+    try:
+        job.start_and_wait()
+    except JobFailedException as exc:
+        print(exc)
+        get_logs(job, job_log_file)
+
+    else:
+        print(job.get_results_metadata_url())
+
+        out_path = job.download_results(output_dir)
+        print(f"{out_path=}")
+
+    print("DONE")
+
+
+def check_job(
+    job_id: str,
+    output_dir: Union[str, Path],
+    backend_url: Optional[str] = None,
+) -> None:
+    backend_url = backend_url or DEFAULT_BACKEND
+
+    connection = connect(backend_url)
 
     output_dir = Path(output_dir)
     job_log_file = output_dir / "job-logs.json"
@@ -202,50 +405,6 @@ def verify_in_openeo(
         if job.status() == "finished":
             out_path = job.download_results(output_dir)
             print(f"{out_path=}")
-
-    else:
-        timestamp = rfc3339.utcnow()
-        timestamp = timestamp.replace(":", "")
-
-        collection_path = Path(collection_path).expanduser().absolute()
-        if verbose:
-            print(f"Collection's absolute path: {collection_path}")
-            print(f"Does collection file exist? {collection_path.exists()}")
-            print(f"{output_dir=}")
-
-        assert collection_path.exists(), f"file should exist: {collection_path=}"
-        print(f"Validating STAC collection file: {collection_path} ...")
-        Collection.from_file(collection_path).validate_all()
-
-        if not output_dir.exists() and not dry_run:
-            print(f"Creating output_dir: {output_dir}")
-            output_dir.mkdir(parents=True)
-
-        print("Creating DataCube: ...")
-        cube: DataCube = create_cube(str(collection_path), connection, bbox, epsg, max_spatial_ext_size)
-        print(cube)
-
-        print("Validating DataCube ...")
-        cube.validate()
-
-        if dry_run:
-            print("This is a dry run. Skipping part that submits a batch job")
-            return
-
-        job: BatchJob = cube.create_job()
-        try:
-            job.start_and_wait()
-        except JobFailedException as exc:
-            print(exc)
-            get_logs(job, job_log_file)
-
-        else:
-            print(job.get_results_metadata_url())
-
-            out_path = job.download_results(output_dir)
-            print(f"{out_path=}")
-
-        print("DONE")
 
 
 def get_logs(job: BatchJob, job_log_file: Optional[Path] = None) -> None:

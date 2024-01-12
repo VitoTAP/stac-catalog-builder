@@ -11,5 +11,10 @@ def data_dir():
 
 
 @pytest.fixture
-def test_output_dir():
+def collection_output_dir():
     return Path(__file__).parent.parent / "tmp"
+
+
+@pytest.fixture
+def geotiff_input_dir(data_dir):
+    return data_dir / "geotiff" / "mock-geotiffs"

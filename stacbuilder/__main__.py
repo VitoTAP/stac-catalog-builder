@@ -1,18 +1,21 @@
 import json
 import logging
 
+
 import click
 
 
+from openeo.util import rfc3339
+
+
 from stacbuilder.builder import (
-    command_build_collection,
     command_load_collection,
     command_validate_collection,
     command_post_process_collection,
     CommandsNewPipeline,
 )
-
 from stacbuilder.verify_openeo import verify_in_openeo
+
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +64,9 @@ def cli(verbose):
 )
 def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
-    command_build_collection(
+    from stacbuilder.builder import old_command_build_collection
+
+    old_command_build_collection(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -69,7 +74,6 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
         overwrite=overwrite,
         max_files=max_files,
     )
-
 
 
 @cli.command()
@@ -98,7 +102,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
 )
 def build_newpipe(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
-    CommandsNewPipeline.command_build_collection_newpipe(
+    CommandsNewPipeline.command_build_collection(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -243,13 +247,15 @@ def post_process(outputdir, collection_config, collection_file):
 @click.option(
     "-m", "--max-extent-size", type=float, default=0.1, help="Maximum size of the spatial extent (in degrees)"
 )
+@click.option("--start-dt", type=click.STRING, help="Start date+time of the temporal extent")
+@click.option("--end-dt", type=click.STRING, help="End date+time of the temporal extent")
 @click.option("-n", "--dry-run", is_flag=True, help="Do a dry-run, don't execute the batch job")
 @click.option("-v", "--verbose", is_flag=True, help="Make output more verbose")
 @click.argument(
     "collection_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
 )
-def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, dry_run, verbose):
+def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, start_dt, end_dt, dry_run, verbose):
     """Test STAC collection via load_stac in open-EO.
 
     It guesses a reasonable spatial and temporal extent based on what
@@ -258,6 +264,9 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
     if bbox:
         bbox = json.loads(bbox)
 
+    start_datetime = rfc3339.parse_datetime(start_dt) if start_dt else None
+    end_datetime = rfc3339.parse_datetime(end_dt) if end_dt else None
+
     verify_in_openeo(
         backend_url=backend_url,
         collection_path=collection_file,
@@ -265,6 +274,8 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
         bbox=bbox,
         epsg=epsg,
         max_spatial_ext_size=max_extent_size,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
         dry_run=dry_run,
         verbose=verbose,
     )

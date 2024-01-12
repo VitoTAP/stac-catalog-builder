@@ -10,13 +10,13 @@ from pystac.collection import Collection
 
 from stacbuilder.builder import (
     STACBuilder,
-    CommandsNewPipeline,
-    command_build_collection,
-    command_load_collection,
-    command_validate_collection,
-    command_post_process_collection,
 )
 from stacbuilder.config import CollectionConfig, InputPathParserConfig
+
+
+@pytest.fixture
+def collection_config_path(data_dir: Path) -> Path:
+    return data_dir / "config" / "config-test-collection.json"
 
 
 @pytest.fixture
@@ -92,6 +92,14 @@ def create_mock_geotiff(tif_path: Path):
     new_dataset.close()
 
 
+@pytest.mark.skip
+def test_create_tiffs(geotiff_paths):
+    # TODO: [refactor]: This method should not be a test but a script to generate test data.
+    #   Also, you only need to run that script one time. But now the test tiffs are
+    #   stored in git.
+    create_geotiff_files(geotiff_paths)
+
+
 @pytest.fixture
 def collection_test_config() -> CollectionConfig:
     data = {
@@ -135,17 +143,17 @@ def collection_test_config() -> CollectionConfig:
     return CollectionConfig(**data)
 
 
-class TestSTACBuilder:
+class TestOldSTACBuilder:
     def test_validate_builder_settings(self, stac_builder: STACBuilder, collection_test_config: CollectionConfig):
         stac_builder.collection_config = collection_test_config
         stac_builder.validate_builder_settings()
 
-    @pytest.mark.skip
-    def test_create_tiffs(self, geotiff_paths):
-        # TODO: [refactor]: This method should not be a test but a script to generate test data.
-        #   Also, you only need to run that script one time. But now the test tiffs are
-        #   stored in git.
-        create_geotiff_files(geotiff_paths)
+    # @pytest.mark.skip
+    # def test_create_tiffs(self, geotiff_paths):
+    #     # TODO: [refactor]: This method should not be a test but a script to generate test data.
+    #     #   Also, you only need to run that script one time. But now the test tiffs are
+    #     #   stored in git.
+    #     create_geotiff_files(geotiff_paths)
 
     def test_collect_input_files(
         self, stac_builder: STACBuilder, collection_test_config: CollectionConfig, geotiff_paths
@@ -185,112 +193,3 @@ class TestSTACBuilder:
 
         collection = Collection.from_file(stac_builder.collection_file)
         collection.validate_all()
-
-
-class TestCommandAPI:
-    def test_command_build_collection(self, data_dir, tmp_path):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        output_dir = tmp_path / "out-mock-geotiffs"
-
-        command_build_collection(
-            collection_config_path=config_file,
-            glob="*/*.tif",
-            input_dir=input_dir,
-            output_dir=output_dir,
-            overwrite=True,
-        )
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
-
-    @pytest.fixture
-    def valid_collection_file(self, data_dir, tmp_path):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        output_dir = tmp_path / "out-mock-geotiffs"
-
-        command_build_collection(
-            collection_config_path=config_file,
-            glob="*/*.tif",
-            input_dir=input_dir,
-            output_dir=output_dir,
-            overwrite=True,
-        )
-        collection_file = output_dir / "collection.json"
-        return collection_file
-
-    def command_list_input_files(self, data_dir):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.command_list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
-
-    def test_command_list_metadata(self, data_dir):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.command_list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
-
-    def test_command_list_items(self, data_dir):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.command_list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
-
-    def test_command_load_collection(self, data_dir, tmp_path):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        output_dir = tmp_path / "out-mock-geotiffs"
-
-        command_build_collection(
-            collection_config_path=config_file,
-            glob="*/*.tif",
-            input_dir=input_dir,
-            output_dir=output_dir,
-            overwrite=True,
-        )
-        collection_file = output_dir / "collection.json"
-        command_load_collection(collection_file=collection_file)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
-
-    def test_command_validate_collection(self, data_dir, tmp_path):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        output_dir = tmp_path / "out-mock-geotiffs"
-
-        command_build_collection(
-            collection_config_path=config_file,
-            glob="*/*.tif",
-            input_dir=input_dir,
-            output_dir=output_dir,
-            overwrite=True,
-        )
-        collection_file = output_dir / "collection.json"
-        command_validate_collection(collection_file=collection_file)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
-
-    def test_command_post_process_collection(self, data_dir, tmp_path):
-        config_file = data_dir / "config/config-test-collection.json"
-        input_dir = data_dir / "geotiff/mock-geotiffs"
-        output_dir = tmp_path / "out-mock-geotiffs"
-
-        command_build_collection(
-            collection_config_path=config_file,
-            glob="*/*.tif",
-            input_dir=input_dir,
-            output_dir=output_dir,
-            overwrite=True,
-        )
-        collection_file = output_dir / "collection.json"
-        post_proc_dir = tmp_path / "post-processed"
-
-        command_post_process_collection(
-            collection_file=collection_file, collection_config_path=config_file, output_dir=post_proc_dir
-        )
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.

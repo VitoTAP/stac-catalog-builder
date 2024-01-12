@@ -1,6 +1,10 @@
+import logging
 from typing import List
 
 import pyproj
+import pyproj.exceptions
+
+logger = logging.getLogger(__name__)
 
 
 def reproject_bounding_box(
@@ -24,7 +28,24 @@ def reproject_bounding_box(
             [min_x, min_y, max_x, max_y]
             [left, bottom, top, right]
     """
-    transformer = pyproj.Transformer.from_crs(crs_from=from_crs, crs_to=to_crs, always_xy=True)
+    if not from_crs:
+        raise ValueError("Argument 'from_crs' must have a value.")
+    if not to_crs:
+        raise ValueError("Argument 'to_crs' must have a value.")
+
+    if not isinstance(from_crs, str):
+        raise ValueError(f"Argument 'from_crs' must be type 'str'. {type(from_crs)=}, {from_crs=}.")
+    if not isinstance(to_crs, str):
+        raise ValueError(f"Argument 'to_crs' must be type 'str'. {type(to_crs)=}, {to_crs=}.")
+
+    try:
+        transformer = pyproj.Transformer.from_crs(crs_from=from_crs, crs_to=to_crs, always_xy=True)
+    except pyproj.exceptions.CRSError:
+        logger.warning(
+            f"Could not find a projection transformation from CRS {from_crs=} to CRS {to_crs}.", exc_info=True
+        )
+        return None
+
     transform = transformer.transform
 
     # ==========================================================================

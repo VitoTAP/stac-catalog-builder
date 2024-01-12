@@ -182,6 +182,15 @@ ifndef MAX_TIFF_FILES
 endif
 
 
+BBOX_VERIFICATION := "[3220000.0, 3950700.0, 3230000.0, 3960700.0]"
+BBOX_VERIFICATION_EPSG := 3035
+
+# max size of spatial extent: 2000 meter
+MAX_SPATIAL_EXTENT_SIZE := 2000
+
+TEMPORAL_EXTENT_START := 2020-01-01T00:00:00Z
+TEMPORAL_EXTENT_END := 2020-02-01T00:00:00Z
+
 # ==============================================================================
 # make targets
 # ==============================================================================
@@ -238,8 +247,6 @@ newpipe-build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
-
-
 .PHONY: list-tiffs
 list-tiffs:
 ## List which GeoTIFF files the STAC builder finds with your current glob and input directory.
@@ -279,7 +286,8 @@ show-collection:
 ## Load and display the contents of the STAC collection file.
 	$(PYTHON) stacbuilder show-collection "$(TEST_OUTPUT_DIR)/collection.json"
 
-
+# 	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
+# 	--epsg=3035 \
 .PHONY: validate
 validate:
 ## Validate the contents of the STAC collection file.
@@ -293,8 +301,7 @@ validate:
 # 	-v \
 # 	-b $(OPENEO_BACKEND_URL) \
 # 	-o $(TEST_OPENEO_DIR) \
-# 	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
-# 	--epsg=3035 \
+
 # 	"$(PUBLISH_DIR)/collection.json"
 
 .PHONY: test-openeo
@@ -316,7 +323,11 @@ test-openeo-dryrun:
 	--dry-run \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
-	--max-extent-size=2000 \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
 	"$(PUBLISH_DIR)/collection.json"
 
 
@@ -332,6 +343,38 @@ test-openeo-dryrun:
 # 	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
 # 	--epsg=3035 \
 # 	"$(PUBLISH_DIR)/collection.json"
+
+
+.PHONY: test-openeo-dryrun
+test-openeo-dryrun:
+## Dry-run show what extent / config would be uses to test the STAC collection
+## in open-EO with load_stac by downloading a small part of it.
+	$(PYTHON) stacbuilder test-openeo \
+	-v \
+	--dry-run \
+	-b $(OPENEO_BACKEND_URL) \
+	-o $(TEST_OPENEO_DIR) \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
+	"$(TEST_OUTPUT_DIR)/collection.json"
+
+
+.PHONY: test-openeo-unpublished
+test-openeo-unpublished:
+## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+	$(PYTHON) stacbuilder test-openeo \
+	-v \
+	-b $(OPENEO_BACKEND_URL) \
+	-o $(TEST_OPENEO_DIR) \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
+	"$(TEST_OUTPUT_DIR)/collection.json"
 
 
 $(PUBLISH_DIR):
@@ -352,11 +395,16 @@ ls-test-out:
 	ls -la $(TEST_OUTPUT_DIR)
 
 
-
 .PHONY: ls-publish-dir
 ls-publish-dir:
 ## List the files in the test pulbish directory.
 	ls -la $(PUBLISH_DIR)
+
+
+.PHONY: ls-test-openeo
+ls-test-openeo:
+## List the files in the test pulbish directory.
+	ls -la $(TEST_OPENEO_DIR)
 
 
 .PHONY: clean-test-out
