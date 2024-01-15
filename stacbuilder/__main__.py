@@ -62,7 +62,7 @@ def cli(verbose):
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
+def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
     from stacbuilder.builder import old_command_build_collection
 
@@ -100,7 +100,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build_newpipe(glob, collection_config, overwrite, inputdir, outputdir, max_files):
+def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
     CommandsNewPipeline.command_build_collection(
         collection_config_path=collection_config,

@@ -222,10 +222,10 @@ show-config:
 
 
 .PHONY: build-collection
-build-collection:
+build-collection-old-pipeline:
 ## Build the STAC collection
 	$(PYTHON) stacbuilder \
-		-v build \
+		-v build-collection-old-pipeline \
 		-g "$(GLOB_PATTERN)" \
 		-c $(COLLECTION_CONFIG) \
 		--overwrite \
@@ -235,10 +235,10 @@ build-collection:
 
 
 .PHONY: build-collection
-newpipe-build-collection:
+build-collection:
 ## Build the STAC collection
 	$(PYTHON) stacbuilder \
-		-v build-newpipe \
+		-v build \
 		-g "$(GLOB_PATTERN)" \
 		-c $(COLLECTION_CONFIG) \
 		--overwrite \
@@ -311,6 +311,11 @@ test-openeo:
 	-v \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
 	"$(PUBLISH_DIR)/collection.json"
 
 

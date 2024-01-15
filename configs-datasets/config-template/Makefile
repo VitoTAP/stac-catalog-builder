@@ -214,10 +214,10 @@ show-config:
 
 
 .PHONY: build-collection
-build-collection:
+build-collection-old-pipeline:
 ## Build the STAC collection
 	$(PYTHON) stacbuilder \
-		-v build \
+		-v build-collection-old-pipeline \
 		-g "$(GLOB_PATTERN)" \
 		-c $(COLLECTION_CONFIG) \
 		--overwrite \

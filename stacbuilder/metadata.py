@@ -122,8 +122,7 @@ class Metadata:
 
     @property
     def proj_geometry_as_wkt(self) -> str:
-        poly: Polygon = Polygon.from_bounds(*self.proj_bbox)
-        return to_wkt(poly)
+        return to_wkt(self.proj_geometry_shapely)
 
     @property
     def proj_geometry_shapely(self) -> Polygon:
