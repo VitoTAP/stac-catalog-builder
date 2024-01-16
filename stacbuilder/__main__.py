@@ -44,7 +44,7 @@ def cli(verbose):
     "--glob",
     default="*",
     type=click.STRING,
-    help="glob pattern for collecting the geotiff files. Example: */*.tif",
+    help="glob pattern for collecting the GeoTIFF files. Example: */*.tif",
 )
 @click.option(
     "-c",
@@ -63,8 +63,12 @@ def cli(verbose):
     type=click.Path(dir_okay=True, file_okay=False),
 )
 def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, outputdir, max_files):
-    """Build a STAC collection from a directory of geotiff files."""
+    """Build a STAC collection from a directory of GeoTIFF files."""
     from stacbuilder.builder import old_command_build_collection
+
+    print(
+        'WARNING: this command is deprecated and will only be kept for a while for back-testing. Use "build" instead.'
+    )
 
     old_command_build_collection(
         collection_config_path=collection_config,
@@ -82,7 +86,7 @@ def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, 
     "--glob",
     default="*",
     type=click.STRING,
-    help="glob pattern for collecting the geotiff files. Example: */*.tif",
+    help="glob pattern for collecting the GeoTIFF files. Example: */*.tif",
 )
 @click.option(
     "-c",
@@ -101,7 +105,7 @@ def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, 
     type=click.Path(dir_okay=True, file_okay=False),
 )
 def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
-    """Build a STAC collection from a directory of geotiff files."""
+    """Build a STAC collection from a directory of GeoTIFF files."""
     CommandsNewPipeline.build_collection(
         collection_config_path=collection_config,
         glob=glob,
@@ -118,7 +122,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     "--glob",
     default="*",
     type=click.STRING,
-    help="glob pattern for collecting the geotiff files. Example: */*.tif",
+    help="glob pattern for collecting the GeoTIFF files. Example: */*.tif",
 )
 @click.option(
     "-c",
@@ -137,7 +141,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     type=click.Path(dir_okay=True, file_okay=False),
 )
 def build_grouped_collections(glob, collection_config, overwrite, inputdir, outputdir, max_files):
-    """Build a STAC collection from a directory of geotiff files."""
+    """Build a STAC collection from a directory of GeoTIFF files."""
     CommandsNewPipeline.build_grouped_collections(
         collection_config_path=collection_config,
         glob=glob,
@@ -150,7 +154,7 @@ def build_grouped_collections(glob, collection_config, overwrite, inputdir, outp
 
 @cli.command()
 @click.option(
-    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
+    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the GeoTIFF files. example */*.tif"
 )
 @click.argument(
     "inputdir",
@@ -158,13 +162,13 @@ def build_grouped_collections(glob, collection_config, overwrite, inputdir, outp
 )
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 def list_tiffs(glob, inputdir, max_files):
-    """List which geotiff files will be selected with this input dir and glob pattern."""
+    """List which GeoTIFF files will be selected with this input dir and glob pattern."""
     CommandsNewPipeline.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
 
 
 @cli.command()
 @click.option(
-    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
+    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the GeoTIFF files. example */*.tif"
 )
 @click.option(
     "-c",
@@ -195,7 +199,7 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
 
 @cli.command()
 @click.option(
-    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the geotiff files. example */*.tif"
+    "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the GeoTIFF files. example */*.tif"
 )
 @click.option(
     "-c",
