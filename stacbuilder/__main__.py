@@ -102,7 +102,43 @@ def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, 
 )
 def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of geotiff files."""
-    CommandsNewPipeline.command_build_collection(
+    CommandsNewPipeline.build_collection(
+        collection_config_path=collection_config,
+        glob=glob,
+        input_dir=inputdir,
+        output_dir=outputdir,
+        overwrite=overwrite,
+        max_files=max_files,
+    )
+
+
+@cli.command()
+@click.option(
+    "-g",
+    "--glob",
+    default="*",
+    type=click.STRING,
+    help="glob pattern for collecting the geotiff files. Example: */*.tif",
+)
+@click.option(
+    "-c",
+    "--collection-config",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    help="Configuration file for the collection",
+)
+@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
+@click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
+@click.argument(
+    "inputdir",
+    type=click.Path(exists=True, dir_okay=True, file_okay=False),
+)
+@click.argument(
+    "outputdir",
+    type=click.Path(dir_okay=True, file_okay=False),
+)
+def build_grouped_collections(glob, collection_config, overwrite, inputdir, outputdir, max_files):
+    """Build a STAC collection from a directory of geotiff files."""
+    CommandsNewPipeline.build_grouped_collections(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -123,7 +159,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 def list_tiffs(glob, inputdir, max_files):
     """List which geotiff files will be selected with this input dir and glob pattern."""
-    CommandsNewPipeline.command_list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
+    CommandsNewPipeline.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
 
 
 @cli.command()
@@ -148,7 +184,7 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    CommandsNewPipeline.command_list_metadata(
+    CommandsNewPipeline.list_metadata(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -179,7 +215,7 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    CommandsNewPipeline.command_list_stac_items(
+    CommandsNewPipeline.list_stac_items(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,

@@ -14,5 +14,10 @@ def collection_output_dir():
 
 
 @pytest.fixture
+def grouped_collection_output_dir():
+    return Path(__file__).parent.parent / "tmp" / "grouped_collections"
+
+
+@pytest.fixture
 def geotiff_input_dir(data_dir):
     return data_dir / "geotiff" / "mock-geotiffs"

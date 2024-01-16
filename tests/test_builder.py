@@ -45,6 +45,18 @@ def geotiff_pipeline(collection_config_from_file, file_collector_config, collect
 
 
 @pytest.fixture
+def geotiff_pipeline_grouped(
+    grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
+) -> GeoTiffPipeline:
+    return GeoTiffPipeline.from_config(
+        collection_config=grouped_collection_test_config,
+        file_coll_cfg=file_collector_config,
+        output_dir=grouped_collection_output_dir,
+        overwrite=False,
+    )
+
+
+@pytest.fixture
 def geotif_paths_relative() -> List[str]:
     return sorted(
         [
@@ -157,6 +169,49 @@ def collection_test_config() -> CollectionConfig:
     return CollectionConfig(**data)
 
 
+@pytest.fixture
+def grouped_collection_test_config() -> CollectionConfig:
+    data = {
+        "collection_id": "foo-2023-v01_grouped",
+        "title": "Foo collection with groups per year",
+        "description": "Description of Foo",
+        "instruments": [],
+        "keywords": ["foo", "bar", "oof"],
+        "mission": [],
+        "platform": [],
+        "providers": [
+            {
+                "name": "Test EO Org",
+                "roles": ["licensor", "processor", "producer"],
+                "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/",
+            }
+        ],
+        "input_path_parser": InputPathParserConfig(
+            classname="RegexInputPathParser",
+            parameters={
+                "regex_pattern": r".*_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
+            },
+        ),
+        "item_assets": {
+            "2m-temp-monthly": {
+                "title": "2m temperature",
+                "description": "temperature 2m above ground (Kelvin)",
+                "eo_bands": [
+                    {"name": "2m_temp", "description": "temperature 2m above ground (Kelvin)", "data_type": "uint16"}
+                ],
+            },
+            "tot-precip-monthly": {
+                "title": "total precipitation",
+                "description": "total precipitation per month (m)",
+                "eo_bands": [
+                    {"name": "tot_precip", "description": "total precipitation per month (m)", "data_type": "uint16"}
+                ],
+            },
+        },
+    }
+    return CollectionConfig(**data)
+
+
 class TestGeoTiffPipeline:
     def test_collect_input_files(self, geotiff_pipeline: GeoTiffPipeline, geotiff_paths: List[Path]):
         input_files = list(geotiff_pipeline.get_input_files())
@@ -176,6 +231,29 @@ class TestGeoTiffPipeline:
         collection = Collection.from_file(geotiff_pipeline.collection_file)
         collection.validate_all()
 
+    def test_build_grouped_collection(self, geotiff_pipeline_grouped: GeoTiffPipeline):
+        assert geotiff_pipeline_grouped.collection is None
+
+        geotiff_pipeline_grouped.build_grouped_collections()
+
+        # TODO: we need to store all collections: one for each group and check all of them
+        #   this likely means we need a new class separate from GeoTiffPipeline
+        #
+        # assert geotiff_pipeline_grouped.collection is not None
+        # assert geotiff_pipeline_grouped.collection_file is not None
+        # assert geotiff_pipeline_grouped.collection_file.exists()
+        # Collection.validate_all(geotiff_pipeline_grouped.collection)
+
+        assert geotiff_pipeline_grouped.collection_groups is not None
+        assert geotiff_pipeline_grouped.collection is None
+
+        for coll in geotiff_pipeline_grouped.collection_groups.values():
+            coll_path = Path(coll.self_href)
+            coll_path.exists()
+
+            collection = Collection.from_file(coll_path)
+            collection.validate_all()
+
 
 class TestCommandAPI:
     def test_command_build_collection(self, data_dir, tmp_path):
@@ -183,7 +261,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.command_build_collection(
+        CommandsNewPipeline.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -199,7 +277,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.command_build_collection(
+        CommandsNewPipeline.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -212,27 +290,21 @@ class TestCommandAPI:
     def command_list_input_files(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.command_list_input_files(
-            collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir
-        )
+        CommandsNewPipeline.list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
     def test_command_list_metadata(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.command_list_metadata(
-            collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir
-        )
+        CommandsNewPipeline.list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
     def test_command_list_items(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.command_list_stac_items(
-            collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir
-        )
+        CommandsNewPipeline.list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
@@ -241,7 +313,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.command_build_collection(
+        CommandsNewPipeline.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -258,7 +330,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.command_build_collection(
+        CommandsNewPipeline.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -275,7 +347,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.command_build_collection(
+        CommandsNewPipeline.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
