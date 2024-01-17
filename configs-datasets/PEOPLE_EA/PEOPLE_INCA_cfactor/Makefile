@@ -247,6 +247,19 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
+.PHONY: build_grouped_collections
+build-grouped-collections:
+## Build the STAC collections, grouped per year
+	$(PYTHON) stacbuilder \
+		-v build-grouped-collections \
+		-g "$(GLOB_PATTERN)" \
+		-c $(COLLECTION_CONFIG) \
+		--overwrite \
+		--max-files $(MAX_TIFF_FILES) \
+		$(TIFF_INPUT_DIR) \
+		$(TEST_OUTPUT_DIR)
+
+
 .PHONY: list-tiffs
 list-tiffs:
 ## List which GeoTIFF files the STAC builder finds with your current glob and input directory.

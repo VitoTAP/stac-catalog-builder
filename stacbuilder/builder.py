@@ -694,6 +694,7 @@ class FileCollector(IDataCollector):
         return self._input_files is not None
 
     def reset(self):
+        print(f"resetting {self.__class__.__name__} instance: {self}")
         self._input_files = None
 
     @property
@@ -850,7 +851,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         asset_definitions = {}
         for band_name, asset_config in self.item_assets_configs.items():
             asset_def: AssetDefinition = asset_config.to_asset_definition()
-            # TODO: check wether we do need to store the collection as the owner here.
+            # TODO: check whether we do need to store the collection as the owner here.
             # asset_def.owner = self.collection
             asset_definitions[band_name] = asset_def
 
@@ -952,6 +953,7 @@ class STACCollectionBuilder:
         self._collection: Collection = None
 
     def reset(self):
+        print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._stac_items = None
 
@@ -989,14 +991,14 @@ class STACCollectionBuilder:
 
     def build_collection(self, stac_items: Iterable[Item]) -> None:
         """Create and save the STAC collection."""
-
+        self.reset()
         self._stac_items = list(stac_items) or []
         self.create_collection()
         self.save_collection()
 
         # We save before we validate, because when the validation fails we want
         # to be able to inspect the incorrect result.
-        self.validate_collection(self.collection)
+        # self.validate_collection(self.collection)
 
     def create_collection(
         self,
@@ -1020,8 +1022,6 @@ class STACCollectionBuilder:
         if output_dir_str.endswith("/"):
             output_dir_str = output_dir_str[-1]
         self._collection.normalize_hrefs(output_dir_str, strategy=strategy)
-
-        return self._collection
 
     def validate_collection(self, collection: Collection):
         """Run STAC validation on the collection."""
@@ -1213,12 +1213,13 @@ class GeoTiffPipeline:
         file_collector: FileCollector,
         path_parser: InputPathParser,
         output_dir: Path,
-        overwrite: bool = False,
+        overwrite: Optional[bool] = False,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
         # TODO: eliminate self.output_dir and self.overwrite
-        self._output_base_dir: Path = output_dir or Path(tempfile.gettempdir())
+        self._output_base_dir: Path = GeoTiffPipeline._get_output_dir_or_default(output_dir)
+        self._collection_dir: Path = None
         self._overwrite: bool = overwrite
 
         # Store dependencies: components that have to be provided to constructor
@@ -1231,9 +1232,8 @@ class GeoTiffPipeline:
 
         self._collection_builder: STACCollectionBuilder = None
 
-        # result
+        # results
         self._collection: Optional[Collection] = None
-
         self._collection_groups: Dict[Hashable, Collection] = {}
 
     @property
@@ -1297,7 +1297,7 @@ class GeoTiffPipeline:
         Also we do not want to mix these (volatile) path settings with the
         stable/fixed settings in the general config file.
         """
-        pipeline = GeoTiffPipeline(None, None, None, None, None)
+        pipeline = GeoTiffPipeline(None, None, None, None)
         pipeline.setup(
             collection_config=collection_config,
             file_coll_cfg=file_coll_cfg,
@@ -1321,7 +1321,7 @@ class GeoTiffPipeline:
             raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
 
         self._collection_config = collection_config
-        self._output_base_dir = output_dir or Path(tempfile.gettempdir())
+        self._output_base_dir = GeoTiffPipeline._get_output_dir_or_default(output_dir)
         self._overwrite = overwrite
 
         # Store dependencies: components that have to be provided to constructor
@@ -1334,28 +1334,40 @@ class GeoTiffPipeline:
 
         self._setup_internals()
 
-    def _setup_internals(self, output_dir: Path = None) -> None:
+    @staticmethod
+    def _get_output_dir_or_default(output_dir: Path | str | None) -> Path:
+        return Path(output_dir) if output_dir else Path(tempfile.gettempdir())
+
+    def _setup_internals(self, group: str | int | None = None) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
-        if self._collection_builder:
-            # It has already been set up => skip it.
-            # TODO: eliminate this issue or log a warning.
-            # TODO: fix logging, currently no longer works.
-            return
+        # if self._collection_builder:
+        #     # It has already been set up => skip it.
+        #     # TODO: eliminate this issue or log a warning.
+        #     # TODO: fix logging, currently no longer works.
+        #     return
 
         self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
         self._metadata_group_creator = GroupMetadataByYear()
 
-        collection_out_dir = output_dir or self._output_base_dir
+        if group and not self.has_grouping:
+            raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
+
+        if group:
+            self._collection_dir = self.get_collection_file_for_group(group)
+        else:
+            self._collection_dir = self._output_base_dir
+
         self._collection_builder = STACCollectionBuilder(
             collection_config=self._collection_config,
             overwrite=self._overwrite,
-            output_dir=collection_out_dir,
+            output_dir=self._collection_dir,
         )
 
     def reset(self) -> None:
+        print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._collection_groups = {}
-        self._collection_builder.reset()
+        # self._collection_builder.reset()
         self._file_collector.reset()
 
     def get_input_files(self) -> Iterable[Path]:
@@ -1397,8 +1409,6 @@ class GeoTiffPipeline:
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
-        self._setup_internals()
-
         for file in self.get_input_files():
             metadata = Metadata(
                 href=str(file),
@@ -1448,11 +1458,15 @@ class GeoTiffPipeline:
         self.reset()
 
         self._collection_builder.build_collection(self.collect_stac_items())
-        self._collection = self._collection_builder.collection
+        # self._collection = self._collection_builder.collection
+        self._collection = self._collection_builder._collection
 
         coll_file = self._collection_builder.collection_file
         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
         post_processor.process_collection(coll_file)
+
+    def get_collection_file_for_group(self, group: str | int):
+        return self._output_base_dir / str(group)
 
     def build_grouped_collections(self):
         self.reset()
@@ -1461,8 +1475,7 @@ class GeoTiffPipeline:
             raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
 
         for group, metadata_list in sorted(self.get_item_groups().items()):
-            collection_out_dir = self._output_base_dir / str(group)
-            self._setup_internals(collection_out_dir)
+            self._setup_internals(group=group)
 
             self._collection_builder.build_collection(metadata_list)
             self._collection_groups[group] = self._collection_builder.collection
@@ -1615,6 +1628,34 @@ class CommandsNewPipeline:
         #     out_dir = Path("tmp/visualization") / coll_cfg.collection_id
         #     _save_geodataframe(df, out_dir, "metadata_table")
 
+    @staticmethod
+    def build_grouped_collections(
+        collection_config_path: Path,
+        glob: str,
+        input_dir: Path,
+        output_dir: Path,
+        overwrite: bool,
+        max_files: Optional[int] = -1,
+        # save_dataframe: Optional[bool] = False,
+    ):
+        collection_config_path = Path(collection_config_path).expanduser().absolute()
+        coll_cfg = CollectionConfig.from_json_file(collection_config_path)
+        file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
+        pipeline = GeoTiffPipeline.from_config(
+            collection_config=coll_cfg,
+            file_coll_cfg=file_coll_cfg,
+            output_dir=output_dir,
+            overwrite=overwrite,
+        )
+
+        pipeline.build_grouped_collections()
+
+        # if save_dataframe:
+        #     df = pipeline.get_metadata_as_geodataframe()
+        #     out_dir = Path("tmp/visualization") / coll_cfg.collection_id
+        #     _save_geodataframe(df, out_dir, "metadata_table")
+
+    @staticmethod
     @staticmethod
     def list_input_files(
         glob: str,

@@ -1,8 +1,12 @@
 import json
 import logging
+import pprint
+from pathlib import Path
 
 
 import click
+import pydantic
+import pydantic.errors
 
 
 from openeo.util import rfc3339
@@ -14,6 +18,7 @@ from stacbuilder.builder import (
     command_post_process_collection,
     CommandsNewPipeline,
 )
+from stacbuilder.config import CollectionConfig
 from stacbuilder.verify_openeo import verify_in_openeo
 
 
@@ -319,6 +324,64 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
         dry_run=dry_run,
         verbose=verbose,
     )
+
+
+#
+# Subcommands for working with the collection configuration file.
+# Mostly to validate and troubleshoot the configuration.
+#
+
+
+@cli.group()
+def config():
+    """Subcommands for collection configuration."""
+    pass
+
+
+@config.command()
+def schema():
+    """Show the JSON schema for CollectionConfig files or objects."""
+    schema = CollectionConfig.model_json_schema()
+    click.echo(pprint.pformat(schema, indent=2))
+
+
+@config.command()
+@click.argument("config_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+def validate_config(config_file):
+    """Check whether a collection configuration file is in the correct format.
+    This only checks if the format is valid. It can not check whether the contents make sense.
+    """
+    config_file = Path(config_file)
+    if not config_file.exists():
+        raise FileNotFoundError(f'Argument "config_file" does not exist. {config_file=}')
+
+    try:
+        CollectionConfig.from_json_file(config_file)
+    except pydantic.ValidationError as exc:
+        click.echo(click.style("ERROR: NOT VALID: \n" + str(exc), fg="red"))
+    else:
+        click.echo(click.style("OK: is valid configuration file", fg="green"))
+
+
+@config.command()
+def docs():
+    click.echo(CollectionConfig.__doc__)
+
+    schema = CollectionConfig.model_json_schema()
+    click.echo(pprint.pformat(schema, indent=2))
+
+    def show_descriptions(schema_dict, path=None):
+        for key, value in schema_dict.items():
+            if not path:
+                path = [key]
+
+            if key == "description":
+                print(path, value)
+            if isinstance(value, dict):
+                path.append(key)
+                show_descriptions(value, path)
+
+    show_descriptions(schema)
 
 
 if __name__ == "__main__":
