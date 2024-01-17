@@ -1,14 +1,6 @@
 # STAC Catalog Builder
 - [STAC Catalog Builder](#stac-catalog-builder)
   - [Setup - Installation](#setup---installation)
-    - [Create Conda Environment with `conda-environment.yaml`](#create-conda-environment-with-conda-environmentyaml)
-    - [How to Manually Create the Conda Environment](#how-to-manually-create-the-conda-environment)
-      - [Create the Conda Environment:](#create-the-conda-environment)
-      - [Activate the Environment:](#activate-the-environment)
-      - [Install Dependencies](#install-dependencies)
-        - [Installation for Using the STAC Builder Tool Only, no Development](#installation-for-using-the-stac-builder-tool-only-no-development)
-        - [Install for Developing the Tool: `requirements-dev.txt`](#install-for-developing-the-tool-requirements-devtxt)
-  - [Export Conda Environment as `environment.yaml`](#export-conda-environment-as-environmentyaml)
   - [Running the Stacbuilder Tool](#running-the-stacbuilder-tool)
     - [Getting Help](#getting-help)
     - [Building a Collection](#building-a-collection)
@@ -33,111 +25,13 @@ We wanted to start with GeoTIFF and we can see about other needs later.
 
 ## Setup - Installation
 
-Install python 3.11 or higher via conda, pyenv or alike.
-
-On Terrascope you will need to stick to conda because the old software there makes it complicated to install certain dependencies that a virtualenv can not install. These dependencies aren't Python packages and the OS yum repository doesn't have an up to date version of those dependencies.
-
-Either of three methods should work:
-
-- A) Use the `conda-environment.yaml` file to create a conda environment.
-- B) Create the conda environment manually and install each dependency.
-    You can follow the packages in requirements/requirements.txt.
-- C) Create a virtualenv and use the requirements file to install the dependencies.
-
-For Terrascope, conda is the easiest way. Otherwise you will need to deal with outdated dependencies such as openssl. Some of these are not Python packages so you cannot isolate those with a virtualenv, but in a conda env you can often install a newer version independent of the operating systems's libraries.
-
-### Create Conda Environment with `conda-environment.yaml`
-
-You can use either conda or its faster drop-in replacement mamba.
-This tool has actually been developed with the FOSS alternative to Anaconda, called [Miniforge](https://github.com/conda-forge/miniforge)
-
-Miniforge uses the open source package repository [conda-forge](https://conda-forge.org/) by default. In Anaconda you would need to specify that channel if you install it manually, but the environment file already specifies the option to use that channeL
-
-
-> TODO: There are still some problems to create an environment purely with conda (no pip). Find out why.
-
-```bash
-conda env create -f conda-environment.yaml python=3.11
-```
-
-### How to Manually Create the Conda Environment
-
-The `conda` command itself can be rather slow, but there is a drop-in replacement called `mamba` that is available in both Anaconda and Miniforge.
-
-
-#### Create the Conda Environment:
-
-```bash
-conda create --name stac-catalog-builder python=3.11
-```
-
-
-#### Activate the Environment:
-
-```bash
-conda activate stac-catalog-builder
-```
-
-#### Install Dependencies
-
-If you prefer to use pip, the requirements files to pip-install them are these files:
-
-- [`./requirements/requirements.txt`](./requirements/requirements.txt): to install only the application, without development support.
-- [`./requirements/requirements-dev.txt`](./requirements/requirements-dev.txt): to install everthing for developing the application.
-
-This method is essentially installing the same dependencies as listed in requirement.txt. This command just uses the corresponding conda command and lists the dependencies explicitly.
-See [`./requirements/requirements.txt`](./requirements/requirements.txt) for the most up to date list of libraries you need to install.
-
-```bash
-# TODO: still issues installing some of the dependencies via conda, find out why
-conda install stactools=0.5.* openeo=0.26 stac-validator=3.3 pystac[validation]=1.8 rasterio=1.3 shapely=2.0 pyproj=3.6 click=8.1
-```
-
-- [ ] TODO: **Verify updated documentation**: I found out that some of the dependencies are only available in pip, not in conda. So there are always a few left we need to pip-install. Are there other packages that only are available via pip/pypi?
-
-> ### NOTE
->
-> The reason why the above command did not work is that I was using the conda-forge channel (via Miniforge) and those versions are not yet available on that channel.
-> Also openeo is not available on conda-forge, only on the regular conda channel.
-> I will have to test this in a regular conda install.
->
-> Highest versions available in conda-forge (d.d. 2024-01-09):
->
-> package | version on conda-forge | desired version
-> --- | --- | ---
-> pystac | 1.6.1 | 1.8
-> stac-validator | 3.2.0 | 3.3
-> stactools | 0.4.2 | 0.5
-> shapely | 1.8.5 | 2.0
-> pyproj | 3.4.0 | 3.6
-> click  | 8.1.3 | 8.1
-> openeo | N/A on conda-forge | 0.26
-
-
-
-##### Installation for Using the STAC Builder Tool Only, no Development
-
-In a virtualenv, or alike:
-
-```bash
-python3 -m pip install -r requirements/requirements.txt
-python3 -m pip install .
-```
-
-##### Install for Developing the Tool: `requirements-dev.txt`
-
-```bash
-python3 -m pip install -r requirements/requirements-dev.txt
-python3 -m pip install -e .
-```
-
-## Export Conda Environment as `environment.yaml`
-
-```bash
-conda env export -f conda-environment.yaml
-```
+See: [docs/installation.md](docs/installation.md)
 
 ## Running the Stacbuilder Tool
+
+See: [docs/how-to-run-stacbuilder.md](docs/how-to-run-stacbuilder.md)
+
+---
 
 ### Getting Help
 

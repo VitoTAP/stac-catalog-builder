@@ -1,12 +1,13 @@
-# User Stories
+# User Stories: what problems does the STAC catalog builder solve?
 
-- [User Stories](#user-stories)
+- [User Stories: what problems does the STAC catalog builder solve?](#user-stories-what-problems-does-the-stac-catalog-builder-solve)
   - [Introduction](#introduction)
   - [Intended users for this tool](#intended-users-for-this-tool)
+    - [Summarized: how technical can the tool be?](#summarized-how-technical-can-the-tool-be)
   - [1. General goal](#1-general-goal)
-  - [2. Globbing](#2-globbing)
-    - [2.1 Globbing: include](#21-globbing-include)
-    - [2.2 Globbing: exclude](#22-globbing-exclude)
+  - [2. Find All Input Files via Globbing](#2-find-all-input-files-via-globbing)
+    - [2.1 Globbing: Including Filee](#21-globbing-including-filee)
+    - [2.2 Globbing: Excluding Files](#22-globbing-excluding-files)
   - [3 Reusing metadata in source images where possible](#3-reusing-metadata-in-source-images-where-possible)
   - [4 metadata configuration](#4-metadata-configuration)
     - [4.1 metadata configuration: options for missing metadata / metadata that can not be read or derived.](#41-metadata-configuration-options-for-missing-metadata--metadata-that-can-not-be-read-or-derived)
@@ -44,17 +45,20 @@ We only want to communicate what the goals of this tool are, for example to new 
 
 It comes down to this:
 
-1. We mainly want to use it to create catalogs for open-EO, hence the users open-EO users.
+1. We mainly want to use it to create catalogs for open-EO, hence the users are open-EO users.
 
 2. It should be usable for people who do have technical skills, but you should not have to be a software developer.
 
 For example people who know EO and GIS, and tend to work with fairly complex data would be able to use it.
 But we want the keep the amount of configuration you have to do reasonably limited, as well as the amount of custom code you may need to write.
 
-This doesn't mean you will never have to add any new code. Some of the path parsing can be very specific to how your new dataset is organised and it is too difficult to build a one-size-fits all solution that has endless flexibility but is also easy to use.
+This doesn't mean you will never have to add any new code.
+In particulate, some of the file path parsing can be very specific to how your new dataset is organized,
+and it is too difficult to build a one-size-fits all solution that has endless flexibility but is also easy to use.
 
+### Summarized: how technical can the tool be?
 
-- So it is okay that the use and configuration is a bit technical, but you should not have write a lot of new code for a new dataset.
+- It is okay that the use and configuration is a bit technical, but you should not have write a lot of new code for a new dataset.
 - It is fine that we need to write a bit of custom code, for example a new class to parse a different GeoTIFF path.
 - It does not have to be fool proof, but it should also not be very cumbersome either.
 
@@ -64,11 +68,11 @@ This doesn't mean you will never have to add any new code. Some of the path pars
 
 > - As an openeo user,
 > - I want to create STAC collections or catalogs from existing datasets (= collections of EO images), <br/>
-> - so that I can use the images in the openeo system, via load_stac.
+> - so that I can use the images in the openeo system, via the load_stac process.
 
-## 2. Globbing
+## 2. Find All Input Files via Globbing
 
-### 2.1 Globbing: include
+### 2.1 Globbing: Including Filee
 
 > - As an openeo user,
 > - I want to find all geotiff files a nested directory structure,<br/>
@@ -77,7 +81,7 @@ This doesn't mean you will never have to add any new code. Some of the path pars
 
 Note: This can be achieve with a glob pattern to find the files in a directory.
 
-### 2.2 Globbing: exclude
+### 2.2 Globbing: Excluding Files
 
 > - As an openeo user,<br/>
 > - I want to be able to ignore some files in a nested directory structure,<br/>

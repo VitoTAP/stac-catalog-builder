@@ -18,7 +18,21 @@ from stacbuilder.projections import reproject_bounding_box
 BoundingBoxList = List[Union[float, int]]
 
 
+# TODO: convert Metadata to a dataclass, and add method (or class) that fills it in from a GeoTIFF.
 class Metadata:
+    """Intermediate metadata that models the properties we actually use.
+
+    Rationale:
+
+    1) STAC times support a lot more than we really need, and this class makes it
+        explicit what we actually use.
+    2) Implementing each conversion to STAC for every new type of input data is extra work.
+        This intermediate metadata make reuse easier to do.
+    3) This class is deliberately simple and has little to no business logic.
+    4) For unit testing it is a lot simpler to instantiate Metadata objects than
+        to creating fake raster files, or fake API responses from a mock of the real API.
+    """
+
     def __init__(
         self,
         href: str,
