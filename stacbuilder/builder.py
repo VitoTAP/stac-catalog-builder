@@ -153,7 +153,7 @@ class STACBuilder:
         print("Saving geodataframe for the bounding boxes of the STAC items ...")
         df = self.get_stac_items_as_geodataframe()
         out_dir = _visualization_dir(self.collection)
-        _save_geodataframe(df, out_dir, "stac_items")
+        GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
 
         print("DONE")
 
@@ -1423,43 +1423,26 @@ class GeoTiffPipeline:
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the intermediate metadata."""
-        meta_list = list(self.get_metadata())
-        if not meta_list:
-            raise InvalidOperation("There are no STAC items. Can not create a GeoDataFrame")
-
-        epsg = meta_list[0].proj_epsg
-        geoms = [m.proj_geometry_shapely for m in meta_list]
-        records = convert_fields_to_string(m.to_dict() for m in meta_list)
-
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
+        return GeodataframeExporter.metadata_to_geodataframe(list(self.get_metadata()))
 
     def get_metadata_as_dataframe(self) -> pd.DataFrame:
         """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        return pd.DataFrame.from_records(md.to_dict() for md in self.get_metadata())
+        return GeodataframeExporter.metadata_to_dataframe(list(self.get_metadata()))
 
     def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the STAC Items."""
-        item_list = list(self.collect_stac_items())
-        if not item_list:
-            raise InvalidOperation("There are no STAC items. Can not create a GeoDataFrame")
-
-        epsg = item_list[0].properties.get("proj:epsg", 4326)
-        records = convert_fields_to_string(i.to_dict() for i in item_list)
-        shapes = [shape(item.geometry) for item in item_list]
-
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
+        return GeodataframeExporter.stac_items_to_geodataframe(list(self.collect_stac_items()))
 
     def get_stac_items_as_dataframe(self) -> pd.DataFrame:
         """Return a pandas DataFrame representing the STAC Items, without the geometry."""
-        return pd.DataFrame.from_records(md.to_dict() for md in self.collect_stac_items())
+        return GeodataframeExporter.stac_items_to_dataframe(list(self.collect_stac_items()))
 
     def build_collection(self):
         """Build the entire STAC collection."""
         self.reset()
 
         self._collection_builder.build_collection(self.collect_stac_items())
-        # self._collection = self._collection_builder.collection
-        self._collection = self._collection_builder._collection
+        self._collection = self._collection_builder.collection
 
         coll_file = self._collection_builder.collection_file
         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
@@ -1485,6 +1468,84 @@ class GeoTiffPipeline:
             post_processor.process_collection(coll_file)
 
 
+def convert_fields_to_string(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out_records = [dict(rec) for rec in records]
+    for rec in out_records:
+        for key, val in rec.items():
+            if isinstance(val, dt.datetime):
+                rec[key] = val.isoformat()
+            elif isinstance(val, list):
+                rec[key] = json.dumps(val)
+    return out_records
+
+
+def _visualization_dir(collection: Collection):
+    collection_path = Path(collection.self_href)
+    return collection_path.parent / "tmp" / "visualization" / collection.id
+
+
+class GeodataframeExporter:
+    """Utitlity class to export metadata and STAC items as geopandas GeoDataframes.
+
+    TODO: find a better name for GeodataframeExporter
+    TODO: This is currently a class with only static methods, perhaps a module would be beter.
+    """
+
+    @staticmethod
+    def stac_items_to_geodataframe(stac_item_list: List[Item]) -> gpd.GeoDataFrame:
+        if not stac_item_list:
+            raise InvalidOperation("stac_item_list is empty or None. Can not create a GeoDataFrame")
+
+        epsg = stac_item_list[0].properties.get("proj:epsg", 4326)
+        records = convert_fields_to_string(i.to_dict() for i in stac_item_list)
+        shapes = [shape(item.geometry) for item in stac_item_list]
+        return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
+
+    @staticmethod
+    def stac_items_to_dataframe(stac_item_list: List[Item]) -> pd.DataFrame:
+        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
+        return pd.DataFrame.from_records(md.to_dict() for md in stac_item_list)
+
+    @staticmethod
+    def metadata_to_geodataframe(metadata_list: List[Metadata]) -> gpd.GeoDataFrame:
+        """Return a GeoDataFrame representing the intermediate metadata."""
+        if not metadata_list:
+            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
+
+        epsg = metadata_list[0].proj_epsg
+        geoms = [m.proj_geometry_shapely for m in metadata_list]
+        records = convert_fields_to_string(m.to_dict() for m in metadata_list)
+
+        return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
+
+    @staticmethod
+    def metadata_to_dataframe(metadata_list: List[Metadata]) -> pd.DataFrame:
+        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
+        if not metadata_list:
+            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
+
+        return pd.DataFrame.from_records(md.to_dict() for md in metadata_list)
+
+    @staticmethod
+    def save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
+        shp_dir = out_dir / "shp"
+        if not shp_dir.exists():
+            shp_dir.mkdir(parents=True)
+
+        csv_path = out_dir / f"{table_name}.csv"
+        shapefile_path = out_dir / f"shp/{table_name}.shp"
+        parquet_path = out_dir / f"{table_name}.parquet"
+
+        print(f"Saving pipe-separated CSV file to: {csv_path}")
+        gdf.to_csv(csv_path, sep="|")
+
+        print(f"Saving shapefile to: {shapefile_path }")
+        gdf.to_file(shapefile_path)
+
+        print(f"Saving geoparquet to: {parquet_path}")
+        gdf.to_parquet(parquet_path)
+
+
 # ##############################################################################
 # CLI command-style functions
 # ==============================================================================
@@ -1499,17 +1560,6 @@ class GeoTiffPipeline:
 #
 # TODO: move the command functions to separate module, perhaps "cli.py"
 # ##############################################################################
-
-
-def convert_fields_to_string(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out_records = [dict(rec) for rec in records]
-    for rec in out_records:
-        for key, val in rec.items():
-            if isinstance(val, dt.datetime):
-                rec[key] = val.isoformat()
-            elif isinstance(val, list):
-                rec[key] = json.dumps(val)
-    return out_records
 
 
 def _setup_builder(
@@ -1706,7 +1756,7 @@ class CommandsNewPipeline:
         if save_dataframe:
             df = pipeline.get_metadata_as_geodataframe()
             out_dir = Path("tmp/visualization") / coll_cfg.collection_id
-            _save_geodataframe(df, out_dir, "metadata_table")
+            GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
 
     @staticmethod
     def list_stac_items(
@@ -1743,28 +1793,4 @@ class CommandsNewPipeline:
         if save_dataframe:
             df = pipeline.get_stac_items_as_geodataframe()
             out_dir = Path("tmp/visualization") / coll_cfg.collection_id
-            _save_geodataframe(df, out_dir, "stac_items")
-
-
-def _visualization_dir(collection: Collection):
-    collection_path = Path(collection.self_href)
-    return collection_path.parent / "tmp" / "visualization" / collection.id
-
-
-def _save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
-    shp_dir = out_dir / "shp"
-    if not shp_dir.exists():
-        shp_dir.mkdir(parents=True)
-
-    csv_path = out_dir / f"{table_name}.csv"
-    shapefile_path = out_dir / f"shp/{table_name}.shp"
-    parquet_path = out_dir / f"{table_name}.parquet"
-
-    print(f"Saving pipe-separated CSV file to: {csv_path}")
-    gdf.to_csv(csv_path, sep="|")
-
-    print(f"Saving shapefile to: {shapefile_path }")
-    gdf.to_file(shapefile_path)
-
-    print(f"Saving geoparquet to: {parquet_path}")
-    gdf.to_parquet(parquet_path)
+            GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
