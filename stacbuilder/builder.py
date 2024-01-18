@@ -63,7 +63,7 @@ def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file:
 
 
 class IDataCollector(Protocol):
-    """Interface for all DataCollector implementations."""
+    """Interface/Protocol for all DataCollector implementations."""
 
     def collect(self) -> None:
         """Collect the data and store it internally.
@@ -149,7 +149,7 @@ class FileCollector(IDataCollector):
 
 
 class IMetadataCollector(IDataCollector):
-    """Protocol for collector that gets Metadata objects from a source.
+    """Interface/Protocol for collector that gets Metadata objects from a source.
 
     You need still to implement the method `collect`
     """
@@ -169,7 +169,7 @@ class IMetadataCollector(IDataCollector):
 
 
 class ISTACItemCollector(IDataCollector):
-    """Protocol for collector that gets STAC Items from a source.
+    """Interface/Protocol for collector that gets STAC Items from a source.
 
     You need still to implement the method `collect`
     """
@@ -189,7 +189,10 @@ class ISTACItemCollector(IDataCollector):
 
 
 class IMapMetadataToSTACItem(Protocol):
-    """Like a mapping, converts intermediate Metadata objects STAC Items."""
+    """Interface for a mapping that converts intermediate Metadata objects STAC Items.
+
+    TODO: name could be better
+    """
 
     def map(self, metadata: Metadata) -> Item:
         """Converts a Metadata objects to a STAC Items."""
@@ -201,7 +204,10 @@ class IMapMetadataToSTACItem(Protocol):
 
 
 class MapMetadataToSTACItem(IMapMetadataToSTACItem):
-    """Converts Metadata objects to STAC Items."""
+    """Converts Metadata objects to STAC Items.
+
+    TODO: name could be better
+    """
 
     def __init__(self, item_assets_configs: Dict[str, AssetConfig]) -> None:
         super().__init__()
@@ -304,7 +310,10 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
 
 class MapGeoTiffToSTACItem:
-    """Like a mapping, extract STAC Items from each file."""
+    """Extracts STAC Items from each file.
+
+    TODO: name could be better
+    """
 
     def __init__(self, path_parser: InputPathParser, map_metadata_to_stac_item: IMapMetadataToSTACItem) -> None:
         # Store dependencies: components that have to be provided to constructor
@@ -371,7 +380,7 @@ class GroupMetadataByAttribute(IGroupMetadataBy):
 
 
 class STACCollectionBuilder:
-    """Creates a collector from collected STAC Items."""
+    """Creates a STAC Collection from STAC Items."""
 
     DEFAULT_EXTENT = Extent(
         SpatialExtent([-180.0, -90.0, 180.0, 90.0]),
@@ -536,6 +545,22 @@ class STACCollectionBuilder:
 
 
 class PostProcessSTACCollectionFile:
+    """Takes an existing STAC collection file and runs our common postprocessing steps
+
+    Currently this include 2 steps:
+
+    - Step 1) converting UTC timezones marked with TZ "Z" (AKA Zulu time)
+        to the notation with "+00:00" . This will be removed when the related GitHub issue is fixed:
+
+        See also https://github.com/Open-EO/openeo-geopyspark-driver/issues/568
+
+    - Step 2) overriding specific key-value pairs in the collections's dictionary with fixed values that we want.
+        This helps to set some values quickly when things don't quite work as expected.
+        For example overriding proj:bbox in at the collection level.
+
+        This is intended as a simple solution for situations where a quick result is needed and a bug fix may take too long.
+    """
+
     def __init__(self, collection_overrides: Optional[Dict[str, Any]]) -> None:
         # Settings
         self._collection_overrides = collection_overrides or {}
