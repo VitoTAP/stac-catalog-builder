@@ -6,7 +6,7 @@
 
 This tool generates a STAC collection from a set of GeoTiff images.
 
-It is mainly intended to create STAC collections and catalogs for use in [openEO ](https://openeo.org/), with the load_stac process.
+It is mainly intended to create STAC collections and catalogs for use in [openEO](https://openeo.org/), with the load_stac process.
 
 It requires a some configuration for the fields we need to fill in, but the goal is to make it much easier to generate STAC collections from a set of EO images.
 
