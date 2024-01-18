@@ -7,46 +7,17 @@ You can ignore the Form classes.
 That idea didn't go very far and is likely to be removed at this point.
 """
 
-import dataclasses as dc
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
 
-from pydantic_core import ErrorDetails
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pystac import MediaType
 from pystac.provider import ProviderRole, Provider
 from pystac.extensions.item_assets import AssetDefinition
 
 
 from openeo.util import dict_no_none
-
-
-# TODO: [decide]: remove or not? Doesn't look like this BaseForm is the way to go.
-class BaseForm:
-    def __init__(self, model_cls: type):
-        self._model_cls = model_cls
-
-    def _get_model(self) -> BaseModel:
-        """Convert to a Pydantic model, if the data is valid"""
-        return self._model_cls.model_validate(self)
-
-    @property
-    def is_valid(self) -> bool:
-        """Determine whether or not the data is valid"""
-        try:
-            self.get_model()
-        except ValidationError as exc:
-            return exc.errors()
-
-    @property
-    def validation_errors(self) -> List[ErrorDetails]:
-        try:
-            self.get_model()
-        except ValidationError as exc:
-            return exc.errors()
-        else:
-            return []
 
 
 DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
@@ -184,112 +155,6 @@ class CollectionConfig(BaseModel):
         return cls.from_json_str(contents)
 
 
-@dc.dataclass
-class CollectionConfigForm:
-    """Allows you to fill in a configuration of a STAC collection.
-
-    While it is very similar to CollectionConfig, a Pydantic model instance
-    can not be created with invalid data which is very annoying in a UI
-    but a form will let you fill in that data before the application
-    validates and converts it to the model, a CollectionConfig instance.
-    """
-
-    collection_id: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    keywords: Optional[List[str]] = dc.field(default_factory=list)
-    providers: Optional[List[ProviderModel]] = dc.field(default_factory=list)
-
-    platform: Optional[List[str]] = dc.field(default_factory=list)
-    mission: Optional[List[str]] = dc.field(default_factory=list)
-    instruments: Optional[List[str]] = dc.field(default_factory=list)
-
-    layout_strategy_item_template: Optional[str] = "${collection}/${year}"
-    input_path_parser: Optional[Dict[str, Any]] = None
-    media_type: Optional[MediaType] = MediaType.GEOTIFF
-
-    # Implementing item_assets would require a form for the AssetConfig.
-    # item_assets: Optional[Dict[str, AssetConfig]] = {}
-
-    overrides: Optional[Dict[str, Any]] = None
-
-    # TODO: links (urls)
-
-    def get_model(self) -> CollectionConfig:
-        """Convert to a  CollectionConfig, if the data is valid"""
-        return CollectionConfig.model_validate(self)
-
-    @property
-    def is_valid(self) -> bool:
-        """Determine whether or not the data is valid"""
-        try:
-            self.get_model()
-            return True
-        except ValidationError:
-            return False
-
-    @property
-    def validation_errors(self) -> List[ErrorDetails]:
-        try:
-            self.get_model()
-        except ValidationError as exc:
-            return exc.errors()
-        else:
-            return []
-
-    @classmethod
-    def from_json_str(cls, json_str: str) -> CollectionConfig:
-        return CollectionConfig.model_validate_json(json_str)
-
-    @classmethod
-    def from_json_file(cls, path: Path) -> CollectionConfig:
-        contents = path.read_text()
-        return cls.from_json_str(contents)
-
-
 class InputsModel(BaseModel):
     input_dir: Path
-    glob: Optional[str] = "*"
-
-
-@dc.dataclass
-class InputsForm:
-    input_dir: Optional[Path] = None
-    glob: Optional[str] = "*"
-
-    def get_model(self) -> InputsModel:
-        """Convert to a InputsModel, if the data is valid"""
-        return InputsModel.model_validate(self)
-
-    @property
-    def validation_errors(self) -> List[ErrorDetails]:
-        errors = []
-        try:
-            self.get_model()
-        except ValidationError as exc:
-            errors = exc.errors()
-
-        if self.input_dir and not self.input_dir.exists():
-            errors.append(f"Input directory does not exist: {self.input_dir!r}")
-
-        return errors
-
-    @property
-    def is_valid(self):
-        return not self.get_errors()
-
-
-@dc.dataclass
-class BuilderInputOutputForm:
-    input_dir: Path
-    output_dir: Path
-    glob: Optional[str] = "*"
-
-    # def check_paths(self):
-    #     pass
-
-
-class STACBuilderConfig(BaseModel):
-    input_dir: Path
-    output_dir: Path
     glob: Optional[str] = "*"

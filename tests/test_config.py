@@ -1,12 +1,7 @@
 import pytest
-
-
-from stacbuilder.config import CollectionConfigForm, CollectionConfig, ProviderModel
-
 from pystac.provider import ProviderRole
 
-
-from stacbuilder.config import InputsForm
+from stacbuilder.config import CollectionConfig, ProviderModel
 
 
 @pytest.fixture
@@ -37,74 +32,6 @@ def test_can_parse_providermodel_from_json():
     assert model.name == "Some EO org"
     assert model.url.unicode_string() == "https://www.some.place.in.space.dev/"
     assert model.roles == {ProviderRole.PRODUCER, ProviderRole.PROCESSOR}
-
-
-class TestCollectionForm:
-    def test_fill_and_validate_collection_form(self):
-        # provider = ProviderModel(name="VITO", url="https://www.vito.be")
-
-        form = CollectionConfigForm()
-        form.collection_id = "foo-2023-v01"
-        form.title = "Foo is a Bar"
-        form.description = "Description of Foo"
-        form.keywords = ["foo", "bar", "oof"]
-        form.providers = [ProviderModel(name="VITO", url="https://www.vito.be")]
-
-        model = form.get_model()
-        expected_config = CollectionConfig(
-            collection_id="foo-2023-v01",
-            title="Foo is a Bar",
-            description="Description of Foo",
-            keywords=["foo", "bar", "oof"],
-            providers=[ProviderModel(name="VITO", url="https://www.vito.be")],
-        )
-        assert model == expected_config
-
-    def test_is_valid_returns_true(self):
-        # provider = ProviderModel(name="VITO", url="https://www.vito.be")
-
-        form = CollectionConfigForm()
-        form.collection_id = "foo-2023-v01"
-        form.title = "Foo is a Bar"
-        form.description = "Description of Foo"
-        form.keywords = ["foo", "bar", "oof"]
-        form.providers = [ProviderModel(name="VITO", url="https://www.vito.be")]
-
-        assert form.is_valid is True
-
-    @pytest.mark.parametrize(
-        "form",
-        [
-            CollectionConfigForm(),
-            CollectionConfigForm(
-                collection_id=None,
-                title="Foo is a Bar",
-                description="Description of Foo",
-            ),
-            CollectionConfigForm(
-                collection_id="foo",
-                title=None,
-                description="Description of Foo",
-            ),
-            CollectionConfigForm(
-                collection_id="foo",
-                title="Foo is a Bar",
-                description=None,
-            ),
-        ],
-    )
-    def test_is_valid_returns_false(self, form):
-        assert form.is_valid is False
-
-    def test_validation_errors(self):
-        form = CollectionConfigForm()
-        form.collection_id = None
-        form.title = "Foo is a Bar"
-        form.description = "Description of Foo"
-        form.keywords = ["foo", "bar", "oof"]
-        form.providers = [ProviderModel(name="VITO", url="https://www.vito.be")]
-
-        assert form.validation_errors
 
 
 class TestCollectionConfigModel:
@@ -157,9 +84,3 @@ class TestCollectionConfigModel:
             platform=[],
             providers=[provider_model],
         )
-
-
-class TestInputsForm:
-    def test_testinputsform(self):
-        form = InputsForm()
-        assert form.validation_errors
