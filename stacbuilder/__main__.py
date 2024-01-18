@@ -21,12 +21,7 @@ import pydantic.errors
 from openeo.util import rfc3339
 
 
-from stacbuilder.builder import (
-    command_load_collection,
-    command_validate_collection,
-    command_post_process_collection,
-    CommandsNewPipeline,
-)
+from stacbuilder.builder import CommandsNewPipeline
 from stacbuilder.config import CollectionConfig
 from stacbuilder.verify_openeo import verify_in_openeo
 
@@ -58,54 +53,6 @@ def cli(verbose):
     ch.setFormatter(formatter)
     # add the handlers to the logger
     _logger.addHandler(ch)
-
-
-@cli.command()
-@click.option(
-    "-g",
-    "--glob",
-    default="*",
-    type=click.STRING,
-    help="glob pattern for collecting the GeoTIFF files. Example: */*.tif",
-)
-@click.option(
-    "-c",
-    "--collection-config",
-    type=click.Path(exists=True, dir_okay=False, file_okay=True),
-    help="Configuration file for the collection",
-)
-@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
-@click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
-@click.argument(
-    "inputdir",
-    type=click.Path(exists=True, dir_okay=True, file_okay=False),
-)
-@click.argument(
-    "outputdir",
-    type=click.Path(dir_okay=True, file_okay=False),
-)
-def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, outputdir, max_files):
-    """Build a STAC collection from a directory of GeoTIFF files."""
-    from stacbuilder.builder import old_command_build_collection
-
-    click.echo(
-        click.style(
-            (
-                "WARNING: this command is deprecated and will only be kept for a while for back-testing. "
-                + 'Use "build" instead.'
-            ),
-            fg="red",
-        )
-    )
-
-    old_command_build_collection(
-        collection_config_path=collection_config,
-        glob=glob,
-        input_dir=inputdir,
-        output_dir=outputdir,
-        overwrite=overwrite,
-        max_files=max_files,
-    )
 
 
 @cli.command()
@@ -263,7 +210,7 @@ def show_collection(collection_file):
 
     You can use this to see if it can be loaded.
     """
-    command_load_collection(collection_file)
+    CommandsNewPipeline.load_collection(collection_file)
 
 
 @cli.command()
@@ -271,7 +218,7 @@ def show_collection(collection_file):
 def validate(collection_file):
     """Run STAC validation on the collection file."""
 
-    command_validate_collection(collection_file)
+    CommandsNewPipeline.validate_collection(collection_file)
 
 
 @cli.command()
@@ -296,7 +243,7 @@ def post_process(outputdir, collection_config, collection_file):
     You make have to do that many times when debugging postpreocessing
     and waiting for collections to be build is annoying.
     """
-    command_post_process_collection(
+    CommandsNewPipeline.postprocess_collection(
         collection_file=collection_file, collection_config_path=collection_config, output_dir=outputdir
     )
 

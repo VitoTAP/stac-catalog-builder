@@ -608,6 +608,18 @@ class STACBuilder:
         )
 
 
+def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file: Path):
+    """Creates a STAC item from a GeoTIFF file, using rio-stac.
+
+    This is the equivalent of the command `rio stac`.
+    """
+    return rst.create_stac_item(
+        source=str(tiff_path),
+        collection=collection_id,
+        collection_url=str(collection_file),
+    )
+
+
 ###############################################################################
 # The STACBuilder above is getting complicated.
 # Working towards a simplifying it, with some pluggable parts,
@@ -1567,87 +1579,20 @@ class GeodataframeExporter:
 # ##############################################################################
 
 
-def _setup_builder(
-    input_dir: Path,
-    glob: str,
-    output_dir: Optional[Path] = None,
-    overwrite: Optional[bool] = False,
-    collection_config_path: Optional[Path] = None,
-    max_files_to_process: Optional[int] = -1,
-) -> STACBuilder:
-    """Build a STAC collection from a directory of geotiff files."""
-
-    builder = STACBuilder()
-
-    if collection_config_path:
-        conf_contents = collection_config_path.read_text()
-        config = CollectionConfig(**json.loads(conf_contents))
-        builder.collection_config = config
-
-    builder.glob = glob
-    builder.input_dir = input_dir
-    builder.max_files_to_process = max_files_to_process
-
-    builder.output_dir = output_dir
-    builder.overwrite = overwrite
-
-    return builder
+# def command_load_collection(
+#     collection_file: Path,
+# ):
+#     """Show the STAC collection in 'collection_file'."""
+#     collection = Collection.from_file(collection_file)
+#     pprint.pprint(collection.to_dict(), indent=2)
 
 
-def old_command_build_collection(
-    collection_config_path: Path,
-    glob: str,
-    input_dir: Path,
-    output_dir: Path,
-    overwrite: bool,
-    max_files: Optional[int] = -1,
-):
-    """Build a STAC collection from a directory of geotiff files."""
-    builder: STACBuilder = _setup_builder(
-        collection_config_path=Path(collection_config_path).expanduser().absolute(),
-        glob=glob,
-        input_dir=Path(input_dir).expanduser().absolute(),
-        output_dir=Path(output_dir).expanduser().absolute(),
-        overwrite=overwrite,
-        max_files_to_process=max_files,
-    )
-    builder.build_collection()
-
-
-def command_load_collection(
-    collection_file: Path,
-):
-    """Show the STAC collection in 'collection_file'."""
-    collection = Collection.from_file(collection_file)
-    pprint.pprint(collection.to_dict(), indent=2)
-
-
-def command_validate_collection(
-    collection_file: Path,
-):
-    """Validate a STAC collection."""
-    collection = Collection.from_file(collection_file)
-    collection.validate_all()
-
-
-def command_post_process_collection(
-    collection_file: Path,
-    collection_config_path: Path,
-    output_dir: Optional[Path] = None,
-):
-    """Run only the post-processing step on an existing STAC collection.
-
-    Mainly intended to troubleshoot the postprocessing so you don't have to
-    regenerate the entire set every time.
-    """
-    builder = STACBuilder()
-    collection_config_path = Path(collection_config_path)
-    conf_contents = collection_config_path.read_text()
-    config = CollectionConfig(**json.loads(conf_contents))
-    builder.collection_config = config
-
-    out_dir = Path(output_dir) if output_dir else None
-    builder.post_process_collection(Path(collection_file), out_dir)
+# def command_validate_collection(
+#     collection_file: Path,
+# ):
+#     """Validate a STAC collection."""
+#     collection = Collection.from_file(collection_file)
+#     collection.validate_all()
 
 
 class CommandsNewPipeline:
@@ -1799,3 +1744,36 @@ class CommandsNewPipeline:
             df = pipeline.get_stac_items_as_geodataframe()
             out_dir = Path("tmp/visualization") / coll_cfg.collection_id
             GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
+
+    @staticmethod
+    def postprocess_collection(
+        collection_file: Path,
+        collection_config_path: Path,
+        output_dir: Optional[Path] = None,
+    ):
+        """Run only the post-processing step, on an existing STAC collection.
+
+        Mainly intended to troubleshoot the postprocessing so you don't have to
+        regenerate the entire set every time.
+        """
+        collection_config_path = Path(collection_config_path).expanduser().absolute()
+        coll_cfg = CollectionConfig.from_json_file(collection_config_path)
+
+        postprocessor = PostProcessSTACCollectionFile(collection_overrides=coll_cfg.overrides)
+        postprocessor.process_collection(collection_file=collection_file, output_dir=output_dir)
+
+    @staticmethod
+    def load_collection(
+        collection_file: Path,
+    ):
+        """Show the STAC collection in 'collection_file'."""
+        collection = Collection.from_file(collection_file)
+        pprint.pprint(collection.to_dict(), indent=2)
+
+    @staticmethod
+    def validate_collection(
+        collection_file: Path,
+    ):
+        """Validate a STAC collection."""
+        collection = Collection.from_file(collection_file)
+        collection.validate_all()
