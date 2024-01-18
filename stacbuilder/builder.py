@@ -1007,22 +1007,6 @@ class GeodataframeExporter:
 # ##############################################################################
 
 
-# def command_load_collection(
-#     collection_file: Path,
-# ):
-#     """Show the STAC collection in 'collection_file'."""
-#     collection = Collection.from_file(collection_file)
-#     pprint.pprint(collection.to_dict(), indent=2)
-
-
-# def command_validate_collection(
-#     collection_file: Path,
-# ):
-#     """Validate a STAC collection."""
-#     collection = Collection.from_file(collection_file)
-#     collection.validate_all()
-
-
 class CommandsNewPipeline:
     """Putting the new versions of the command under this class for now to
     make switching between old and new easier for testing the conversion.
