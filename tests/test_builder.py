@@ -11,9 +11,8 @@ from pystac.collection import Collection
 from stacbuilder.builder import (
     GeoTiffPipeline,
     CommandsNewPipeline,
-    FileCollectorConfig,
 )
-from stacbuilder.config import CollectionConfig, InputPathParserConfig
+from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
 
 
 @pytest.fixture

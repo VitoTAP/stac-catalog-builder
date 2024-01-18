@@ -155,6 +155,7 @@ class CollectionConfig(BaseModel):
         return cls.from_json_str(contents)
 
 
-class InputsModel(BaseModel):
+class FileCollectorConfig(BaseModel):
     input_dir: Path
     glob: Optional[str] = "*"
+    max_files: int = -1
