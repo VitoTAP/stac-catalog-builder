@@ -1,3 +1,12 @@
+"""The main module, which is run as the program.
+
+This defines the Commane Line Interface of the application.
+We want to keep this layer thin so we can write unit/integration tests for the
+functionality underneath without dealing directly with the CLI.
+
+The functions you find in this module should remain very simple.
+"""
+
 import json
 import logging
 import pprint
@@ -28,6 +37,14 @@ _logger = logging.getLogger(__name__)
 @click.group()
 @click.option("-v", "--verbose", is_flag=True, help="show debug output")
 def cli(verbose):
+    """Main CLI group. This is the base command.
+
+    Everything that is in here will run at the start of every stacbuilder command.
+    """
+
+    #
+    # Set up logging for the application.
+    #
     log_level = logging.INFO
     if verbose:
         log_level = logging.DEBUG
@@ -71,8 +88,14 @@ def build_collection_old_pipeline(glob, collection_config, overwrite, inputdir, 
     """Build a STAC collection from a directory of GeoTIFF files."""
     from stacbuilder.builder import old_command_build_collection
 
-    print(
-        'WARNING: this command is deprecated and will only be kept for a while for back-testing. Use "build" instead.'
+    click.echo(
+        click.style(
+            (
+                "WARNING: this command is deprecated and will only be kept for a while for back-testing. "
+                + 'Use "build" instead.'
+            ),
+            fg="red",
+        )
     )
 
     old_command_build_collection(

@@ -308,6 +308,18 @@ validate:
 	$(PYTHON) stacbuilder validate "$(TEST_OUTPUT_DIR)/collection.json"
 
 
+.PHONY: profile-validate
+profile-validate:
+## Profile the validation, large collections take surprisingly long.
+	$(PYTHON) -m cProfile -o stacbuilder-validate.stats stacbuilder/__main__.py validate "$(TEST_OUTPUT_DIR)/collection.json"
+
+
+.PHONY: profile-loadcollection
+profile-loadcollection:
+## Profile loading (showing) a collection, large collections take surprisingly long.
+	$(PYTHON) -m cProfile -o stacbuilder-show-collection.stats stacbuilder/__main__.py show-collection "$(TEST_OUTPUT_DIR)/collection.json"
+
+
 .PHONY: test-openeo
 test-openeo:
 ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.

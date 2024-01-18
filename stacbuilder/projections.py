@@ -1,3 +1,7 @@
+"""
+For converting bounding boxes to a different Coordinate Reference System.
+"""
+
 import logging
 from typing import Any, Callable, List, Tuple
 

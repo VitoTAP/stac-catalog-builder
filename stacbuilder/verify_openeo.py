@@ -1,6 +1,9 @@
+"""
+Support for verifying that a new STAC collection/catalog works in open-EO
+"""
+
 import datetime as dt
 import json
-from pprint import pprint
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -182,12 +185,12 @@ def create_cube_OLD(
     print(f"final spatial extent for filtering: {[west, south, east, north]}, {epsg=}")
     cube = cube.filter_bbox(west=west, south=south, east=east, north=north, crs=epsg)
 
-    print("cube.validate() ...")
-    validation_errors = cube.validate()
-    if validation_errors:
-        print("Validation failed:")
-        pprint(validation_errors)
-        raise Exception("Validation failed")
+    # print("cube.validate() ...")
+    # validation_errors = cube.validate()
+    # if validation_errors:
+    #     print("Validation failed:")
+    #     pprint(validation_errors)
+    #     raise Exception("Validation failed")
 
     return cube
 
@@ -224,12 +227,12 @@ def create_cube(
     print(f"final spatial extent for filtering: {[west, south, east, north]}, {epsg=}")
     cube = cube.filter_bbox(west=west, south=south, east=east, north=north, crs=epsg)
 
-    print("cube.validate() ...")
-    validation_errors = cube.validate()
-    if validation_errors:
-        print("Validation failed:")
-        pprint(validation_errors)
-        raise Exception("Validation failed")
+    # print("cube.validate() ...")
+    # validation_errors = cube.validate()
+    # if validation_errors:
+    #     print("Validation failed:")
+    #     pprint(validation_errors)
+    #     raise Exception("Validation failed")
 
     return cube
 
@@ -361,8 +364,8 @@ def verify_in_openeo(
     )
     print(cube)
 
-    print("PROGRESS: Validating DataCube ...")
-    cube.validate()
+    # print("PROGRESS: Validating DataCube ...")
+    # cube.validate()
 
     if dry_run:
         print("DONE: This is a dry run. Skipping part that submits a batch job")

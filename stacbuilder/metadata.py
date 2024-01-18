@@ -1,3 +1,16 @@
+"""
+Intermediate metadata that models the properties we actually use.
+
+Rationale:
+
+1) STAC times support a lot more than we really need, and this class makes it
+    explicit what we actually use.
+2) Implementing each conversion to STAC for every new type of input data is extra work.
+    This intermediate metadata make reuse easier to do.
+3) This class is deliberately simple and has little to no business logic.
+4) For unit testing it is a lot simpler to instantiate Metadata objects than
+    to creating fake raster files, or fake API responses from a mock of the real API.
+"""
 import datetime as dt
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -22,15 +35,11 @@ BoundingBoxList = List[Union[float, int]]
 class Metadata:
     """Intermediate metadata that models the properties we actually use.
 
-    Rationale:
-
-    1) STAC times support a lot more than we really need, and this class makes it
-        explicit what we actually use.
-    2) Implementing each conversion to STAC for every new type of input data is extra work.
-        This intermediate metadata make reuse easier to do.
-    3) This class is deliberately simple and has little to no business logic.
-    4) For unit testing it is a lot simpler to instantiate Metadata objects than
-        to creating fake raster files, or fake API responses from a mock of the real API.
+    TODO: Decouple: turn this into a actual dataclass and extract all rasterio stuff from the constructor.
+        We should have a component that reads the file and then fills is or constructs a Metadata instance.
+        Now Metadata is tied completely to GeoTIFFs and we want to use it for any
+        data source as an intermediate step that makes it easier to create
+        STAC items with the same subset of metadata we want to have for every data source.
     """
 
     def __init__(

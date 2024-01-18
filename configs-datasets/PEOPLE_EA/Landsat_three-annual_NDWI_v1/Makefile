@@ -247,6 +247,19 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
+.PHONY: build_grouped_collections
+build-grouped-collections:
+## Build the STAC collections, grouped per year
+	$(PYTHON) stacbuilder \
+		-v build-grouped-collections \
+		-g "$(GLOB_PATTERN)" \
+		-c $(COLLECTION_CONFIG) \
+		--overwrite \
+		--max-files $(MAX_TIFF_FILES) \
+		$(TIFF_INPUT_DIR) \
+		$(TEST_OUTPUT_DIR)
+
+
 .PHONY: list-tiffs
 list-tiffs:
 ## List which GeoTIFF files the STAC builder finds with your current glob and input directory.
@@ -304,6 +317,19 @@ validate:
 
 # 	"$(PUBLISH_DIR)/collection.json"
 
+
+.PHONY: profile-validate
+profile-validate:
+## Profile the validation, large collections take surprisingly long.
+	$(PYTHON) -m cProfile -o stacbuilder-validate.stats stacbuilder/__main__.py validate "$(TEST_OUTPUT_DIR)/collection.json"
+
+
+.PHONY: profile-loadcollection
+profile-loadcollection:
+## Profile loading (showing) a collection, large collections take surprisingly long.
+	$(PYTHON) -m cProfile -o stacbuilder-show-collection.stats stacbuilder/__main__.py show-collection "$(TEST_OUTPUT_DIR)/collection.json"
+
+
 .PHONY: test-openeo
 test-openeo:
 ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
@@ -350,13 +376,28 @@ test-openeo-dryrun:
 # 	"$(PUBLISH_DIR)/collection.json"
 
 
-.PHONY: test-openeo-dryrun
-test-openeo-dryrun:
-## Dry-run show what extent / config would be uses to test the STAC collection
-## in open-EO with load_stac by downloading a small part of it.
+# .PHONY: test-openeo-dryrun
+# test-openeo-dryrun:
+# ## Dry-run show what extent / config would be uses to test the STAC collection
+# ## in open-EO with load_stac by downloading a small part of it.
+# 	$(PYTHON) stacbuilder test-openeo \
+# 	-v \
+# 	--dry-run \
+# 	-b $(OPENEO_BACKEND_URL) \
+# 	-o $(TEST_OPENEO_DIR) \
+# 	--bbox=$(BBOX_VERIFICATION) \
+# 	--epsg=$(BBOX_VERIFICATION_EPSG) \
+# 	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+# 	--start-dt=$(TEMPORAL_EXTENT_START) \
+# 	--end-dt=$(TEMPORAL_EXTENT_END) \
+# 	"$(TEST_OUTPUT_DIR)/collection.json"
+
+
+.PHONY: test-openeo-unpublished
+test-openeo-unpublished:
+## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
 	-v \
-	--dry-run \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
 	--bbox=$(BBOX_VERIFICATION) \
@@ -367,10 +408,11 @@ test-openeo-dryrun:
 	"$(TEST_OUTPUT_DIR)/collection.json"
 
 
-.PHONY: test-openeo-unpublished
-test-openeo-unpublished:
+.PHONY: test-openeo-unpublished-dryrun
+test-openeo-unpublished-dryrun:
 ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
+	--dry-run \
 	-v \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \

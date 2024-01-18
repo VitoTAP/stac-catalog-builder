@@ -1,3 +1,22 @@
+"""
+This is a module, for a temporary fix and it will be removed when the proper fix has been deployed.
+
+This utility module helps us to convert a timezone format that, at present,
+the openeo-geopyspark-driver doesn't support.
+This root cause is that the method datetime.fromisoformat in Python *version 3.8*
+does not yet support this ISO format.
+https://docs.python.org/3/library/datetime.html#datetime.datetime.fromisoformat
+However higher versions of Python fix that issue, but we don't want to force
+all users of openeo-geopyspark-driver to migrate to Python >3.8 just for this one issue.
+
+
+See GitHub issue:
+https://github.com/Open-EO/openeo-geopyspark-driver/issues/568
+
+And PR to fix this:
+https://github.com/Open-EO/openeo-geopyspark-driver/pull/615
+"""
+
 import copy
 import datetime as dt
 import json

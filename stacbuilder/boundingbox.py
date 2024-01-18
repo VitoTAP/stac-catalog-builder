@@ -1,10 +1,13 @@
+"""For working with bounding boxes of the rasters, in various formats.
+"""
+
 from typing import Dict, List
 
 from shapely.geometry import Polygon
 
 
 def bbox_list_to_dict(bbox: List[float]) -> Dict[str, float]:
-    """Convert bounding box in list form to a dictionary.
+    """Convert bounding box in list format to a dictionary.
 
     Utility function for a common conversion.
     """
@@ -15,7 +18,7 @@ def bbox_list_to_dict(bbox: List[float]) -> Dict[str, float]:
 
 
 def bbox_dict_to_list(bbox_dict: Dict[str, float]) -> List[float]:
-    """Convert bounding box in dictionary form to a list.
+    """Convert bounding box in dictionary format to a list.
 
     Utility function for a common conversion.
     """

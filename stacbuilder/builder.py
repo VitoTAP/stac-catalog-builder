@@ -1,3 +1,8 @@
+"""The core module of the STAC catalog builder.
+
+This contains the classes that generate the STAC catalogs, collections and items.
+"""
+
 import datetime as dt
 import json
 import logging

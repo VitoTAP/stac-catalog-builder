@@ -1,3 +1,12 @@
+"""
+Support for extracting data from HRVPP.
+
+This is done via the terracatalogueclient.
+
+At present, all code in this module is still very experimental (d.d. 2024-01-18)
+
+"""
+
 import datetime as dt
 from itertools import chain
 from pprint import pprint

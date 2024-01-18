@@ -181,6 +181,15 @@ ifndef MAX_TIFF_FILES
 	MAX_TIFF_FILES := -1
 endif
 
+# TODO: need to check this extent
+BBOX_VERIFICATION := "[-180.0, -90.0, 180.0, 90.0]"
+BBOX_VERIFICATION_EPSG := 4326
+
+# max size of spatial extent: 2000 meter
+MAX_SPATIAL_EXTENT_SIZE := 0.01
+
+TEMPORAL_EXTENT_START := 2020-01-01T00:00:00Z
+TEMPORAL_EXTENT_END := 2020-02-01T00:00:00Z
 
 # ==============================================================================
 # make targets
@@ -212,7 +221,6 @@ show-config:
 .PHONY: show-config
 
 
-
 .PHONY: build-collection
 build-collection-old-pipeline:
 ## Build the STAC collection
@@ -225,6 +233,31 @@ build-collection-old-pipeline:
 		$(TIFF_INPUT_DIR) \
 		$(TEST_OUTPUT_DIR)
 
+
+.PHONY: build-collection
+build-collection:
+## Build the STAC collection
+	$(PYTHON) stacbuilder \
+		-v build \
+		-g "$(GLOB_PATTERN)" \
+		-c $(COLLECTION_CONFIG) \
+		--overwrite \
+		--max-files $(MAX_TIFF_FILES) \
+		$(TIFF_INPUT_DIR) \
+		$(TEST_OUTPUT_DIR)
+
+
+.PHONY: build_grouped_collections
+build-grouped-collections:
+## Build the STAC collections, grouped per year
+	$(PYTHON) stacbuilder \
+		-v build-grouped-collections \
+		-g "$(GLOB_PATTERN)" \
+		-c $(COLLECTION_CONFIG) \
+		--overwrite \
+		--max-files $(MAX_TIFF_FILES) \
+		$(TIFF_INPUT_DIR) \
+		$(TEST_OUTPUT_DIR)
 
 
 .PHONY: list-tiffs
@@ -273,6 +306,18 @@ validate:
 	$(PYTHON) stacbuilder validate "$(TEST_OUTPUT_DIR)/collection.json"
 
 
+.PHONY: profile-validate
+profile-validate:
+## Profile the validation, large collections take surprisingly long.
+	$(PYTHON) -m cProfile -o stacbuilder-validate.stats stacbuilder/__main__.py validate "$(TEST_OUTPUT_DIR)/collection.json"
+
+
+.PHONY: profile-loadcollection
+profile-loadcollection:
+## Profile loading (showing) a collection, large collections take surprisingly long.
+	$(PYTHON) -m cProfile -o stacbuilder-show-collection.stats stacbuilder/__main__.py show-collection "$(TEST_OUTPUT_DIR)/collection.json"
+
+
 .PHONY: test-openeo
 test-openeo:
 ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
@@ -280,7 +325,11 @@ test-openeo:
 	-v \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
-	--max-extent-size=2000 \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
 	"$(PUBLISH_DIR)/collection.json"
 
 
@@ -293,8 +342,44 @@ test-openeo-dryrun:
 	--dry-run \
 	-b $(OPENEO_BACKEND_URL) \
 	-o $(TEST_OPENEO_DIR) \
-	--max-extent-size=2000 \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
 	"$(PUBLISH_DIR)/collection.json"
+
+
+
+.PHONY: test-openeo-unpublished
+test-openeo-unpublished:
+## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+	$(PYTHON) stacbuilder test-openeo \
+	-v \
+	-b $(OPENEO_BACKEND_URL) \
+	-o $(TEST_OPENEO_DIR) \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
+	"$(TEST_OUTPUT_DIR)/collection.json"
+
+
+.PHONY: test-openeo-unpublished-dryrun
+test-openeo-unpublished-dryrun:
+## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+	$(PYTHON) stacbuilder test-openeo \
+	--dry-run \
+	-v \
+	-b $(OPENEO_BACKEND_URL) \
+	-o $(TEST_OPENEO_DIR) \
+	--bbox=$(BBOX_VERIFICATION) \
+	--epsg=$(BBOX_VERIFICATION_EPSG) \
+	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
+	--start-dt=$(TEMPORAL_EXTENT_START) \
+	--end-dt=$(TEMPORAL_EXTENT_END) \
+	"$(TEST_OUTPUT_DIR)/collection.json"
 
 
 $(PUBLISH_DIR):
@@ -315,11 +400,16 @@ ls-test-out:
 	ls -la $(TEST_OUTPUT_DIR)
 
 
-
 .PHONY: ls-publish-dir
 ls-publish-dir:
 ## List the files in the test pulbish directory.
 	ls -la $(PUBLISH_DIR)
+
+
+.PHONY: ls-test-openeo
+ls-test-openeo:
+## List the files in the test pulbish directory.
+	ls -la $(TEST_OPENEO_DIR)
 
 
 .PHONY: clean-test-out

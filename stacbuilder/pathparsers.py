@@ -1,7 +1,7 @@
-# TODO: rename and restructure: this module contains mostly InputPathParsers.
-#   It was named core because a lot of other modules will import from here
-#   and we need to prevent circular imports; but that doesn't say what it
-#   really does anymore.
+"""Classes that parse input paths and extract metadata from the file name or file path.
+
+Normally these are paths to GeoTIFF files, but this could include other file formats in the future.
+"""
 
 import abc
 import calendar
@@ -25,16 +25,35 @@ class UnknownInputPathParserClass(Exception):
 
 
 class InputPathParserFactory:
+    """Constructs an InputPathParser that matches class name.
+
+    In the CollectionConfig we can configure which InputPathParser to use for
+    that particular dataset. This factory makes it possible to find and
+    instantiate that class.
+
+    Optionally you can also configure some parameters to pass to the constructor,
+    but this is a but cumbersome to configure. In general it is easier and cleaner
+    to create a subclass of InputPathParserFactory (or one of its general subclasses)
+    where you set all the parameters hard coded for that specific STAC collection.
+
+    All subclasses of InputPathParserFactory automatically register themselves
+    in the InputPathParserFactory, via the __init_subclass__ in their abstract
+    base class, InputPathParser.
+    """
+
     _implementations = {}
 
     @classmethod
     def register(cls, parser_class: type):
+        """Register a new subclass as a InputPathParser, so the factory knows
+        all the classes it can instantiate."""
         name = parser_class.__name__
         cls._implementations[name] = parser_class
 
     @classmethod
     @property
     def implementation_names(cls):
+        """Get the class names of all known implementations."""
         return sorted(cls._implementations.keys())
 
     @classmethod
@@ -47,25 +66,51 @@ class InputPathParserFactory:
 
 
 class InputPathParser(abc.ABC):
+    """Abstract Base Class for all input path parsers."""
+
+    @classmethod
     def __init_subclass__(cls) -> None:
+        """This method is called whenever the containing class is subclassed.
+
+        All subclasses of InputPathParserFactory automatically register themselves
+        in the InputPathParserFactory, via the __init_subclass__ in their abstract
+        base class, InputPathParser.
+        """
         super().__init_subclass__()
         InputPathParserFactory.register(cls)
 
     @abc.abstractmethod
     def parse(self, input_file: Path) -> Dict[str, Any]:
+        """Parse the path to an input file to extract metadata from the file path."""
         return {}
 
 
 class NoopInputPathParser(InputPathParser):
+    """A dummy InputPathParser that never extracts anything from the path.
+
+    Not every dataset will need path parsing and this class makes it easier
+    deal with that. Otherwise you need to check for `None` everywhere.
+    """
+
     def parse(self, input_file: Path) -> Dict[str, Any]:
         return {}
 
 
 TypeConverter = Callable[[str], Any]
+"""Type alias for the callables we need, what signature the function/method must have."""
+
 TypeConverterMapping = Dict[str, TypeConverter]
+"""Type alias for the converting functions.
+
+These convert strings extracted from the path into a more useful time.
+For example a year, month or day can be converted to an integer, or an entire
+date could be converted to datetime.
+"""
 
 
 class RegexInputPathParser(InputPathParser):
+    """Path parser that uses regular expressions to extract properties from a path."""
+
     def __init__(
         self,
         regex_pattern: Union[str, re.Pattern],
@@ -121,18 +166,22 @@ class RegexInputPathParser(InputPathParser):
         return self._data
 
     def _post_process_data(self):
+        """Optionally do any desired processing on the extracted data."""
         pass
 
     @property
-    def data(self):
+    def data(self) -> Dict[str, Any]:
+        """Get the data extracted from the path."""
         return self._data
 
     @property
-    def regex(self):
+    def regex(self) -> re.Pattern:
+        """Get the regular expression used to parse the path."""
         return self._regex
 
     @property
-    def type_converters(self):
+    def type_converters(self) -> TypeConverterMapping:
+        """Return a"""
         return self._type_converters
 
 
@@ -174,12 +223,13 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
         )
 
     def _post_process_data(self):
-        start_dt = self._get_start_datetime()
+        start_dt = self._derive_start_datetime()
         self._data["datetime"] = start_dt
         self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._get_end_datetime()
+        self._data["end_datetime"] = self._derive_end_datetime()
 
-    def _get_start_datetime(self):
+    def _derive_start_datetime(self):
+        """Derive the start datetime from other properties that were extracted."""
         year = self._data.get("year")
         month = self._data.get("month")
         day = self._data.get("day")
@@ -194,8 +244,9 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
 
         return dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
 
-    def _get_end_datetime(self):
-        start_dt = self._get_start_datetime()
+    def _derive_end_datetime(self):
+        """Derive the end datetime from other properties that were extracted."""
+        start_dt = self._derive_start_datetime()
         if not start_dt:
             print(
                 "WARNING: Could not determine start_datetime: " + f"{self._data=}, {self._path=}, {self._regex.pattern}"
