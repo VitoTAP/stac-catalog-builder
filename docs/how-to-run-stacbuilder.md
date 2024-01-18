@@ -298,7 +298,7 @@ Commands:
   list-tiffs       List which geotiff files will be selected with this...
   post-process     Run only the postprocessing.
   show-collection  Read the STAC collection file and display its contents.
-  test-openeo      Test STAC collection via load_stac in open-EO.
+  test-openeo      Test STAC collection via load_stac in openEO.
   validate         Run STAC validation on the collection file.
 
 ```
@@ -306,7 +306,7 @@ Commands:
 The main command is off course `build`.
 The other commands are meant for troubleshooting and show you what metadata or stac items the tool would generate (So these commands don't a STAC collection).
 
-Another useful one is `test-openeo`, because for our purposes, the goal is that it works with load_stac in open-EO.
+Another useful one is `test-openeo`, because for our purposes, the goal is that it works with load_stac in openEO.
 
 ```shell
 $python3 -m  stacbuilder build --help

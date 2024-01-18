@@ -45,7 +45,7 @@ We only want to communicate what the goals of this tool are, for example to new 
 
 It comes down to this:
 
-1. We mainly want to use it to create catalogs for open-EO, hence the users are open-EO users.
+1. We mainly want to use it to create catalogs for openEO, hence the users are openEO users.
 
 2. It should be usable for people who do have technical skills, but you should not have to be a software developer.
 

@@ -134,8 +134,8 @@ OUT_DIR_ROOT := $(WORKSPACE)/${DATASET_NAME}
 # ------------------------------------------------------------------------------
 # OPENEO_BACKEND_URL
 # ------------------------------------------------------------------------------
-# URL for the open-EO backend to use when testing the STAC collection in
-# open-EO (via the python client)
+# URL for the openEO backend to use when testing the STAC collection in
+# openEO (via the python client)
 OPENEO_BACKEND_URL := openeo-dev.vito.be
 
 
@@ -309,7 +309,7 @@ validate:
 
 # .PHONY: test-openeo
 # test-openeo:
-# ## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+# ## Test the STAC collection works in openEO with load_stac by downloading a small part of it.
 # 	$(PYTHON) stacbuilder test-openeo \
 # 	-v \
 # 	-b $(OPENEO_BACKEND_URL) \
@@ -332,7 +332,7 @@ profile-loadcollection:
 
 .PHONY: test-openeo
 test-openeo:
-## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+## Test the STAC collection works in openEO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
 	-v \
 	-b $(OPENEO_BACKEND_URL) \
@@ -348,7 +348,7 @@ test-openeo:
 .PHONY: test-openeo-dryrun
 test-openeo-dryrun:
 ## Dry-run show what extent / config would be uses to test the STAC collection
-## in open-EO with load_stac by downloading a small part of it.
+## in openEO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
 	-v \
 	--dry-run \
@@ -365,7 +365,7 @@ test-openeo-dryrun:
 # .PHONY: test-openeo-dryrun
 # test-openeo-dryrun:
 # ## Dry-run show what extent / config would be uses to test the STAC collection
-# ## in open-EO with load_stac by downloading a small part of it.
+# ## in openEO with load_stac by downloading a small part of it.
 # 	$(PYTHON) stacbuilder test-openeo \
 # 	-v \
 # 	--dry-run \
@@ -379,7 +379,7 @@ test-openeo-dryrun:
 # .PHONY: test-openeo-dryrun
 # test-openeo-dryrun:
 # ## Dry-run show what extent / config would be uses to test the STAC collection
-# ## in open-EO with load_stac by downloading a small part of it.
+# ## in openEO with load_stac by downloading a small part of it.
 # 	$(PYTHON) stacbuilder test-openeo \
 # 	-v \
 # 	--dry-run \
@@ -395,7 +395,7 @@ test-openeo-dryrun:
 
 .PHONY: test-openeo-unpublished
 test-openeo-unpublished:
-## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+## Test the STAC collection works in openEO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
 	-v \
 	-b $(OPENEO_BACKEND_URL) \
@@ -410,7 +410,7 @@ test-openeo-unpublished:
 
 .PHONY: test-openeo-unpublished-dryrun
 test-openeo-unpublished-dryrun:
-## Test the STAC collection works in open-EO with load_stac by downloading a small part of it.
+## Test the STAC collection works in openEO with load_stac by downloading a small part of it.
 	$(PYTHON) stacbuilder test-openeo \
 	--dry-run \
 	-v \

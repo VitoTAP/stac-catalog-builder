@@ -1,5 +1,5 @@
 """
-Support for verifying that a new STAC collection/catalog works in open-EO
+Support for verifying that a new STAC collection/catalog works in openEO
 """
 
 import datetime as dt
@@ -267,7 +267,7 @@ def verify_in_openeo(
     print(f"PROGRESS: Counting files in collection directory: {coll_dir}")
     print("    This may take long if there are very many files.")
     print(
-        "    If this already takes long, then you should definitely LIMIT your spatial and temporal extent to keep the test on open-EO short enough"
+        "    If this already takes long, then you should definitely LIMIT your spatial and temporal extent to keep the test on openEO short enough"
     )
     print("    Counting in progress ...")
     # files_in_collection = [f for f in coll_dir.rglob("*") if f.is_file()]

@@ -302,7 +302,7 @@ def post_process(outputdir, collection_config, collection_file):
 
 
 @cli.command
-@click.option("-b", "--backend-url", type=click.STRING, help="URL for open-EO backend", default="openeo-dev.vito.be")
+@click.option("-b", "--backend-url", type=click.STRING, help="URL for openEO backend", default="openeo-dev.vito.be")
 @click.option(
     "-o",
     "--out-dir",
@@ -324,7 +324,7 @@ def post_process(outputdir, collection_config, collection_file):
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
 )
 def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, start_dt, end_dt, dry_run, verbose):
-    """Test STAC collection via load_stac in open-EO.
+    """Test STAC collection via load_stac in openEO.
 
     It guesses a reasonable spatial and temporal extent based on what
     extent the collection declares.
