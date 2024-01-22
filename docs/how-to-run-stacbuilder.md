@@ -11,8 +11,7 @@ python3 stacbuilder build --help
 
 The configuration is described in a separate document.
 
-See: [How to Configura a New Dataset](how-to-configure-new-dataset.md)
-
+See: [How to Configure a New Dataset](how-to-configure-new-dataset.md)
 
 ---
 

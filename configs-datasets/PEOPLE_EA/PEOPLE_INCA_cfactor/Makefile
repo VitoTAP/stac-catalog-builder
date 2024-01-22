@@ -91,7 +91,6 @@ DATASET_NAME := PEOPLE_INCA_cfactor
 #
 # You should find it in the same folder as this Makefile.
 #
-# TODO: simplify: remove ".local/datasets/PEOPLE_EA"
 COLLECTION_CONFIG := $(WORKSPACE)/${DATASET_NAME}/config-collection.json
 
 
