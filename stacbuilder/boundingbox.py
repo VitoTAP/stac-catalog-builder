@@ -30,7 +30,7 @@ def bbox_dict_to_list(bbox_dict: Dict[str, float]) -> List[float]:
 
 def to_bbox_dict(west: float, south: float, east: float, north: float) -> Dict[str, float]:
     """Create a bounding box dictionary from individual XY coordinates.
-    
+
     Utility function for a common conversion.
     The result does not include the CRS (EPSG code), only coordinates.
     """
@@ -45,7 +45,7 @@ def to_bbox_dict(west: float, south: float, east: float, north: float) -> Dict[s
 # def polygon_from_bounds(minx, miny, maxx, maxy) -> Polygon:
 #     """
 #     Returns a rectangular polygon representing the bounding box.
-    
+
 #     Utility function for a common conversion.
 #     The resulting Polygon does not have any information about the CRS (EPSG code), only coordinates.
 #     """
@@ -55,23 +55,24 @@ def to_bbox_dict(west: float, south: float, east: float, north: float) -> Dict[s
 @dc.dataclass
 class BoundingBox:
     """Bounding box in a GIS coordinate reference system.
-    
+
     We assume that it is a CRS that is has an EPSG code, since these are the
     ones we support in openEO.
-    
+
     For the names of the coordinates we choose the geographic names, i.e.
     west, east for the (X-axis), and south and north for the Y-axis, rather
     than x_min, x_max, y_min and y_max.
-    This is simply because that terminology is more common throughout the 
+    This is simply because that terminology is more common throughout the
     openEO software, even though in some special cases the x_min/max y_min/max
     names may be more accurate.
 
     For ease of use do provide x_min, x_max, y_min and y_max as read-only properties.
     You could regards these as an alias for the other properties.
     """
+
     west: float  # AKA min_x
-    east: float  # AKA max_x
     south: float  # AKA min_y
+    east: float  # AKA max_x
     north: float  # AKA min_y
     epsg: Optional[int]
 
@@ -109,23 +110,24 @@ class BoundingBox:
             "epsg": self.epsg,
         }
 
-
     # TODO: method name could be better
     def set_from_dict(self, values: Dict[str, float]) -> None:
         """Take the new coordinate values from a dictionary."""
         self.west = values["west"]
+        self.south = values["south"]
         self.east = values["east"]
         self.north = values["north"]
-        self.south = values["south"]
         self.epsg = values["epsg"]
 
     @staticmethod
     def from_dict(values: Dict[str, float]) -> "BoundingBox":
         """Create an instance using the values from a dictionary.
-        
+
         Utility method because this is a common case.
         """
-        return BoundingBox.create_empty().set_from_dict(values)
+        bbox = BoundingBox.create_empty()
+        bbox.set_from_dict(values)
+        return bbox
 
     def to_list(self) -> List[float]:
         """Convert coordinates to the standard W,S,E,N list format."""
@@ -140,23 +142,10 @@ class BoundingBox:
     @staticmethod
     def from_list(bbox_list: List[float], epsg: int) -> "BoundingBox":
         """Create an instance using the values from a list that has the order W,S,E,N ."""
-        return BoundingBox.create_empty().set_from_list(bbox_list)
+        bbox = BoundingBox.create_empty()
+        bbox.set_from_list(bbox_list, epsg=epsg)
+        return bbox
 
     def to_polygon(self) -> Polygon:
         """Returns a rectangular polygon representing the bounding box."""
-        return Polygon.from_bounds(self.to_list())
-
-
-@dc.dataclass
-class ProjectedBoundingBox:
-    """Bundles all data we want to know about the bounding box and projection."""
-
-    bbox_lat_lon: BoundingBox
-    bbox_projected: BoundingBox
-    transform: Optional[List[float]]
-
-    @property
-    def projected_epsg(self) -> Optional[int]:
-        if not self.bbox_projected:
-            return None
-        return self.bbox_projected.epsg
+        return Polygon.from_bounds(*self.to_list())

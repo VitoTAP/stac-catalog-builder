@@ -14,7 +14,7 @@ Rationale:
 import datetime as dt
 from pathlib import Path
 from types import NoneType
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 import rasterio
@@ -25,7 +25,7 @@ from stactools.core.io import ReadHrefModifier
 from openeo.util import rfc3339, normalize_crs
 
 
-from stacbuilder.boundingbox import BoundingBox, ProjectedBoundingBox
+from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.pathparsers import InputPathParser
 from stacbuilder.projections import reproject_bounding_box
 
@@ -383,12 +383,12 @@ class RasterBBoxReader:
     """
 
     @classmethod
-    def from_raster_path(cls, path: Path) -> "ProjectedBoundingBox":
+    def from_raster_path(cls, path: Path) -> Tuple[BoundingBox, BoundingBox, List[float]]:
         with rasterio.open(path) as dataset:
             return cls.from_rasterio_dataset(dataset)
 
     @staticmethod
-    def from_rasterio_dataset(dataset) -> "ProjectedBoundingBox":
+    def from_rasterio_dataset(dataset) -> Tuple[BoundingBox, BoundingBox, List[float]]:
         bbox_lat_lon = None
         bbox_projected = BoundingBox.from_list(list(dataset.bounds))
         proj_epsg = None
@@ -409,4 +409,4 @@ class RasterBBoxReader:
 
         transform = list(dataset.transform)[0:6]
 
-        return ProjectedBoundingBox(bbox_lat_lon=bbox_lat_lon, bbox_projected=bbox_projected, transform=transform)
+        return bbox_lat_lon, bbox_projected, transform

@@ -59,17 +59,13 @@ endif
 # Otherwise it can become a mess.
 
 
+
 #
 # You can also set WORKSPACE to a fixed value but.
 # However the template will search and save everything in the same directory as the Makefile.
 #
-# WORKSPACE := /home/johan.schreurs/Public/codebases/vito-git-repo/STAC-catalog-builder/configs-datasets/PEOPLE_EA/PEOPLE_INCA_cfactor/
-
-#
-# Set workspace to directory where this Makefile is located.
-#
+# Set workspace to directory where this Makefile is located:
 MK_PATH = $(abspath $(lastword $(MAKEFILE_LIST)))
-# MK_PARENT = $(realpath $(MK_PATH)../)
 MK_PARENT = $(dir $(realpath $(MK_PATH)))
 WORKSPACE = $(realpath  $(MK_PARENT)../)
 
@@ -221,19 +217,6 @@ show-config:
 
 
 .PHONY: build-collection
-build-collection-old-pipeline:
-## Build the STAC collection
-	$(PYTHON) stacbuilder \
-		-v build-collection-old-pipeline \
-		-g "$(GLOB_PATTERN)" \
-		-c $(COLLECTION_CONFIG) \
-		--overwrite \
-		--max-files $(MAX_TIFF_FILES) \
-		$(TIFF_INPUT_DIR) \
-		$(TEST_OUTPUT_DIR)
-
-
-.PHONY: build-collection
 build-collection:
 ## Build the STAC collection
 	$(PYTHON) stacbuilder \
@@ -350,23 +333,6 @@ test-openeo-dryrun:
 	--end-dt=$(TEMPORAL_EXTENT_END) \
 	"$(PUBLISH_DIR)/collection.json"
 
-
-
-# .PHONY: test-openeo-dryrun
-# test-openeo-dryrun:
-# ## Dry-run show what extent / config would be uses to test the STAC collection
-# ## in openEO with load_stac by downloading a small part of it.
-# 	$(PYTHON) stacbuilder test-openeo \
-# 	-v \
-# 	--dry-run \
-# 	-b $(OPENEO_BACKEND_URL) \
-# 	-o $(TEST_OPENEO_DIR) \
-# 	--bbox=$(BBOX_VERIFICATION) \
-# 	--epsg=$(BBOX_VERIFICATION_EPSG) \
-# 	--max-extent-size=$(MAX_SPATIAL_EXTENT_SIZE) \
-# 	--start-dt=$(TEMPORAL_EXTENT_START) \
-# 	--end-dt=$(TEMPORAL_EXTENT_END) \
-# 	"$(TEST_OUTPUT_DIR)/collection.json"
 
 
 .PHONY: test-openeo-unpublished
