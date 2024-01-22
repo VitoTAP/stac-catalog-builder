@@ -105,7 +105,7 @@ class Metadata:
 
         # TODO: item_type is currently a misnomer, more like an asset type.
         # We use this to find the corresponding asset definition config in the CollectionConfig
-        self._item_type: Optional[str] = None
+        self._asset_type: Optional[str] = None
 
         # Temporal extent
         # everything to do with the date + time and temporal extent this asset corresponds to.
@@ -140,6 +140,7 @@ class Metadata:
 
     def _read_geotiff(self, href):
         self.href = href
+        self.asset_id = Path(href).stem
         self.item_id = Path(href).stem
 
         if self._read_href_modifier:
@@ -212,15 +213,15 @@ class Metadata:
         self._item_id = value
 
     @property
-    def item_type(self) -> str:
+    def asset_type(self) -> str:
         # Default to the band name if it is not set
-        if not self._item_type:
+        if not self._asset_type:
             return self.band
-        return self._item_type
+        return self._asset_type
 
-    @item_type.setter
-    def item_type(self, value: str) -> None:
-        self._item_type = value
+    @asset_type.setter
+    def asset_type(self, value: str) -> None:
+        self._asset_type = value
 
     @property
     def geometry(self) -> Dict[str, Any]:
@@ -254,6 +255,7 @@ class Metadata:
     def version(self) -> str:
         return "1.0.0"
 
+    # TODO: Remove property "band" b/c there may be > 1 band in 1 asset and we don't read them from the raster anyway.
     @property
     def band(self) -> str:
         return self._band
@@ -345,7 +347,7 @@ class Metadata:
             "asset_id": self.asset_id,
             "href": self.href,
             "modified_href": self.modified_href,
-            "item_type": self.item_type,
+            "asset_type": self.asset_type,
             "band": self.band,
             "datetime": self.datetime,
             "start_datetime": self.start_datetime,

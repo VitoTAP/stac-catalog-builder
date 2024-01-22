@@ -222,10 +222,10 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         return self._item_assets_configs
 
     def map(self, metadata: Metadata) -> Item:
-        if metadata.item_type not in self.item_assets_configs:
+        if metadata.asset_type not in self.item_assets_configs:
             error_msg = (
                 "Found an unknown item type, not defined in collection configuration: "
-                + f"{metadata.item_type}, returning item=None, "
+                + f"{metadata.asset_type}, returning item=None, "
                 + f"{metadata.href=}"
             )
             _logger.warning(error_msg)
@@ -247,7 +247,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # TODO: support optional parts: store the tile ID if dataset uses that.
         #   We would need a way to customize extracting that tile ID for the specific dataset.
 
-        description = self.item_assets_configs[metadata.item_type].description
+        description = self.item_assets_configs[metadata.asset_type].description
         item.common_metadata.description = description
 
         item.common_metadata.created = dt.datetime.utcnow()
@@ -257,7 +257,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
-        item.add_asset(metadata.item_type, self._create_asset(metadata))
+        item.add_asset(metadata.asset_type, self._create_asset(metadata))
 
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg
@@ -278,7 +278,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
     def _create_asset(self, metadata: Metadata) -> Asset:
         asset_defs = self._get_assets_definitions()
-        asset_def: AssetDefinition = asset_defs[metadata.item_type]
+        asset_def: AssetDefinition = asset_defs[metadata.asset_type]
         return asset_def.create_asset(metadata.href)
 
         # asset = Asset(href=make_absolute_href(metadata.href))
