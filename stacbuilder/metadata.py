@@ -13,6 +13,7 @@ Rationale:
 """
 import datetime as dt
 from pathlib import Path
+from types import NoneType
 from typing import Any, Dict, List, Optional, Union
 
 
@@ -24,6 +25,7 @@ from stactools.core.io import ReadHrefModifier
 from openeo.util import rfc3339, normalize_crs
 
 
+from stacbuilder.boundingbox import BoundingBox, ProjectedBoundingBox
 from stacbuilder.pathparsers import InputPathParser
 from stacbuilder.projections import reproject_bounding_box
 
@@ -42,20 +44,114 @@ class Metadata:
         STAC items with the same subset of metadata we want to have for every data source.
     """
 
+    # This is metadata of an asset that belongs to a STAC item, not really the metadata of one STAC item.
+    # (Realizing this now when reviewing the code, this class has been roughly the same since the earliest versions of the tool)
+    # We process files which correspond to assets.
+    # Those assets are grouped into STAC items.
+    # Also an asset can either be one band, or it can itself contain multiple bands.
+    #
+    # properties we want to collect:
+    # - item_id
+    # - path or href (How do we handle URLs?)
+    # - item_type?? Or rather asset_type (to be decided and renamed)
+    #       We use this to find the corresponding asset definition config in the CollectionConfig
+    # - band
+    # - everything to do with the date and time.
+    #       datetime is the standard name (To be confirmed)
+    #       But this could correspond to either the start datetime or end datetime, usually the start datetime.
+    #       Often it is easier to extract year, month and day as separate parts of the path.
+    #       Keep in mind some paths only contain a year, or a year and month.
+    # - bounding box and everything to do with the CRS (projected CRS)
+    #   - in lat-lon
+    #   - as well as projected + the CRS
+    #   - geometry of the bounding box
+    # - raster shape (height & width in pixels)
+    # - raster tags
+
     def __init__(
         self,
+        extract_href_info: InputPathParser,
+        read_href_modifier: Optional[ReadHrefModifier] = None,
+    ):
+        # original and modified path/href
+        self._href: Optional[str] = None
+        self._modified_href: Optional[str] = None
+
+        # components to convert data
+        self._read_href_modifier = read_href_modifier
+        self._extract_href_info = extract_href_info
+
+        # The raw dictionary of data extracted from the href
+        self._info_from_href: Dict[str, Any] = None
+
+        # Essential asset info: what asset is it and what STAC item does it belong to
+        # What bands does it contain or correspond to.
+        # TODO: support multiple bands
+        # TODO: clean up how multiple assets get assigned to one STAC item of the same type.
+
+        self._asset_id: Optional[str] = None
+        """The asset ID normally corresponds to the file, unless the InputPathParser provides a value to override it."""
+
+        self._item_id: Optional[str] = None
+        """Which STAC item this asset belongs to.
+        When a STAC item bundles multiple assets then the InputPathParser in extract_href_info
+        must provide a value for item_id.
+        However, when each asset corresponds to one STAC item then asset_id and item_id will
+        be identical. So if we don't get an explicit value for item_id we assume it is the same as
+        asset_id.
+        """
+
+        self._band: Optional[str] = None
+
+        # TODO: item_type is currently a misnomer, more like an asset type.
+        # We use this to find the corresponding asset definition config in the CollectionConfig
+        self._item_type: Optional[str] = None
+
+        # Temporal extent
+        # everything to do with the date + time and temporal extent this asset corresponds to.
+        self._datetime = dt.datetime.utcnow()
+        self._start_datetime: Optional[dt.datetime] = None
+        self._end_datetime: Optional[dt.datetime] = None
+        self._year: Optional[int] = None
+        self._month: Optional[int] = None
+        self._day: Optional[int] = None
+
+        # Spatial extent
+        self.bbox: Optional[List[float]] = None
+        self.proj_bbox: Optional[List[float]] = None
+        self._proj_epsg: Optional[Any] = None
+        self.transform: Optional[List[float]] = None
+
+        # raster shape in pixels
+        self.shape: Optional[List[int]] = None
+
+        # Tags in the raster.
+        self.tags: List[str] = []
+
+    @staticmethod
+    def from_href(
         href: str,
         extract_href_info: InputPathParser,
         read_href_modifier: Optional[ReadHrefModifier] = None,
     ):
-        if read_href_modifier:
-            modified_href = read_href_modifier(href)
+        meta = Metadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
+        meta._read_geotiff(href)
+        return meta
+
+    def _read_geotiff(self, href):
+        self.href = href
+        self.item_id = Path(href).stem
+
+        if self._read_href_modifier:
+            self._modified_href = self._read_href_modifier(href)
         else:
-            modified_href = href
-        with rasterio.open(modified_href) as dataset:
+            self._modified_href = href
+
+        with rasterio.open(self._modified_href) as dataset:
             self.proj_bbox = list(dataset.bounds)
 
-            self._proj_epsg = None
+            # reset proj_epsg
+            self.proj_epsg = None
             # TODO: once this works well, integrate normalize_crs into  proj_epsg
             normalized_epsg = normalize_crs(dataset.crs)
             if normalized_epsg is not None:
@@ -68,33 +164,11 @@ class Metadata:
             else:
                 west, south, east, north = self.proj_bbox[:4]
                 self.bbox = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
+
             self.transform = list(dataset.transform)[0:6]
             self.shape = dataset.shape
             self.tags = dataset.tags()
 
-            # print(f"{href=}")
-            # print(f"{modified_href=}")
-            # print(f"projected: proj_bbox={self.proj_bbox}")
-            # print(f"projected CRS: {dataset.crs}")
-            # print(f"{dataset.bounds=}")
-            # print(f"{dataset.transform=}")
-            # print(f"lat long: bbox={self.bbox}")
-            # # print(f"{dataset.shape=}")
-            # # print(f"{dataset.tags()=}")
-
-        self.href = href
-        self._item_id = Path(href).stem
-        self._item_type = None
-        self._band = None
-
-        self._datetime = dt.datetime.utcnow()
-        self._start_datetime = None
-        self._end_datetime = None
-        self._year = None
-        self._month = None
-        self._day = None
-
-        self._extract_href_info = extract_href_info
         self.process_href_info()
 
     def process_href_info(self):
@@ -106,6 +180,30 @@ class Metadata:
                 setattr(self, key, value)
 
     @property
+    def href(self) -> str:
+        return self._href
+
+    @href.setter
+    def href(self, value: str) -> str:
+        self._href = str(value)
+
+    @property
+    def modified_href(self) -> str:
+        return self._modified_href
+
+    @modified_href.setter
+    def modified_href(self, value: str) -> str:
+        self._modified_href = str(value)
+
+    @property
+    def asset_id(self) -> str:
+        return self._asset_id
+
+    @asset_id.setter
+    def asset_id(self, value: str) -> None:
+        self._asset_id = value
+
+    @property
     def item_id(self) -> str:
         return self._item_id
 
@@ -115,6 +213,7 @@ class Metadata:
 
     @property
     def item_type(self) -> str:
+        # Default to the band name if it is not set
         if not self._item_type:
             return self.band
         return self._item_type
@@ -134,7 +233,7 @@ class Metadata:
 
     @proj_epsg.setter
     def proj_epsg(self, value: Optional[int]) -> Union[int, None]:
-        if not isinstance(value, (int, None)):
+        if not isinstance(value, (int, NoneType)):
             raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
         self._proj_epsg = value
 
@@ -242,8 +341,10 @@ class Metadata:
         :return: A dictionary that represents the same metadata.
         """
         data = {
-            "itemId": self.item_id,
+            "item_id": self.item_id,
+            "asset_id": self.asset_id,
             "href": self.href,
+            "modified_href": self.modified_href,
             "item_type": self.item_type,
             "band": self.band,
             "datetime": self.datetime,
@@ -267,3 +368,43 @@ class Metadata:
 
     def __str__(self):
         return str(self.to_dict())
+
+
+class RasterBBoxReader:
+    """Reads bounding box info from a raster file format.
+
+    TODO: this is very much unfinished untested code.
+        This is an preliminary implementation, and completely UNTESTED.
+        We want to extract all the raster reading stuff out of the module `metadata`
+        into a separate module, and this class is the start of the process.
+        It is therefore more "thinking in writing" than finished code.
+    """
+
+    @classmethod
+    def from_raster_path(cls, path: Path) -> "ProjectedBoundingBox":
+        with rasterio.open(path) as dataset:
+            return cls.from_rasterio_dataset(dataset)
+
+    @staticmethod
+    def from_rasterio_dataset(dataset) -> "ProjectedBoundingBox":
+        bbox_lat_lon = None
+        bbox_projected = BoundingBox.from_list(list(dataset.bounds))
+        proj_epsg = None
+
+        # TODO: once this works well, integrate normalize_crs into  proj_epsg
+        normalized_epsg = normalize_crs(dataset.crs)
+        if normalized_epsg is not None:
+            proj_epsg = normalized_epsg
+        elif hasattr(dataset.crs, "to_epsg"):
+            proj_epsg = dataset.crs.to_epsg()
+
+        if not proj_epsg or proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
+            bbox_lat_lon = bbox_projected
+        else:
+            west, south, east, north = bbox_projected.to_list()
+            bbox_list = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
+            bbox_lat_lon = BoundingBox.from_list(bbox_list)
+
+        transform = list(dataset.transform)[0:6]
+
+        return ProjectedBoundingBox(bbox_lat_lon=bbox_lat_lon, bbox_projected=bbox_projected, transform=transform)

@@ -98,12 +98,12 @@ class FileCollector(IDataCollector):
         self.input_dir: Path = input_dir
         self.glob: str = glob
         self.max_files: int = max_files
-        self._unify_not_set_to_defaults()
+        self._set_missing_fields_to_defaults()
 
         # The result
         self._input_files: List[Path] = None
 
-    def _unify_not_set_to_defaults(self):
+    def _set_missing_fields_to_defaults(self):
         if not self.input_dir:
             self.input_dir = None
 
@@ -115,16 +115,17 @@ class FileCollector(IDataCollector):
 
     @staticmethod
     def from_config(config: FileCollectorConfig) -> "FileCollector":
+        """Use the configuration object to create a new FileCollector instance."""
         collector = FileCollector()
         collector.setup(config)
         return collector
 
     def setup(self, config: FileCollectorConfig):
-        """Use the configuration to set up this FileCollector."""
+        """Read the settings for this instance from the configuration object."""
         self.input_dir = config.input_dir
         self.glob = config.glob
         self.max_files = config.max_files
-        self._unify_not_set_to_defaults()
+        self._set_missing_fields_to_defaults()
         self.reset()
 
     def collect(self):
@@ -206,7 +207,8 @@ class IMapMetadataToSTACItem(Protocol):
 class MapMetadataToSTACItem(IMapMetadataToSTACItem):
     """Converts Metadata objects to STAC Items.
 
-    TODO: name could be better
+    TODO: class name could be better
+    TODO: find better name for item_assets_configs, maybe asset_definition_configs.
     """
 
     def __init__(self, item_assets_configs: Dict[str, AssetConfig]) -> None:
@@ -275,7 +277,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         return item
 
     def _create_asset(self, metadata: Metadata) -> Asset:
-        asset_defs = self._get_item_assets_definitions()
+        asset_defs = self._get_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.item_type]
         return asset_def.create_asset(metadata.href)
 
@@ -297,7 +299,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         # return asset
 
-    def _get_item_assets_definitions(self) -> List[AssetDefinition]:
+    def _get_assets_definitions(self) -> List[AssetDefinition]:
         """Create AssetDefinitions, according to the config in self.item_assets_configs"""
         asset_definitions = {}
         for band_name, asset_config in self.item_assets_configs.items():
@@ -327,7 +329,7 @@ class MapGeoTiffToSTACItem:
 
     def to_metadata(self, file: Path) -> Metadata:
         """Generate the intermediate Metadata for the specified GeoTIFF path."""
-        return Metadata(
+        return Metadata.from_href(
             href=str(file),
             extract_href_info=self._path_parser,
             read_href_modifier=None,
@@ -851,7 +853,7 @@ class GeoTiffPipeline:
     def get_metadata(self) -> Iterable[Metadata]:
         """Generate the intermediate metadata objects, from the input files."""
         for file in self.get_input_files():
-            yield Metadata(
+            yield Metadata.from_href(
                 href=str(file),
                 extract_href_info=self._path_parser,
                 read_href_modifier=None,
@@ -880,7 +882,7 @@ class GeoTiffPipeline:
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
         for file in self.get_input_files():
-            metadata = Metadata(
+            metadata = Metadata.from_href(
                 href=str(file),
                 extract_href_info=self._path_parser,
                 read_href_modifier=None,

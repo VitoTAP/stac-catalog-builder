@@ -132,7 +132,7 @@ class CollectionConfig(BaseModel):
     input_path_parser: Optional[InputPathParserConfig] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
-    # Defines Items with their assets and what bands the assets contain.
+    # Defines what assets items have, and what bands the assets contain.
     item_assets: Optional[Dict[str, AssetConfig]] = {}
 
     # TODO: links (urls)

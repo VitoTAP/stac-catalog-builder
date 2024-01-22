@@ -1,3 +1,17 @@
+"""Tests for the stacbuilder.builder module
+
+Classes we really need to add coverage for:
+
+TODO: need coverage for GeoTiffPipeline
+TODO: need coverage for STACCollectionBuilder
+TODO: need coverage for MapMetadataToSTACItem
+TODO: need coverage for MapGeoTiffToSTACItem
+TODO: need coverage for GroupMetadataByYear and GroupMetadataByAttribute
+TODO: need coverage for PostProcessSTACCollectionFile
+
+Best to add unit tests in a bottom-up way.
+
+"""
 from pathlib import Path
 from typing import List
 
