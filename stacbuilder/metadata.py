@@ -215,6 +215,7 @@ class Metadata:
     @property
     def asset_type(self) -> str:
         # Default to the band name if it is not set
+        # TODO: remove this fallback, and going to remove band as a property as well.
         if not self._asset_type:
             return self.band
         return self._asset_type

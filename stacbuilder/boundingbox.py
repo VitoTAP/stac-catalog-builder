@@ -3,7 +3,8 @@
 import dataclasses as dc
 from typing import Dict, List, Optional
 
-from shapely.geometry import Polygon
+from shapely import to_wkt
+from shapely.geometry import mapping, Polygon
 
 
 def bbox_list_to_dict(bbox: List[float]) -> Dict[str, float]:
@@ -146,6 +147,13 @@ class BoundingBox:
         bbox.set_from_list(bbox_list, epsg=epsg)
         return bbox
 
-    def to_polygon(self) -> Polygon:
+    def as_polygon(self) -> Polygon:
         """Returns a rectangular polygon representing the bounding box."""
-        return Polygon.from_bounds(*self.to_list())
+        return Polygon.from_bounds(self.west, self.south, self.east, self.north)
+
+    def as_wkt(self):
+        return to_wkt(self.as_polygon())
+
+    def as_geometry_dict(self):
+        return mapping(self.as_polygon())
+        # return mapping(box(self.west, self.south, self.east, self.north))

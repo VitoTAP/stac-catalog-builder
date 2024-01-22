@@ -1,5 +1,6 @@
 import pytest
 
+from shapely import to_wkt
 from shapely.geometry.polygon import Polygon
 
 
@@ -143,7 +144,30 @@ class TestBoundingBox:
         expected_bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
         assert actual_bbox == expected_bbox
 
-    def test_to_polygon(self):
+    def test_as_polygon(self):
         bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
         expected = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
-        assert bbox.to_polygon() == expected
+        assert bbox.as_polygon() == expected
+
+    def test_as_wkt(self):
+        bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
+        polygon = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
+        expected_wkt = to_wkt(polygon)
+        assert bbox.as_wkt() == expected_wkt
+
+    def test_as_geometry_dict(self):
+        bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
+        expected = {
+            "type": "Polygon",
+            "coordinates": (
+                # a single outer ring
+                (
+                    (10.0, 20.0),  # south-west / LL / min_x, min_y
+                    (10.0, 40.0),  # north-west / UL / min_x, max_y
+                    (30.0, 40.0),  # north-east / UR / max_x, max_y
+                    (30.0, 20.0),  # south-east / LR / max_x, min_y
+                    (10.0, 20.0),  # close the ring: last point = first point
+                ),
+            ),
+        }
+        assert bbox.as_geometry_dict() == expected
