@@ -466,7 +466,8 @@ class STACCollectionBuilder:
         for item in self._stac_items:
             # for asset in item.assets:
             #     asset.owner = self._collection
-            assert item is not None
+            if item is None:
+                continue
             self._collection.add_item(item)
 
         self._collection.update_extent_from_items()
