@@ -31,9 +31,14 @@ Source = "https://github.com/VitoTAP/stac-catalog-builder"
 packages = ["stacbuilder"]
 
 [tool.hatch.build.targets.sdist]
+include = [
+  "/stacbuilder",
+]
 exclude = [
   "/.github",
   "/docs",
+  "/tests",
+  "/configs-datasets",
 ]
 
 [tool.hatch.version]

@@ -102,9 +102,18 @@ dmypy.json
 # pyrightconfig.json
 
 
-# If you have miscellaneous local files for development that you want to 
-# keep out of git you can put these in the folder called '.local'
+# Having a .local folder that is ignored by git is often handy for files that you want
+# to keep near your code but that are not part of the git repo because they won't work for everyone.
+# For example your own configuration files for testing that will only work in your
+# own development environment.
+# Off course, you could also put them outside your git working dir, but sometimes
+# having everything inside the workspace makes things simpler.
 .local
+
 
 # Test output from generating STAC collections goes here
 tmp/
+
+
+# statistics files for profiling performance, output of the cProfile module.
+*.stats
