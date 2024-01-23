@@ -40,7 +40,7 @@ from stacbuilder.pathparsers import (
     InputPathParserFactory,
 )
 from stacbuilder.config import AssetConfig, CollectionConfig, FileCollectorConfig
-from stacbuilder.metadata import Metadata
+from stacbuilder.metadata import AssetMetadata
 from stacbuilder.timezoneformat import TimezoneFormatConverter
 
 
@@ -156,7 +156,7 @@ class IMetadataCollector(IDataCollector):
     """
 
     def __init__(self):
-        self._metadata_list: List[Metadata] = None
+        self._metadata_list: List[AssetMetadata] = None
 
     def has_collected(self) -> bool:
         return self._metadata_list is not None
@@ -165,7 +165,7 @@ class IMetadataCollector(IDataCollector):
         self._metadata_list = None
 
     @property
-    def metadata(self) -> List[Metadata]:
+    def metadata(self) -> List[AssetMetadata]:
         return self._metadata_list or []
 
 
@@ -176,7 +176,7 @@ class ISTACItemCollector(IDataCollector):
     """
 
     def __init__(self):
-        self._metadata_list: List[Metadata] = None
+        self._metadata_list: List[AssetMetadata] = None
 
     def has_collected(self) -> bool:
         return self._metadata_list is not None
@@ -195,11 +195,11 @@ class IMapMetadataToSTACItem(Protocol):
     TODO: name could be better
     """
 
-    def map(self, metadata: Metadata) -> Item:
+    def map(self, metadata: AssetMetadata) -> Item:
         """Converts a Metadata objects to a STAC Items."""
         ...
 
-    def map_all(self, metadata_source: Iterable[Metadata]) -> Iterable[Item]:
+    def map_all(self, metadata_source: Iterable[AssetMetadata]) -> Iterable[Item]:
         """Return generator the converts all metadata objects to STAC Items"""
         return (self.map(metadata) for metadata in metadata_source)
 
@@ -221,7 +221,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
         return self._item_assets_configs
 
-    def map(self, metadata: Metadata) -> Item:
+    def map(self, metadata: AssetMetadata) -> Item:
         if metadata.asset_type not in self.item_assets_configs:
             error_msg = (
                 "Found an unknown item type, not defined in collection configuration: "
@@ -234,8 +234,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         item = Item(
             href=metadata.href,
             id=metadata.item_id,
-            geometry=metadata.geometry,
-            bbox=metadata.bbox,
+            geometry=metadata.geometry_as_dict,
+            bbox=metadata.bbox_as_list,
             datetime=metadata.datetime,
             start_datetime=metadata.start_datetime,
             end_datetime=metadata.end_datetime,
@@ -261,8 +261,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg
-        item_proj.bbox = metadata.proj_bbox
-        item_proj.geometry = metadata.proj_geometry
+        item_proj.bbox = metadata.proj_bbox_as_list
+        item_proj.geometry = metadata.proj_geometry_as_dict
         item_proj.transform = metadata.transform
         item_proj.shape = metadata.shape
 
@@ -276,7 +276,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return item
 
-    def _create_asset(self, metadata: Metadata) -> Asset:
+    def _create_asset(self, metadata: AssetMetadata) -> Asset:
         asset_defs = self._get_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.asset_type]
         return asset_def.create_asset(metadata.href)
@@ -327,21 +327,21 @@ class MapGeoTiffToSTACItem:
         metadata = self.to_metadata(file)
         return self._metadata_to_stac_item.map(metadata)
 
-    def to_metadata(self, file: Path) -> Metadata:
+    def to_metadata(self, file: Path) -> AssetMetadata:
         """Generate the intermediate Metadata for the specified GeoTIFF path."""
-        return Metadata.from_href(
+        return AssetMetadata.from_href(
             href=str(file),
             extract_href_info=self._path_parser,
             read_href_modifier=None,
         )
 
-    def map_all(self, files: Iterable[Path]) -> Iterable[Metadata]:
+    def map_all(self, files: Iterable[Path]) -> Iterable[AssetMetadata]:
         """Return generator the converts all files to STAC Items"""
         return (self.to_stac_item(file) for file in files)
 
 
 class IGroupMetadataBy(Protocol):
-    def group_by(self, iter_metadata) -> Dict[Hashable, List[Metadata]]:
+    def group_by(self, iter_metadata) -> Dict[Hashable, List[AssetMetadata]]:
         ...
 
 
@@ -349,8 +349,8 @@ class GroupMetadataByYear(IGroupMetadataBy):
     def __init__(self) -> None:
         super().__init__()
 
-    def group_by(self, iter_metadata) -> Dict[int, List[Metadata]]:
-        groups: Dict[int, Metadata] = {}
+    def group_by(self, iter_metadata) -> Dict[int, List[AssetMetadata]]:
+        groups: Dict[int, AssetMetadata] = {}
 
         for metadata in iter_metadata:
             year = metadata.year
@@ -366,8 +366,8 @@ class GroupMetadataByAttribute(IGroupMetadataBy):
         super().__init__()
         self._attribute_name = attribute_name
 
-    def group_by(self, iter_metadata) -> Dict[Hashable, List[Metadata]]:
-        groups: Dict[int, Metadata] = {}
+    def group_by(self, iter_metadata) -> Dict[Hashable, List[AssetMetadata]]:
+        groups: Dict[int, AssetMetadata] = {}
 
         for metadata in iter_metadata:
             attr = getattr(metadata, self._attribute_name)
@@ -850,10 +850,10 @@ class GeoTiffPipeline:
         for file in self._file_collector.input_files:
             yield file
 
-    def get_metadata(self) -> Iterable[Metadata]:
+    def get_metadata(self) -> Iterable[AssetMetadata]:
         """Generate the intermediate metadata objects, from the input files."""
         for file in self.get_input_files():
-            yield Metadata.from_href(
+            yield AssetMetadata.from_href(
                 href=str(file),
                 extract_href_info=self._path_parser,
                 read_href_modifier=None,
@@ -863,7 +863,7 @@ class GeoTiffPipeline:
     def has_grouping(self):
         return self._metadata_group_creator is not None
 
-    def get_metadata_groups(self) -> Dict[Hashable, List[Metadata]]:
+    def get_metadata_groups(self) -> Dict[Hashable, List[AssetMetadata]]:
         if not self.has_grouping:
             return None
         return self._metadata_group_creator.group_by(self.get_metadata())
@@ -882,7 +882,7 @@ class GeoTiffPipeline:
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
         for file in self.get_input_files():
-            metadata = Metadata.from_href(
+            metadata = AssetMetadata.from_href(
                 href=str(file),
                 extract_href_info=self._path_parser,
                 read_href_modifier=None,
@@ -979,19 +979,19 @@ class GeodataframeExporter:
         return pd.DataFrame.from_records(md.to_dict() for md in stac_item_list)
 
     @staticmethod
-    def metadata_to_geodataframe(metadata_list: List[Metadata]) -> gpd.GeoDataFrame:
+    def metadata_to_geodataframe(metadata_list: List[AssetMetadata]) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the intermediate metadata."""
         if not metadata_list:
             raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
 
         epsg = metadata_list[0].proj_epsg
-        geoms = [m.proj_geometry_shapely for m in metadata_list]
+        geoms = [m.proj_bbox_as_polygon for m in metadata_list]
         records = convert_fields_to_string(m.to_dict() for m in metadata_list)
 
         return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
 
     @staticmethod
-    def metadata_to_dataframe(metadata_list: List[Metadata]) -> pd.DataFrame:
+    def metadata_to_dataframe(metadata_list: List[AssetMetadata]) -> pd.DataFrame:
         """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
         if not metadata_list:
             raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")

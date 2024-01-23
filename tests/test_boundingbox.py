@@ -1,6 +1,5 @@
 import pytest
 
-from shapely import to_wkt
 from shapely.geometry.polygon import Polygon
 
 
@@ -85,6 +84,7 @@ class TestBoundingBox:
             (1.0, 2.0, 3.0, 4.0, 4326),
             (-180.0, -90.0, 180.0, 90.0, 4326),
             (624651.02, 687947.46, 694307.66, 799081.79, 3812),
+            (624651.02, 687947.46, 694307.66, 799081.79, "EPSG:3812"),
         ],
     )
     def test_constructor_keyword_args(self, west, south, east, north, epsg):
@@ -146,17 +146,24 @@ class TestBoundingBox:
 
     def test_as_polygon(self):
         bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
-        expected = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
-        assert bbox.as_polygon() == expected
+        actual_polygon = bbox.as_polygon()
+
+        # Note: Shapely basically ignores the CRS. We don't verify it here.
+        # TODO:  If we do find a way to add the CRS, we should verify that too.
+        expected_polygon = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
+        assert actual_polygon == expected_polygon
 
     def test_as_wkt(self):
         bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
-        polygon = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
-        expected_wkt = to_wkt(polygon)
+        # Note that standard Well-Known Text does not include the Coordinate Reference System.
+        # EWKT or "Extended WKT" does include it, but this is not what we are working with here.
+        # (EWKT is used by PostGIS for example)
+        expected_wkt = "POLYGON ((10 20, 10 40, 30 40, 30 20, 10 20))"
         assert bbox.as_wkt() == expected_wkt
 
     def test_as_geometry_dict(self):
         bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
+        # Note: Shapely basically ignores the CRS.
         expected = {
             "type": "Polygon",
             "coordinates": (

@@ -116,6 +116,8 @@ class AssetConfig(BaseModel):
 class CollectionConfig(BaseModel):
     """Model, store configuration of a STAC collection"""
 
+    # TODO: add nested configuration object for how to group collections
+    #   Currently the default class is GroupMetadataByYear and there are no options to choose a grouping.
     model_config = ConfigDict(from_attributes=True)
 
     collection_id: str

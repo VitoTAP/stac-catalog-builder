@@ -17,12 +17,13 @@ from types import NoneType
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 
+import dateutil.parser
 import rasterio
 from shapely import to_wkt
 from shapely.geometry import box, mapping, Polygon
 from stactools.core.io import ReadHrefModifier
 
-from openeo.util import rfc3339, normalize_crs
+from openeo.util import normalize_crs
 
 
 from stacbuilder.boundingbox import BoundingBox
@@ -34,7 +35,7 @@ BoundingBoxList = List[Union[float, int]]
 
 
 # TODO: convert Metadata to a dataclass, and add method (or class) that fills it in from a GeoTIFF.
-class Metadata:
+class AssetMetadata:
     """Intermediate metadata that models the properties we actually use.
 
     TODO: Decouple: turn this into a actual dataclass and extract all rasterio stuff from the constructor.
@@ -53,11 +54,11 @@ class Metadata:
     # properties we want to collect:
     # - item_id
     # - path or href (How do we handle URLs?)
-    # - item_type?? Or rather asset_type (to be decided and renamed)
+    # - asset_type:
     #       We use this to find the corresponding asset definition config in the CollectionConfig
-    # - band
+    # - band(s)
     # - everything to do with the date and time.
-    #       datetime is the standard name (To be confirmed)
+    #       "datetime" is the standard name (To be confirmed)
     #       But this could correspond to either the start datetime or end datetime, usually the start datetime.
     #       Often it is easier to extract year, month and day as separate parts of the path.
     #       Keep in mind some paths only contain a year, or a year and month.
@@ -109,20 +110,30 @@ class Metadata:
 
         # Temporal extent
         # everything to do with the date + time and temporal extent this asset corresponds to.
-        self._datetime = dt.datetime.utcnow()
+        self._datetime = None
         self._start_datetime: Optional[dt.datetime] = None
         self._end_datetime: Optional[dt.datetime] = None
         self._year: Optional[int] = None
         self._month: Optional[int] = None
         self._day: Optional[int] = None
 
-        # Spatial extent
-        self.bbox: Optional[List[float]] = None
-        self.proj_bbox: Optional[List[float]] = None
+        # TOGGLE tot compare new implementation to old in tests while we are refactoring.
+        # TODO: remove self._use_new_bbox_method, this toggle is a hack for testing the refactored version.
+        # Refactoring to use cleaner, easier to unit test BoundingBox class
+        self._use_new_bbox_method = True
+
+        # Spatial extent, the old properties that we will replace. Refactoring in progress.
+        self._bbox_list: Optional[List[float]] = None
+        self._proj_bbox: Optional[List[float]] = None
         self._proj_epsg: Optional[Any] = None
+        # new properties for the bounding boxes.
+        self._bbox_lat_lon: Optional[BoundingBox] = None
+        self._bbox_projected: Optional[BoundingBox] = None
+
+        # Affine transform as the raster file states it, in case we need it for CRS conversions.
         self.transform: Optional[List[float]] = None
 
-        # raster shape in pixels
+        # Raster shape in pixels
         self.shape: Optional[List[int]] = None
 
         # Tags in the raster.
@@ -134,7 +145,7 @@ class Metadata:
         extract_href_info: InputPathParser,
         read_href_modifier: Optional[ReadHrefModifier] = None,
     ):
-        meta = Metadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
+        meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
         meta._read_geotiff(href)
         return meta
 
@@ -142,6 +153,7 @@ class Metadata:
         self.href = href
         self.asset_id = Path(href).stem
         self.item_id = Path(href).stem
+        self.datetime = dt.datetime.utcnow()
 
         if self._read_href_modifier:
             self._modified_href = self._read_href_modifier(href)
@@ -149,26 +161,37 @@ class Metadata:
             self._modified_href = href
 
         with rasterio.open(self._modified_href) as dataset:
-            self.proj_bbox = list(dataset.bounds)
-
-            # reset proj_epsg
-            self.proj_epsg = None
-            # TODO: once this works well, integrate normalize_crs into  proj_epsg
-            normalized_epsg = normalize_crs(dataset.crs)
-            if normalized_epsg is not None:
-                self.proj_epsg = normalized_epsg
-            elif hasattr(dataset.crs, "to_epsg"):
-                self.proj_epsg = dataset.crs.to_epsg()
-
-            if not self.proj_epsg or self.proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
-                self.bbox = self.proj_bbox
-            else:
-                west, south, east, north = self.proj_bbox[:4]
-                self.bbox = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
-
-            self.transform = list(dataset.transform)[0:6]
             self.shape = dataset.shape
             self.tags = dataset.tags()
+
+            if self._use_new_bbox_method:
+                self._bbox_lat_lon, self._bbox_projected, self._transform = RasterBBoxReader.from_rasterio_dataset(
+                    dataset
+                )
+                self._bbox_list = self._bbox_lat_lon.to_list()
+                self._proj_bbox = self._bbox_projected.to_list()
+                self._proj_epsg = self._bbox_projected.epsg
+            else:
+                self._proj_bbox = list(dataset.bounds)
+
+                # reset proj_epsg
+                self._proj_epsg = None
+                # TODO: once this works well, integrate normalize_crs into  proj_epsg
+                normalized_epsg = normalize_crs(dataset.crs)
+                if normalized_epsg is not None:
+                    self._proj_epsg = normalized_epsg
+                elif hasattr(dataset.crs, "to_epsg"):
+                    self._proj_epsg = dataset.crs.to_epsg()
+
+                if not self._proj_epsg or self._proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
+                    self._bbox_list = self._proj_bbox
+                else:
+                    west, south, east, north = self._proj_bbox[:4]
+                    self._bbox_list = reproject_bounding_box(
+                        west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326"
+                    )
+
+                self.transform = list(dataset.transform)[0:6]
 
         self.process_href_info()
 
@@ -181,15 +204,20 @@ class Metadata:
                 setattr(self, key, value)
 
     @property
-    def href(self) -> str:
+    def version(self) -> str:
+        # TODO: make name more specific: check what this version is about (STAC version most likely)
+        return "1.0.0"
+
+    @property
+    def href(self) -> Optional[str]:
         return self._href
 
     @href.setter
-    def href(self, value: str) -> str:
+    def href(self, value: str) -> Optional[str]:
         self._href = str(value)
 
     @property
-    def modified_href(self) -> str:
+    def modified_href(self) -> Optional[str]:
         return self._modified_href
 
     @modified_href.setter
@@ -197,7 +225,7 @@ class Metadata:
         self._modified_href = str(value)
 
     @property
-    def asset_id(self) -> str:
+    def asset_id(self) -> Optional[str]:
         return self._asset_id
 
     @asset_id.setter
@@ -205,15 +233,24 @@ class Metadata:
         self._asset_id = value
 
     @property
-    def item_id(self) -> str:
+    def item_id(self) -> Optional[str]:
         return self._item_id
 
     @item_id.setter
     def item_id(self, value: str) -> None:
         self._item_id = value
 
+    # TODO: Remove property "band" b/c there may be > 1 band in 1 asset and we don't read them from the raster anyway.
     @property
-    def asset_type(self) -> str:
+    def band(self) -> Optional[str]:
+        return self._band
+
+    @band.setter
+    def band(self, value: str) -> None:
+        self._band = value
+
+    @property
+    def asset_type(self) -> Optional[str]:
         # Default to the band name if it is not set
         # TODO: remove this fallback, and going to remove band as a property as well.
         if not self._asset_type:
@@ -225,79 +262,134 @@ class Metadata:
         self._asset_type = value
 
     @property
-    def geometry(self) -> Dict[str, Any]:
-        geometry_dict: Dict[str, Any] = mapping(box(*self.bbox))
-        return geometry_dict
+    def bbox_lat_lon(self) -> Optional[BoundingBox]:
+        return self._bbox_lat_lon
+
+    @bbox_lat_lon.setter
+    def bbox_lat_lon(self, bbox: BoundingBox) -> None:
+        self._bbox_lat_lon = bbox
 
     @property
-    def proj_epsg(self) -> Union[int, None]:
+    def bbox_as_list(self) -> Optional[List[float]]:
+        if self._use_new_bbox_method:
+            if not self._bbox_lat_lon:
+                return None
+            return self._bbox_lat_lon.to_list()
+
+        return self._bbox_list
+
+    @property
+    def bbox_projected(self) -> Optional[BoundingBox]:
+        return self._bbox_projected
+
+    @bbox_projected.setter
+    def bbox_projected(self, bbox: BoundingBox) -> None:
+        self._bbox_projected = bbox
+
+    @property
+    def proj_bbox_as_list(self) -> Optional[List[float]]:
+        # TODO: [decide] convert this RO property to a method or not?
+        if self._use_new_bbox_method:
+            if not self._bbox_projected:
+                return None
+            return self._bbox_projected.to_list()
+
+        return self._proj_bbox
+
+    @property
+    def proj_epsg(self) -> Optional[int]:
+        if self._use_new_bbox_method:
+            if not self._bbox_projected:
+                return None
+            return self._bbox_projected.epsg
+
         return self._proj_epsg
 
     @proj_epsg.setter
-    def proj_epsg(self, value: Optional[int]) -> Union[int, None]:
+    def proj_epsg(self, value: Optional[int]) -> Optional[int]:
+        # TODO: remove setter for epsg, should become a readonly property that returns self._bbox_projected.epsg.
         if not isinstance(value, (int, NoneType)):
             raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
         self._proj_epsg = value
 
     @property
-    def proj_geometry(self) -> Dict[str, Any]:
-        geometry_dict: Dict[str, Any] = mapping(box(*self.proj_bbox))
+    def geometry_as_dict(self) -> Optional[Dict[str, Any]]:
+        # TODO: [decide] convert this RO property to a method or not?
+        if self._use_new_bbox_method:
+            if not self._bbox_lat_lon:
+                return None
+            return self._bbox_lat_lon.as_geometry_dict()
+
+        geometry_dict: Dict[str, Any] = mapping(box(*self._bbox_list))
         return geometry_dict
 
     @property
-    def proj_geometry_as_wkt(self) -> str:
-        return to_wkt(self.proj_geometry_shapely)
+    def proj_geometry_as_dict(self) -> Optional[Dict[str, Any]]:
+        # TODO: [decide] convert this RO property to a method or not?
+        if self._use_new_bbox_method:
+            if not self._bbox_projected:
+                return None
+            return self._bbox_projected.as_geometry_dict()
+
+        geometry_dict: Dict[str, Any] = mapping(box(*self._proj_bbox))
+        return geometry_dict
 
     @property
-    def proj_geometry_shapely(self) -> Polygon:
-        return Polygon.from_bounds(*self.proj_bbox)
+    def proj_geometry_as_wkt(self) -> Optional[str]:
+        # TODO: [decide] convert this RO property to a method or not?
+        if self._use_new_bbox_method:
+            if not self._bbox_projected:
+                return None
+            return self._bbox_projected.as_wkt()
+
+        return to_wkt(self.proj_bbox_as_polygon)
 
     @property
-    def version(self) -> str:
-        return "1.0.0"
+    def proj_bbox_as_polygon(self) -> Optional[Polygon]:
+        # TODO: [decide] convert this RO property to a method or not?
+        # TODO: method name could be better
+        if self._use_new_bbox_method:
+            if not self._bbox_projected:
+                return None
+            return self._bbox_projected.as_polygon()
 
-    # TODO: Remove property "band" b/c there may be > 1 band in 1 asset and we don't read them from the raster anyway.
-    @property
-    def band(self) -> str:
-        return self._band
-
-    @band.setter
-    def band(self, value: str) -> None:
-        self._band = value
+        return Polygon.from_bounds(*self._proj_bbox)
 
     @property
-    def datetime(self) -> dt.datetime:
+    def datetime(self) -> Optional[dt.datetime]:
         return self._datetime
 
     @datetime.setter
     def datetime(self, value) -> None:
         self._datetime = self.check_datetime(value)
 
-    def check_datetime(self, value) -> dt.datetime:
+    @classmethod
+    def check_datetime(cls, value) -> dt.datetime:
         if isinstance(value, dt.datetime):
             return value
 
         if isinstance(value, dt.date):
-            return self.convert_date_to_datetime(value)
+            return cls.convert_date_to_datetime(value)
 
         if isinstance(value, str):
             # if not value.endswith("Z") and not "+" in value:
             #     converted_value = value + "Z"
             # else:
             #     converted_value = value
-            converted_value = rfc3339.parse_date_or_datetime(value)
-            if isinstance(converted_value, dt.date):
-                return self.convert_date_to_datetime(converted_value)
+            converted_value = dateutil.parser.parse(value)
+            if not isinstance(converted_value, dt.datetime):
+                return cls.convert_date_to_datetime(converted_value)
             else:
                 return converted_value
 
         raise TypeError(f"Can not convert this time to datetime: type={type(value)}, {value=}")
 
-    def convert_date_to_datetime(self, value) -> dt.datetime:
+    @staticmethod
+    def convert_date_to_datetime(value: dt.date) -> dt.datetime:
         return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)
 
     @property
-    def start_datetime(self) -> dt.datetime:
+    def start_datetime(self) -> Optional[dt.datetime]:
         return self._start_datetime
 
     @start_datetime.setter
@@ -305,7 +397,7 @@ class Metadata:
         self._start_datetime = self.check_datetime(value)
 
     @property
-    def end_datetime(self) -> dt.datetime:
+    def end_datetime(self) -> Optional[dt.datetime]:
         return self._end_datetime
 
     @end_datetime.setter
@@ -356,11 +448,11 @@ class Metadata:
             "year": self.year,
             "month": self.month,
             "day": self.day,
-            "bbox": self.bbox,
+            "bbox": self.bbox_as_list,
             "proj_epsg": self.proj_epsg,
-            "proj_bbox": self.proj_bbox,
-            "geometry": self.geometry,
-            "proj_geometry": self.proj_geometry,
+            "proj_bbox": self._proj_bbox,
+            "geometry": self.geometry_as_dict,
+            "proj_geometry": self.proj_geometry_as_dict,
             "proj_geometry_as_wkt": self.proj_geometry_as_wkt,
         }
         # Include internal information for debugging.
@@ -391,7 +483,7 @@ class RasterBBoxReader:
     @staticmethod
     def from_rasterio_dataset(dataset) -> Tuple[BoundingBox, BoundingBox, List[float]]:
         bbox_lat_lon = None
-        bbox_projected = BoundingBox.from_list(list(dataset.bounds))
+        bbox_projected = None
         proj_epsg = None
 
         # TODO: once this works well, integrate normalize_crs into  proj_epsg
@@ -401,12 +493,14 @@ class RasterBBoxReader:
         elif hasattr(dataset.crs, "to_epsg"):
             proj_epsg = dataset.crs.to_epsg()
 
+        bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
+
         if not proj_epsg or proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
             bbox_lat_lon = bbox_projected
         else:
             west, south, east, north = bbox_projected.to_list()
             bbox_list = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
-            bbox_lat_lon = BoundingBox.from_list(bbox_list)
+            bbox_lat_lon = BoundingBox.from_list(bbox_list, epsg=4326)
 
         transform = list(dataset.transform)[0:6]
 

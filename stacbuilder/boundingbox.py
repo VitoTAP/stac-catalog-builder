@@ -43,16 +43,6 @@ def to_bbox_dict(west: float, south: float, east: float, north: float) -> Dict[s
     }
 
 
-# def polygon_from_bounds(minx, miny, maxx, maxy) -> Polygon:
-#     """
-#     Returns a rectangular polygon representing the bounding box.
-
-#     Utility function for a common conversion.
-#     The resulting Polygon does not have any information about the CRS (EPSG code), only coordinates.
-#     """
-#     return Polygon.from_bounds(minx, miny, maxx, maxy)
-
-
 @dc.dataclass
 class BoundingBox:
     """Bounding box in a GIS coordinate reference system.
@@ -149,6 +139,8 @@ class BoundingBox:
 
     def as_polygon(self) -> Polygon:
         """Returns a rectangular polygon representing the bounding box."""
+        # Note: shapely basically ignores the CRS in its geometries, so we leave it out.
+        # TODD: is there still a way can we include the CRS in the shapely geometry? And is worth the trouble?
         return Polygon.from_bounds(self.west, self.south, self.east, self.north)
 
     def as_wkt(self):
@@ -156,4 +148,3 @@ class BoundingBox:
 
     def as_geometry_dict(self):
         return mapping(self.as_polygon())
-        # return mapping(box(self.west, self.south, self.east, self.north))
