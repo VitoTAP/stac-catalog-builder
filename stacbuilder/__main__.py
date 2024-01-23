@@ -71,6 +71,7 @@ def cli(verbose):
 )
 @click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
+@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
@@ -79,7 +80,7 @@ def cli(verbose):
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
+def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, save_dataframe):
     """Build a STAC collection from a directory of GeoTIFF files."""
     CommandsNewPipeline.build_collection(
         collection_config_path=collection_config,
@@ -88,6 +89,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
         output_dir=outputdir,
         overwrite=overwrite,
         max_files=max_files,
+        save_dataframe=save_dataframe,
     )
 
 
@@ -217,8 +219,14 @@ def show_collection(collection_file):
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
     """Run STAC validation on the collection file."""
-
     CommandsNewPipeline.validate_collection(collection_file)
+
+
+@cli.command()
+@click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+def extract_item_bboxes(collection_file):
+    """Extract and save the bounding boxes of the STAC items in the collection, to both ShapeFile and GeoParquet format."""
+    CommandsNewPipeline.extract_item_bboxes(collection_file)
 
 
 @cli.command()
@@ -323,7 +331,7 @@ def validate_config(config_file):
     """
     config_file = Path(config_file)
     if not config_file.exists():
-        raise FileNotFoundError(f'Argument "config_file" does not exist. {config_file=}')
+        raise FileNotFoundError(f"config_file could not be found. {config_file=}")
 
     try:
         CollectionConfig.from_json_file(config_file)
@@ -331,6 +339,27 @@ def validate_config(config_file):
         click.echo(click.style("ERROR: NOT VALID: \n" + str(exc), fg="red"))
     else:
         click.echo(click.style("OK: is valid configuration file", fg="green"))
+
+
+@config.command()
+@click.argument("config_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+def show_config(config_file):
+    """Read the config file and show how the parsed contents.
+
+    This is a way to check if you are getting what you expected from the configuration.
+    This may be important for things like asset and band names, titles and descriptions.
+    """
+    config_file = Path(config_file)
+    if not config_file.exists():
+        raise FileNotFoundError(f"config_file could not be found. {config_file=}")
+
+    try:
+        configuration = CollectionConfig.from_json_file(config_file)
+    except pydantic.ValidationError as exc:
+        click.echo(click.style("ERROR: NOT VALID: \n" + str(exc), fg="red"))
+    else:
+        pprint.pprint(configuration.model_dump(), indent=2, width=160)
+        # print(json.dumps(configuration.model_dump(), indent=2))
 
 
 @config.command()

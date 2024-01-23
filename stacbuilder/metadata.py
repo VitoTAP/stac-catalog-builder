@@ -183,6 +183,9 @@ class AssetMetadata:
                 elif hasattr(dataset.crs, "to_epsg"):
                     self._proj_epsg = dataset.crs.to_epsg()
 
+                if not self._proj_epsg:
+                    self._proj_epsg = 4326
+
                 if not self._proj_epsg or self._proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
                     self._bbox_list = self._proj_bbox
                 else:
@@ -493,9 +496,12 @@ class RasterBBoxReader:
         elif hasattr(dataset.crs, "to_epsg"):
             proj_epsg = dataset.crs.to_epsg()
 
+        if not proj_epsg:
+            proj_epsg = 4326
+
         bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
 
-        if not proj_epsg or proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
+        if proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
             bbox_lat_lon = bbox_projected
         else:
             west, south, east, north = bbox_projected.to_list()

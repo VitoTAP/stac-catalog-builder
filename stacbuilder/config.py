@@ -71,9 +71,11 @@ class EOBandConfig(BaseModel):
 
     description: str = Field(description="Description of the band.")
 
+    # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
     # TODO: maybe use a numpy type or make an Enum for data_type
     data_type: str = Field(description="which data type this raster band has, use the same names as numpy.")
 
+    # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
     # TODO: how do we store NaN in JSON?
     nodata: Optional[Union[int, float, str]] = Field(
         default=None, description='What value is used to represent "NO DATA" in the raster'

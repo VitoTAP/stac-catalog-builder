@@ -629,7 +629,7 @@ class PostProcessSTACCollectionFile:
 
     @classmethod
     def _convert_timezones_encoded_as_z(cls, collection_file: Path, output_dir: Path):
-        print("Converting UeTC timezones encoded as 'Z' to +00:00...")
+        print("Converting UTC timezones encoded as 'Z' to +00:00...")
         conv = TimezoneFormatConverter()
         out_dir = output_dir or collection_file.parent
         item_paths = cls.get_item_paths_for_coll_file(collection_file)
@@ -940,22 +940,6 @@ class GeoTiffPipeline:
             post_processor.process_collection(coll_file)
 
 
-def convert_fields_to_string(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out_records = [dict(rec) for rec in records]
-    for rec in out_records:
-        for key, val in rec.items():
-            if isinstance(val, dt.datetime):
-                rec[key] = val.isoformat()
-            elif isinstance(val, list):
-                rec[key] = json.dumps(val)
-    return out_records
-
-
-def _visualization_dir(collection: Collection):
-    collection_path = Path(collection.self_href)
-    return collection_path.parent / "tmp" / "visualization" / collection.id
-
-
 class GeodataframeExporter:
     """Utitlity class to export metadata and STAC items as geopandas GeoDataframes.
 
@@ -963,13 +947,20 @@ class GeodataframeExporter:
     TODO: This is currently a class with only static methods, perhaps a module would be beter.
     """
 
-    @staticmethod
-    def stac_items_to_geodataframe(stac_item_list: List[Item]) -> gpd.GeoDataFrame:
+    @classmethod
+    def stac_items_to_geodataframe(cls, stac_item_list: List[Item]) -> gpd.GeoDataFrame:
         if not stac_item_list:
             raise InvalidOperation("stac_item_list is empty or None. Can not create a GeoDataFrame")
 
+        if not isinstance(stac_item_list, list):
+            stac_item_list = list(stac_item_list)
+
         epsg = stac_item_list[0].properties.get("proj:epsg", 4326)
-        records = convert_fields_to_string(i.to_dict() for i in stac_item_list)
+        records = cls.convert_dict_records_to_strings(i.to_dict() for i in stac_item_list)
+        # it: Item
+        # records = cls.convert_records_to_strings(
+        #     (it.id, it.collection_id, it.bbox, it.datetime) for it in stac_item_list
+        # )
         shapes = [shape(item.geometry) for item in stac_item_list]
         return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
 
@@ -978,15 +969,15 @@ class GeodataframeExporter:
         """Return a pandas DataFrame representing the STAC Items, without the geometry."""
         return pd.DataFrame.from_records(md.to_dict() for md in stac_item_list)
 
-    @staticmethod
-    def metadata_to_geodataframe(metadata_list: List[AssetMetadata]) -> gpd.GeoDataFrame:
+    @classmethod
+    def metadata_to_geodataframe(cls, metadata_list: List[AssetMetadata]) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the intermediate metadata."""
         if not metadata_list:
             raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
 
         epsg = metadata_list[0].proj_epsg
         geoms = [m.proj_bbox_as_polygon for m in metadata_list]
-        records = convert_fields_to_string(m.to_dict() for m in metadata_list)
+        records = cls.convert_dict_records_to_strings(m.to_dict() for m in metadata_list)
 
         return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
 
@@ -999,12 +990,38 @@ class GeodataframeExporter:
         return pd.DataFrame.from_records(md.to_dict() for md in metadata_list)
 
     @staticmethod
+    def convert_dict_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out_records = [dict(rec) for rec in records]
+        for rec in out_records:
+            for key, val in rec.items():
+                if isinstance(val, dt.datetime):
+                    rec[key] = val.isoformat()
+                elif isinstance(val, list):
+                    rec[key] = json.dumps(val)
+        return out_records
+
+    @staticmethod
+    def convert_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        temp_records = list(records)
+        out_records = []
+
+        for record in temp_records:
+            convert_record = []
+            for column in record:
+                if isinstance(column, dt.datetime):
+                    convert_record.append(column.isoformat())
+                elif isinstance(column, list):
+                    convert_record.append(json.dumps(column))
+            out_records.append(convert_record)
+        return out_records
+
+    @staticmethod
     def save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
         shp_dir = out_dir / "shp"
         if not shp_dir.exists():
             shp_dir.mkdir(parents=True)
 
-        csv_path = out_dir / f"{table_name}.csv"
+        csv_path = out_dir / f"{table_name}.pipe.csv"
         shapefile_path = out_dir / f"shp/{table_name}.shp"
         parquet_path = out_dir / f"{table_name}.parquet"
 
@@ -1016,6 +1033,18 @@ class GeodataframeExporter:
 
         print(f"Saving geoparquet to: {parquet_path}")
         gdf.to_parquet(parquet_path)
+
+    @staticmethod
+    def visualization_dir(collection: Collection):
+        collection_path = Path(collection.self_href)
+        return collection_path.parent / "tmp" / "visualization" / collection.id
+
+    @classmethod
+    def export_item_bboxes(cls, collection: Collection):
+        out_dir: Path = cls.visualization_dir(collection)
+        items = collection.get_all_items()
+        gdf: gpd.GeoDataFrame = cls.stac_items_to_geodataframe(items)
+        cls.save_geodataframe(gdf, out_dir, "stac_item_bboxes")
 
 
 # ##############################################################################
@@ -1048,7 +1077,7 @@ class CommandsNewPipeline:
         output_dir: Path,
         overwrite: bool,
         max_files: Optional[int] = -1,
-        # save_dataframe: Optional[bool] = False,
+        save_dataframe: Optional[bool] = False,
     ):
         collection_config_path = Path(collection_config_path).expanduser().absolute()
         coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -1061,6 +1090,9 @@ class CommandsNewPipeline:
         )
 
         pipeline.build_collection()
+
+        if save_dataframe:
+            GeodataframeExporter.export_item_bboxes(pipeline.collection)
 
         # if save_dataframe:
         #     df = pipeline.get_metadata_as_geodataframe()
@@ -1095,6 +1127,11 @@ class CommandsNewPipeline:
         #     _save_geodataframe(df, out_dir, "metadata_table")
 
     @staticmethod
+    def extract_item_bboxes(collection_file: Path):
+        """Extract the bounding boxes of the STAC items in the collection."""
+        collection = Collection.from_file(collection_file)
+        GeodataframeExporter.export_item_bboxes(collection)
+
     @staticmethod
     def list_input_files(
         glob: str,
