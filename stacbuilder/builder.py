@@ -11,11 +11,13 @@ import shutil
 import tempfile
 from itertools import islice
 from pathlib import Path
-from typing import Any, Dict, Hashable, Iterable, List, Optional, Protocol
+from typing import Any, Dict, Hashable, Iterable, List, Optional, Protocol, Union
 
 
 import geopandas as gpd
 import pandas as pd
+import rasterio
+import rio_stac.stac as rst
 from shapely.geometry import shape
 from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
 from pystac.errors import STACValidationError
@@ -24,14 +26,12 @@ from pystac.layout import TemplateLayoutStrategy
 # TODO: add the GridExtension support again
 # from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
-
 from pystac.extensions.projection import ItemProjectionExtension
 
 # TODO: add the GridExtension support again
 # from pystac.extensions.projection import ProjectionExtension
 from pystac.extensions.raster import RasterExtension
-
-import rio_stac.stac as rst
+from stactools.core.io import ReadHrefModifier
 
 
 from stacbuilder.exceptions import InvalidOperation
@@ -40,11 +40,40 @@ from stacbuilder.pathparsers import (
     InputPathParserFactory,
 )
 from stacbuilder.config import AssetConfig, CollectionConfig, FileCollectorConfig
-from stacbuilder.metadata import AssetMetadata
+from stacbuilder.metadata import AssetMetadata, RasterBBoxReader
 from stacbuilder.timezoneformat import TimezoneFormatConverter
 
 
 _logger = logging.getLogger(__name__)
+
+
+class MakeRelativeToCollection:
+    def __init__(self, data_root_dir: Path) -> None:
+        self.data_root_dir = data_root_dir
+
+    def __call__(self, asset_path: str) -> str:
+        """This method must match the signature of ReadHrefModifier.
+        ReadHrefModifier is a type alias for Callable[[str], str]
+        """
+        # return str(self.get_path_relative_to_collection(asset_path, self.collection_root_dir))
+        return str(asset_path.relative_to(self.data_root_dir))
+
+    # @staticmethod
+    # def get_path_relative_to_collection(asset_path: Path, collection_path: Path):
+    #     return asset_path.relative_to(collection_path)
+
+
+class CreateAssetUrl:
+    def __init__(self, url_template: str, data_root: Path) -> None:
+        self.url_template = url_template
+        self.data_root = data_root
+
+    def __call__(self, asset_path: Path) -> str:
+        return self.get_url(asset_path)
+
+    def get_url(self, asset_path: Path):
+        rel_path: Path = asset_path.relative_to(self.data_root)
+        return self.url_template.format(str(rel_path))
 
 
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
@@ -193,6 +222,7 @@ class IMapMetadataToSTACItem(Protocol):
     """Interface for a mapping that converts intermediate Metadata objects STAC Items.
 
     TODO: name could be better
+    TODO: Will we really have multiple implementations or not? If probability low, remove IMapMetadataToSTACItem
     """
 
     def map(self, metadata: AssetMetadata) -> Item:
@@ -258,6 +288,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
         item.add_asset(metadata.asset_type, self._create_asset(metadata))
+        item.make_asset_hrefs_relative()
 
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg
@@ -311,33 +342,111 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         return asset_definitions
 
 
-class MapGeoTiffToSTACItem:
-    """Extracts STAC Items from each file.
+# class MapGeoTiffToSTACItem:
+#     """Extracts STAC Items from each file.
+
+#     TODO: name could be better
+#     TODO: no usages detected anywhere => confirm this and remove it
+#     """
+
+#     def __init__(
+#             self,
+#             path_parser: InputPathParser,
+#             map_metadata_to_stac_item: IMapMetadataToSTACItem,
+#             # extract_href_info: Optional[InputPathParser] = None,
+#             href_modifier: Optional[ReadHrefModifier] = None,
+#             collection_root_path: Optional[Path] = None,
+#         ) -> None:
+#         # Store dependencies: components that have to be provided to constructor
+#         self._path_parser = path_parser
+#         self._metadata_to_stac_item = map_metadata_to_stac_item
+
+#         # self._extract_href_info = extract_href_info
+
+#         # # TODO: remove MakeRelativeToCollection as default. This is a hack to test it quickly.
+#         self._href_modifier = href_modifier or MakeRelativeToCollection(self._collection_root_path)
+#         self._collection_root_path = collection_root_path or None
+
+#     def to_stac_item(self, file: Path) -> Item:
+#         """Generate the STAC Item for the specified GeoTIFF path."""
+#         metadata = self.to_metadata(file)
+#         return self._metadata_to_stac_item.map(metadata)
+
+#     def to_metadata(self, file: Path) -> AssetMetadata:
+#         """Generate the intermediate Metadata for the specified GeoTIFF path."""
+#         return AssetMetadata.from_file_path(
+#             asset_path=str(file),
+#             extract_href_info=self._path_parser,
+#             read_href_modifier=self._href_modifier,
+#         )
+
+#     def to_metadata(self, file: Path) -> AssetMetadata:
+#         """Generate the intermediate Metadata for the specified GeoTIFF path."""
+#         return AssetMetadata.from_file_path(
+#             asset_path=str(file),
+#             extract_href_info=self._path_parser,
+#             read_href_modifier=self._href_modifier,
+#         )
+
+#     def map_all(self, files: Iterable[Path]) -> Iterable[AssetMetadata]:
+#         """Return generator the converts all files to STAC Items"""
+#         return (self.to_stac_item(file) for file in files)
+
+
+class MapGeoTiffToAssetMetadata:
+    """Extracts AssetMetadata from each file.
 
     TODO: name could be better
+    TODO: no usages detected anywhere => confirm this and remove it
     """
 
-    def __init__(self, path_parser: InputPathParser, map_metadata_to_stac_item: IMapMetadataToSTACItem) -> None:
+    def __init__(
+        self,
+        path_parser: InputPathParser,
+        href_modifier: Optional[ReadHrefModifier] = None,
+    ) -> None:
         # Store dependencies: components that have to be provided to constructor
         self._path_parser = path_parser
-        self._metadata_to_stac_item = map_metadata_to_stac_item
+        # TODO: remove MakeRelativeToCollection as default. This is a hack to test it quickly.
+        self._href_modifier = href_modifier or None
 
-    def to_stac_item(self, file: Path) -> Item:
-        """Generate the STAC Item for the specified GeoTIFF path."""
-        metadata = self.to_metadata(file)
-        return self._metadata_to_stac_item.map(metadata)
+    def to_metadata(
+        self,
+        asset_path: Union[Path, str],
+    ) -> AssetMetadata:
+        if not asset_path:
+            raise ValueError(
+                f'Argument "asset_path" must have a value, it can not be None or the empty string. {asset_path=}'
+            )
+        if not isinstance(asset_path, (Path, str)):
+            raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
 
-    def to_metadata(self, file: Path) -> AssetMetadata:
-        """Generate the intermediate Metadata for the specified GeoTIFF path."""
-        return AssetMetadata.from_href(
-            href=str(file),
+        asset_meta = AssetMetadata(
             extract_href_info=self._path_parser,
-            read_href_modifier=None,
+            # read_href_modifier=self._href_modifier
         )
+        asset_meta.original_href = asset_path
+        asset_meta.asset_path = asset_path
+        asset_meta.asset_id = Path(asset_path).stem
+        asset_meta.item_id = Path(asset_path).stem
+        asset_meta.datetime = dt.datetime.utcnow()
 
-    def map_all(self, files: Iterable[Path]) -> Iterable[AssetMetadata]:
-        """Return generator the converts all files to STAC Items"""
-        return (self.to_stac_item(file) for file in files)
+        if self._href_modifier:
+            asset_meta.href = self._href_modifier(asset_path)
+        else:
+            asset_meta.href = asset_path
+
+        with rasterio.open(asset_path) as dataset:
+            asset_meta.shape = dataset.shape
+            asset_meta.tags = dataset.tags()
+            bboxes_result = RasterBBoxReader.from_rasterio_dataset(dataset)
+            asset_meta.bbox_lat_lon, asset_meta.bbox_projected, asset_meta.transform = bboxes_result
+            # asset_meta._bbox_list = self._bbox_lat_lon.to_list()
+            # asset_meta._proj_bbox = self._bbox_projected.to_list()
+            # asset_meta._proj_epsg = self._bbox_projected.epsg
+
+        asset_meta.process_href_info()
+        return asset_meta
 
 
 class IGroupMetadataBy(Protocol):
@@ -497,6 +606,10 @@ class STACCollectionBuilder:
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
 
+        # NOTE: creating a self-contained collection allows to move the collection and item files
+        # but this is not enough to also be able to move the assets.
+        # The href links to asset files also have the be relative (to the location of the STAC item)
+        # This needs to be done via the href_modifier
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
 
     @property
@@ -687,10 +800,10 @@ class GeoTiffPipeline:
         path_parser: InputPathParser,
         output_dir: Path,
         overwrite: Optional[bool] = False,
+        assets_relative: Optional[bool] = False,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
-        # TODO: eliminate self.output_dir and self.overwrite
         self._output_base_dir: Path = GeoTiffPipeline._get_output_dir_or_default(output_dir)
         self._collection_dir: Path = None
         self._overwrite: bool = overwrite
@@ -700,6 +813,7 @@ class GeoTiffPipeline:
         self._path_parser = path_parser
 
         # Components / dependencies that we set up internally
+        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
         self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
         self._metadata_group_creator: IGroupMetadataBy = None
 
@@ -745,7 +859,11 @@ class GeoTiffPipeline:
         return self._path_parser
 
     @property
-    def meta_to_stac_item_mapper(self) -> MapGeoTiffToSTACItem:
+    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
+        return self._geotiff_to_metadata_mapper
+
+    @property
+    def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
         return self._meta_to_stac_item_mapper
 
     @staticmethod
@@ -811,7 +929,10 @@ class GeoTiffPipeline:
     def _get_output_dir_or_default(output_dir: Path | str | None) -> Path:
         return Path(output_dir) if output_dir else Path(tempfile.gettempdir())
 
-    def _setup_internals(self, group: str | int | None = None) -> None:
+    def _setup_internals(
+        self,
+        group: str | int | None = None,
+    ) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
         # if self._collection_builder:
         #     # It has already been set up => skip it.
@@ -819,6 +940,13 @@ class GeoTiffPipeline:
         #     # TODO: fix logging, currently no longer works.
         #     return
 
+        href_modifier = None
+        if self._collection_config.use_relative_asset_paths:
+            href_modifier = MakeRelativeToCollection(data_root_dir=self._file_collector.input_dir)
+
+        self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
+            path_parser=self._path_parser, href_modifier=href_modifier
+        )
         self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
         self._metadata_group_creator = GroupMetadataByYear()
 
@@ -854,11 +982,12 @@ class GeoTiffPipeline:
     def get_metadata(self) -> Iterable[AssetMetadata]:
         """Generate the intermediate metadata objects, from the input files."""
         for file in self.get_input_files():
-            yield AssetMetadata.from_href(
-                href=str(file),
-                extract_href_info=self._path_parser,
-                read_href_modifier=None,
-            )
+            # yield AssetMetadata.from_file_path(
+            #     asset_path=str(file),
+            #     extract_href_info=self._path_parser,
+            #     read_href_modifier=None,
+            # )
+            yield self._geotiff_to_metadata_mapper.to_metadata(file)
 
     @property
     def has_grouping(self):
@@ -883,13 +1012,17 @@ class GeoTiffPipeline:
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
         for file in self.get_input_files():
-            metadata = AssetMetadata.from_href(
-                href=str(file),
-                extract_href_info=self._path_parser,
-                read_href_modifier=None,
-            )
+            # metadata = AssetMetadata.from_file_path(
+            #     asset_path=str(file),
+            #     extract_href_info=self._path_parser,
+            #     read_href_modifier=None,
+            # )
+            metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
+
+            # TODO: implement grouping of several assets that belong to one item, here.
+
             stac_item = self._meta_to_stac_item_mapper.map(metadata)
-            # Ignore it when the file was not a known type, for example it is
+            # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
                 yield stac_item
@@ -958,6 +1091,10 @@ class GeodataframeExporter:
 
         epsg = stac_item_list[0].properties.get("proj:epsg", 4326)
         records = cls.convert_dict_records_to_strings(i.to_dict() for i in stac_item_list)
+        # TODO: limit the number of fields to what we need to see. Something like the code below.
+        #
+        # Not working yet, coming back to this but it is not a priority.
+        #
         # it: Item
         # records = cls.convert_records_to_strings(
         #     (it.id, it.collection_id, it.bbox, it.datetime) for it in stac_item_list
@@ -999,6 +1136,10 @@ class GeodataframeExporter:
                     rec[key] = val.isoformat()
                 elif isinstance(val, list):
                     rec[key] = json.dumps(val)
+                elif isinstance(val, (int, float, bool, str)):
+                    rec[key] = val
+                else:
+                    rec[key] = str(val)
         return out_records
 
     @staticmethod
@@ -1013,6 +1154,10 @@ class GeodataframeExporter:
                     convert_record.append(column.isoformat())
                 elif isinstance(column, list):
                     convert_record.append(json.dumps(column))
+                elif isinstance(column, (int, float, bool, str)):
+                    convert_record.append(column)
+                else:
+                    convert_record.append(str(column))
             out_records.append(convert_record)
         return out_records
 

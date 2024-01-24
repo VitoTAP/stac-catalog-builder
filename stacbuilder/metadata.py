@@ -76,7 +76,13 @@ class AssetMetadata:
     ):
         # original and modified path/href
         self._href: Optional[str] = None
-        self._modified_href: Optional[str] = None
+        self._original_href: Optional[str] = None
+
+        # Very often the input will be a (Posix) path to an asset file, for now only GeoTIFFs.
+        # When we start to support using URLs to convert those assets to STAC items, then
+        # `self._asset_path` could be None, or it could be set to the local path that the
+        # openEO server needs to access.
+        self._asset_path: Optional[Path] = None
 
         # components to convert data
         self._read_href_modifier = read_href_modifier
@@ -140,27 +146,60 @@ class AssetMetadata:
         self.tags: List[str] = []
 
     @staticmethod
-    def from_href(
+    def from_file_path(
+        asset_path: str,
+        extract_href_info: InputPathParser,
+        read_href_modifier: Optional[ReadHrefModifier] = None,
+    ) -> "AssetMetadata":
+        meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
+        meta._read_geotiff(asset_path)
+        return meta
+
+    @staticmethod
+    def from_url(
         href: str,
         extract_href_info: InputPathParser,
         read_href_modifier: Optional[ReadHrefModifier] = None,
-    ):
+    ) -> "AssetMetadata":
         meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
-        meta._read_geotiff(href)
+        from urllib.parse import ParseResult, urlparse
+
+        parsed_url: ParseResult = urlparse(href)
+        if parsed_url.scheme and parsed_url.netloc:
+            # It is indeed a URL, do we need to download it or can rasterio handle URLs?
+            # Also the href modifier needs to do something different for local paths vs URLs.
+            import warnings
+
+            warnings.showwarning(
+                "URL handling has not been implemented yet. Passing it directly to rasterio but it may not work"
+            )
+            meta._read_geotiff(Path(href))
+
+        else:
+            meta._read_geotiff(Path(href))
+
         return meta
 
-    def _read_geotiff(self, href):
-        self.href = href
-        self.asset_id = Path(href).stem
-        self.item_id = Path(href).stem
+    def _read_geotiff(self, asset_path: Union[Path, str]) -> None:
+        if not asset_path:
+            raise ValueError(
+                f'Argument "asset_path" must have a value, it can not be None or the empty string. {asset_path=}'
+            )
+        if not isinstance(asset_path, (Path, str)):
+            raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
+
+        self.original_href = asset_path
+        self.asset_path = asset_path
+        self.asset_id = Path(asset_path).stem
+        self.item_id = Path(asset_path).stem
         self.datetime = dt.datetime.utcnow()
 
         if self._read_href_modifier:
-            self._modified_href = self._read_href_modifier(href)
+            self.href = self._read_href_modifier(asset_path)
         else:
-            self._modified_href = href
+            self.href = asset_path
 
-        with rasterio.open(self._modified_href) as dataset:
+        with rasterio.open(self.asset_path) as dataset:
             self.shape = dataset.shape
             self.tags = dataset.tags()
 
@@ -216,16 +255,24 @@ class AssetMetadata:
         return self._href
 
     @href.setter
-    def href(self, value: str) -> Optional[str]:
+    def href(self, value: str) -> None:
         self._href = str(value)
 
     @property
-    def modified_href(self) -> Optional[str]:
-        return self._modified_href
+    def original_href(self) -> Optional[str]:
+        return self._original_href
 
-    @modified_href.setter
-    def modified_href(self, value: str) -> str:
-        self._modified_href = str(value)
+    @original_href.setter
+    def original_href(self, value: str) -> None:
+        self._original_href = str(value)
+
+    @property
+    def asset_path(self) -> Optional[Path]:
+        return self._asset_path
+
+    @asset_path.setter
+    def asset_path(self, value: Union[Path, str]) -> None:
+        self._asset_path = Path(value)
 
     @property
     def asset_id(self) -> Optional[str]:
@@ -309,7 +356,7 @@ class AssetMetadata:
         return self._proj_epsg
 
     @proj_epsg.setter
-    def proj_epsg(self, value: Optional[int]) -> Optional[int]:
+    def proj_epsg(self, value: Optional[int]) -> None:
         # TODO: remove setter for epsg, should become a readonly property that returns self._bbox_projected.epsg.
         if not isinstance(value, (int, NoneType)):
             raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
@@ -442,7 +489,8 @@ class AssetMetadata:
             "item_id": self.item_id,
             "asset_id": self.asset_id,
             "href": self.href,
-            "modified_href": self.modified_href,
+            "original_href": self.original_href,
+            "asset_path": self.asset_path,
             "asset_type": self.asset_type,
             "band": self.band,
             "datetime": self.datetime,
@@ -451,9 +499,11 @@ class AssetMetadata:
             "year": self.year,
             "month": self.month,
             "day": self.day,
+            "shape": self.shape,
+            "tags": self.tags,
             "bbox": self.bbox_as_list,
             "proj_epsg": self.proj_epsg,
-            "proj_bbox": self._proj_bbox,
+            "proj_bbox": self.proj_bbox_as_list,
             "geometry": self.geometry_as_dict,
             "proj_geometry": self.proj_geometry_as_dict,
             "proj_geometry_as_wkt": self.proj_geometry_as_wkt,

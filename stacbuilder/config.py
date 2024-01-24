@@ -115,6 +115,12 @@ class AssetConfig(BaseModel):
         )
 
 
+class FileCollectorConfig(BaseModel):
+    input_dir: Path
+    glob: Optional[str] = "*"
+    max_files: int = -1
+
+
 class CollectionConfig(BaseModel):
     """Model, store configuration of a STAC collection"""
 
@@ -133,6 +139,7 @@ class CollectionConfig(BaseModel):
     instruments: Optional[List[str]] = []
 
     layout_strategy_item_template: Optional[str] = "${collection}/${year}"
+    use_relative_asset_paths: bool = False
     input_path_parser: Optional[InputPathParserConfig] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
@@ -148,6 +155,12 @@ class CollectionConfig(BaseModel):
     # This is done at the very end in the post-processing step of the builder.
     overrides: Optional[Dict[str, Any]] = None
 
+    # TODO: to simplify the use we want to include the config for the input files and output directory.
+    #   This will help us to ditch the makefiles that automate commands with lots of options,
+    #   which mainly consists of these paths.
+    #   For now we leave it out and just earmark this spot to added it here.
+    # input_files_config: Optional[FileCollectorConfig] = None
+
     @classmethod
     def from_json_str(cls, json_str: str) -> "CollectionConfig":
         return CollectionConfig.model_validate_json(json_str)
@@ -157,9 +170,3 @@ class CollectionConfig(BaseModel):
         cfg_path = Path(path)
         contents = cfg_path.read_text()
         return cls.from_json_str(contents)
-
-
-class FileCollectorConfig(BaseModel):
-    input_dir: Path
-    glob: Optional[str] = "*"
-    max_files: int = -1
