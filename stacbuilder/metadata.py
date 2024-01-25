@@ -1,5 +1,5 @@
 """
-Intermediate metadata that models the properties we actually use.
+Intermediate asset metadata that models the properties we actually use.
 
 Rationale:
 
@@ -11,6 +11,7 @@ Rationale:
 4) For unit testing it is a lot simpler to instantiate Metadata objects than
     to creating fake raster files, or fake API responses from a mock of the real API.
 """
+
 from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
@@ -20,9 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dateutil.parser
 import numpy as np
-from shapely import to_wkt
-from shapely.geometry import box, mapping, Polygon
-from stactools.core.io import ReadHrefModifier
+from shapely.geometry import Polygon
 
 
 from stacbuilder.boundingbox import BoundingBox
@@ -54,7 +53,6 @@ class RasterMetadata:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            # "nodata": self.nodata,
             "shape": self.shape,
             "tags": self.tags(),
             "bands": [b.to_dict() for b in self.bands],
@@ -98,8 +96,7 @@ class AssetMetadata:
 
     def __init__(
         self,
-        extract_href_info: InputPathParser,
-        read_href_modifier: Optional[ReadHrefModifier] = None,
+        extract_href_info: Optional[InputPathParser] = None,
     ):
         # original and modified path/href
         self._href: Optional[str] = None
@@ -112,7 +109,6 @@ class AssetMetadata:
         self._asset_path: Optional[Path] = None
 
         # components to convert data
-        self._read_href_modifier = read_href_modifier
         self._extract_href_info = extract_href_info
 
         # The raw dictionary of data extracted from the href
@@ -150,16 +146,7 @@ class AssetMetadata:
         self._month: Optional[int] = None
         self._day: Optional[int] = None
 
-        # TOGGLE tot compare new implementation to old in tests while we are refactoring.
-        # TODO: remove self._use_new_bbox_method, this toggle is a hack for testing the refactored version.
-        # Refactoring to use cleaner, easier to unit test BoundingBox class
-        self._use_new_bbox_method = True
-
-        # Spatial extent, the old properties that we will replace. Refactoring in progress.
-        self._bbox_list: Optional[List[float]] = None
-        self._proj_bbox: Optional[List[float]] = None
-        self._proj_epsg: Optional[Any] = None
-        # new properties for the bounding boxes.
+        # The bounding boxes, in latitude-longitude and also the projected version.
         self._bbox_lat_lon: Optional[BoundingBox] = None
         self._bbox_projected: Optional[BoundingBox] = None
 
@@ -173,31 +160,6 @@ class AssetMetadata:
         self.tags: List[str] = []
 
         self.raster_metadata: Optional[RasterMetadata] = None
-
-    # @staticmethod
-    # def from_url(
-    #     href: str,
-    #     extract_href_info: InputPathParser,
-    #     read_href_modifier: Optional[ReadHrefModifier] = None,
-    # ) -> "AssetMetadata":
-    #     meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
-    #     from urllib.parse import ParseResult, urlparse
-
-    #     parsed_url: ParseResult = urlparse(href)
-    #     if parsed_url.scheme and parsed_url.netloc:
-    #         # It is indeed a URL, do we need to download it or can rasterio handle URLs?
-    #         # Also the href modifier needs to do something different for local paths vs URLs.
-    #         import warnings
-
-    #         warnings.showwarning(
-    #             "URL handling has not been implemented yet. Passing it directly to rasterio but it may not work"
-    #         )
-    #         meta._read_geotiff(Path(href))
-
-    #     else:
-    #         meta._read_geotiff(Path(href))
-
-    #     return meta
 
     def process_href_info(self):
         href_info = self._extract_href_info.parse(self.href)
@@ -283,12 +245,9 @@ class AssetMetadata:
 
     @property
     def bbox_as_list(self) -> Optional[List[float]]:
-        if self._use_new_bbox_method:
-            if not self._bbox_lat_lon:
-                return None
-            return self._bbox_lat_lon.to_list()
-
-        return self._bbox_list
+        if not self._bbox_lat_lon:
+            return None
+        return self._bbox_lat_lon.to_list()
 
     @property
     def bbox_projected(self) -> Optional[BoundingBox]:
@@ -301,21 +260,15 @@ class AssetMetadata:
     @property
     def proj_bbox_as_list(self) -> Optional[List[float]]:
         # TODO: [decide] convert this RO property to a method or not?
-        if self._use_new_bbox_method:
-            if not self._bbox_projected:
-                return None
-            return self._bbox_projected.to_list()
-
-        return self._proj_bbox
+        if not self._bbox_projected:
+            return None
+        return self._bbox_projected.to_list()
 
     @property
     def proj_epsg(self) -> Optional[int]:
-        if self._use_new_bbox_method:
-            if not self._bbox_projected:
-                return None
-            return self._bbox_projected.epsg
-
-        return self._proj_epsg
+        if not self._bbox_projected:
+            return None
+        return self._bbox_projected.epsg
 
     @proj_epsg.setter
     def proj_epsg(self, value: Optional[int]) -> None:
@@ -327,45 +280,31 @@ class AssetMetadata:
     @property
     def geometry_as_dict(self) -> Optional[Dict[str, Any]]:
         # TODO: [decide] convert this RO property to a method or not?
-        if self._use_new_bbox_method:
-            if not self._bbox_lat_lon:
-                return None
-            return self._bbox_lat_lon.as_geometry_dict()
-
-        geometry_dict: Dict[str, Any] = mapping(box(*self._bbox_list))
-        return geometry_dict
+        if not self._bbox_lat_lon:
+            return None
+        return self._bbox_lat_lon.as_geometry_dict()
 
     @property
     def proj_geometry_as_dict(self) -> Optional[Dict[str, Any]]:
         # TODO: [decide] convert this RO property to a method or not?
-        if self._use_new_bbox_method:
-            if not self._bbox_projected:
-                return None
-            return self._bbox_projected.as_geometry_dict()
-
-        geometry_dict: Dict[str, Any] = mapping(box(*self._proj_bbox))
-        return geometry_dict
+        if not self._bbox_projected:
+            return None
+        return self._bbox_projected.as_geometry_dict()
 
     @property
     def proj_geometry_as_wkt(self) -> Optional[str]:
         # TODO: [decide] convert this RO property to a method or not?
-        if self._use_new_bbox_method:
-            if not self._bbox_projected:
-                return None
-            return self._bbox_projected.as_wkt()
-
-        return to_wkt(self.proj_bbox_as_polygon)
+        if not self._bbox_projected:
+            return None
+        return self._bbox_projected.as_wkt()
 
     @property
     def proj_bbox_as_polygon(self) -> Optional[Polygon]:
         # TODO: [decide] convert this RO property to a method or not?
         # TODO: method name could be better
-        if self._use_new_bbox_method:
-            if not self._bbox_projected:
-                return None
-            return self._bbox_projected.as_polygon()
-
-        return Polygon.from_bounds(*self._proj_bbox)
+        if not self._bbox_projected:
+            return None
+        return self._bbox_projected.as_polygon()
 
     @property
     def datetime(self) -> Optional[dt.datetime]:

@@ -468,10 +468,7 @@ class MapGeoTiffToAssetMetadata:
         if not isinstance(asset_path, (Path, str)):
             raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
 
-        asset_meta = AssetMetadata(
-            extract_href_info=self._path_parser,
-            # read_href_modifier=self._href_modifier
-        )
+        asset_meta = AssetMetadata(extract_href_info=self._path_parser)
         asset_meta.original_href = asset_path
         asset_meta.asset_path = asset_path
         asset_meta.asset_id = Path(asset_path).stem
@@ -502,6 +499,31 @@ class MapGeoTiffToAssetMetadata:
 
         asset_meta.process_href_info()
         return asset_meta
+
+    # @staticmethod
+    # def from_url(
+    #     href: str,
+    #     extract_href_info: InputPathParser,
+    #     read_href_modifier: Optional[ReadHrefModifier] = None,
+    # ) -> "AssetMetadata":
+    #     meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
+    #     from urllib.parse import ParseResult, urlparse
+
+    #     parsed_url: ParseResult = urlparse(href)
+    #     if parsed_url.scheme and parsed_url.netloc:
+    #         # It is indeed a URL, do we need to download it or can rasterio handle URLs?
+    #         # Also the href modifier needs to do something different for local paths vs URLs.
+    #         import warnings
+
+    #         warnings.showwarning(
+    #             "URL handling has not been implemented yet. Passing it directly to rasterio but it may not work"
+    #         )
+    #         meta._read_geotiff(Path(href))
+
+    #     else:
+    #         meta._read_geotiff(Path(href))
+
+    #     return meta
 
 
 class IGroupMetadataBy(Protocol):

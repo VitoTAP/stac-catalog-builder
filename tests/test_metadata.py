@@ -10,7 +10,7 @@ from stacbuilder.boundingbox import BoundingBox
 
 class TestAssetMetadata:
     def test_constructor_sets_defaults(self):
-        meta = AssetMetadata(extract_href_info=None, read_href_modifier=None)
+        meta = AssetMetadata(extract_href_info=None)
 
         meta.asset_id is None
         meta.item_id is None
@@ -107,7 +107,7 @@ class TestAssetMetadata:
         ],
     )
     def test_set_datetime(self, in_value, expected):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.datetime = in_value
         assert meta.datetime == expected
 
@@ -123,7 +123,7 @@ class TestAssetMetadata:
         ],
     )
     def test_set_start_datetime(self, in_value, expected):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.start_datetime = in_value
         assert meta.start_datetime == expected
 
@@ -139,7 +139,7 @@ class TestAssetMetadata:
         ],
     )
     def test_set_end_datetime(self, in_value, expected):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.end_datetime = in_value
         assert meta.end_datetime == expected
 
@@ -151,13 +151,13 @@ class TestAssetMetadata:
 
     @pytest.fixture
     def metadata_with_proj_bbox(self, boundingboxes) -> AssetMetadata:
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.bbox_projected = boundingboxes[0]
         meta.bbox_lat_lon = boundingboxes[1]
         return meta
 
     def test_bbox_lat_lon(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         bbox_wgs84 = BoundingBox(4.0, 51.0576293, 4.9100677, 52.0, 3812)
         meta.bbox_lat_lon = bbox_wgs84
 
@@ -165,7 +165,7 @@ class TestAssetMetadata:
         assert meta.bbox_as_list == [4.0, 51.0576293, 4.9100677, 52.0]
 
     def test_bbox_projected(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         bbox_proj = BoundingBox(624651.02, 687947.46, 694307.66, 799081.79, 3812)
         meta.bbox_projected = bbox_proj
 
@@ -174,7 +174,7 @@ class TestAssetMetadata:
         assert meta.proj_epsg == 3812
 
     def test_geometry_dict(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.bbox_lat_lon = BoundingBox(4.0, 51.0, 5.0, 52.0, 4326)
         expected = {
             "type": "Polygon",
@@ -192,12 +192,12 @@ class TestAssetMetadata:
         assert meta.geometry_as_dict == expected
 
     def test_proj_epsg(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.bbox_projected = BoundingBox(624651.02, 687947.46, 694307.66, 799081.79, 3812)
         assert meta.proj_epsg == 3812
 
     def proj_geometry_as_dict(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         meta.bbox_projected = BoundingBox(624651.02, 687947.46, 694307.66, 799081.79, 3812)
         expected = {
             "type": "Polygon",
@@ -215,7 +215,7 @@ class TestAssetMetadata:
         assert meta.proj_geometry_as_dict == expected
 
     def test_geometry_as_wkt(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         min_x = 624651.02
         min_y = 687947.46
         max_x = 694307.66
@@ -227,7 +227,7 @@ class TestAssetMetadata:
         assert meta.proj_geometry_as_wkt == expected_wkt
 
     def test_proj_bbox_as_polygon(self):
-        meta = AssetMetadata(None, None)
+        meta = AssetMetadata()
         min_x = 624651.02
         min_y = 687947.46
         max_x = 694307.66
