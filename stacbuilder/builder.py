@@ -54,17 +54,6 @@ CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0
 ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
 
 
-class MakeRelativeToCollection:
-    def __init__(self, data_root_dir: Path) -> None:
-        self.data_root_dir = data_root_dir
-
-    def __call__(self, asset_path: str) -> str:
-        """This method must match the signature of ReadHrefModifier.
-        ReadHrefModifier is a type alias for Callable[[str], str]
-        """
-        return str(Path(asset_path).relative_to(self.data_root_dir))
-
-
 class ModifyAssetHref:
     def __init__(
         self,
@@ -307,7 +296,6 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
         item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
-        # item.make_asset_hrefs_relative()
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg
         item_proj.bbox = metadata.proj_bbox_as_list
@@ -1001,10 +989,8 @@ class GeoTiffPipeline:
     ) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
 
+        # TODO: implement href modified that translates file path to a URL with a configurable base URL
         href_modifier = None
-
-        if self._collection_config.use_relative_asset_paths:
-            href_modifier = MakeRelativeToCollection(data_root_dir=self._file_collector.input_dir)
 
         self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
             path_parser=self._path_parser, href_modifier=href_modifier

@@ -141,7 +141,6 @@ class CollectionConfig(BaseModel):
     instruments: Optional[List[str]] = []
 
     layout_strategy_item_template: Optional[str] = "${collection}/${year}"
-    use_relative_asset_paths: bool = False
     input_path_parser: Optional[InputPathParserConfig] = None
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
