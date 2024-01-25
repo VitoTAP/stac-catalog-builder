@@ -7,6 +7,7 @@ You can ignore the Form classes.
 That idea didn't go very far and is likely to be removed at this point.
 """
 
+import enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
@@ -71,22 +72,80 @@ class EOBandConfig(BaseModel):
 
     description: str = Field(description="Description of the band.")
 
-    # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
-    # TODO: maybe use a numpy type or make an Enum for data_type
-    data_type: str = Field(description="which data type this raster band has, use the same names as numpy.")
+    # # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
+    # # TODO: maybe use a numpy type or make an Enum for data_type
+    # data_type:92str = Field(description="which data type this raster band has, use the same names as numpy.")
 
-    # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
+    # # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
+    # # TODO: how do we store NaN in JSON?
+    # nodata: Optional[Union[int, float, str]] = Field(
+    #     default=None, description='What value is used to represent "NO DATA" in the raster'
+    # )
+
+    # # TODO: check what were the other allowed values for `sampling`.
+    # sampling: Optional[str] = Field(default=None, description="Whether sampling is `area` or ???")
+
+    # spatial_resolution: Optional[int] = Field(
+    #     default=None, description="Spatial resolution, usually in meter, but possibly in degrees, depending on the CRS."
+    # )
+
+
+class SamplingType(enum.StrEnum):
+    AREA = "area"
+    POINT = "point"
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
+class RasterBandConfig(BaseModel):
+    """Default values for the Raster Band Object from the Raster extension
+
+    See also: https://github.com/stac-extensions/raster
+
+    When specifying a raster band object at asset level, it is recommended to use the projection extension to specify information about the raster projection, especially proj:shape to specify the height and width of the raster.
+
+    Field Name 	Type 	Description
+    nodata 	number|string 	Pixel values used to identify pixels that are nodata in the band either by the pixel value as a number or nan, inf or -inf (all strings).
+    sampling 	string 	One of area or point. Indicates whether a pixel value should be assumed to represent a sampling over the region of the pixel or a point sample at the center of the pixel.
+    data_type 	string 	The data type of the pixels in the band. One of the data types as described below.
+    bits_per_sample 	number 	The actual number of bits used for this band. Normally only present when the number of bits is non-standard for the datatype, such as when a 1 bit TIFF is represented as byte.
+    spatial_resolution 	number 	Average spatial resolution (in meters) of the pixels in the band.
+    statistics 	Statistics Object 	Statistics of all the pixels in the band.
+    unit 	string 	Unit denomination of the pixel value.
+    scale 	number 	Multiplicator factor of the pixel value to transform into the value (i.e. translate digital number to reflectance).
+    offset 	number 	Number to be added to the pixel value (after scaling) to transform into the value (i.e. translate digital number to reflectance).
+    histogram 	Histogram Object 	Histogram distribution information of the pixels values in the band.
+    """
+
+    # not part of the extension but we need a a way to identify the band
+    name: str
+
     # TODO: how do we store NaN in JSON?
     nodata: Optional[Union[int, float, str]] = Field(
-        default=None, description='What value is used to represent "NO DATA" in the raster'
+        default=None,
+        description='What value is used to represent "NO DATA" in the raster',
     )
+    # TODO: maybe use a numpy type or make an Enum for data_type
+    data_type: Optional[str] = Field(description="which data type this raster band has, use the same names as numpy.")
 
     # TODO: check what were the other allowed values for `sampling`.
-    sampling: Optional[str] = Field(default=None, description="Whether sampling is `area` or ???")
+    sampling: Optional[str] = Field(
+        default=SamplingType.AREA, description="Whether sampling is `area` or `point`", type=SamplingType
+    )
+
+    # TODO: bits_per_sample
 
     spatial_resolution: Optional[int] = Field(
         default=None, description="Spatial resolution, usually in meter, but possibly in degrees, depending on the CRS."
     )
+
+    unit: Optional[str] = None
+    scale: Optional[float] = None
+    offset: Optional[float] = None
+
+    # statistics and histogram: Can not define defaults for these fields
+    #   They have to be read from the raster, with rasterio.
 
 
 class AssetConfig(BaseModel):
@@ -98,7 +157,14 @@ class AssetConfig(BaseModel):
     description: str
     media_type: Optional[MediaType] = MediaType.GEOTIFF
     roles: Optional[List[str]] = ["data"]
-    eo_bands: List[EOBandConfig]
+
+    # The bands are not always electro-optical bands,
+    # for example weather observation and climate data.
+    eo_bands: Optional[List[EOBandConfig]] = None
+
+    raster_bands: Optional[List[RasterBandConfig]] = None
+
+    # TODO: [decide] Do we still need extra_fields?
     # extra_fields = Dict[str, Any]
 
     def to_asset_definition(self) -> AssetDefinition:

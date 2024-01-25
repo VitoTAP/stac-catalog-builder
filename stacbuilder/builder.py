@@ -330,6 +330,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
     def _create_asset(self, metadata: AssetMetadata, item: Item) -> Asset:
         asset_defs = self._get_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.asset_type]
+        asset_config = self._get_assets_config_for(metadata.asset_type)
         asset: Asset = asset_def.create_asset(metadata.href)
         asset.set_owner(item)
 
@@ -341,13 +342,43 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         raster_bands = []
 
         if metadata.raster_metadata:
-            band_md = metadata.raster_metadata.bands[0]
-            new_band: RasterBand = RasterBand.create(
-                # TODO: need to get this information via rasterio.
-                data_type=band_md.data_type,
-                nodata=band_md.nodata,
-            )
-            raster_bands.append(new_band)
+            # TODO: HACK: making assumptions here that each bans in the raster appear in the same order as in our config.
+            #    Would be better if we could identify the band by name.
+            if not asset_config.raster_bands:
+                # There is no information to fill in default values for raster:bands
+                # Just fill in what we do have.
+                for band_md in metadata.raster_metadata.bands:
+                    new_band: RasterBand = RasterBand.create(
+                        # TODO: need to get this information via rasterio.
+                        data_type=band_md.data_type,
+                        nodata=band_md.nodata,
+                    )
+                    raster_bands.append(new_band)
+            else:
+                # The default values for raster:bands are available in the configuration
+                for i, raster_bands_config in enumerate(asset_config.raster_bands):
+                    band_md = metadata.raster_metadata.bands[i]
+
+                    new_band: RasterBand = RasterBand.create(
+                        # TODO: need to get this information via rasterio.
+                        data_type=band_md.data_type or raster_bands_config.data_type,
+                        nodata=band_md.nodata or raster_bands_config.nodata,
+                    )
+                    if raster_bands_config.sampling is not None:
+                        new_band.sampling = raster_bands_config.sampling.__str__()
+
+                    if raster_bands_config.offset is not None:
+                        new_band.offset = raster_bands_config.offset
+                    if raster_bands_config.scale is not None:
+                        new_band.scale = raster_bands_config.scale
+
+                    if raster_bands_config.spatial_resolution is not None:
+                        new_band.spatial_resolution = raster_bands_config.spatial_resolution
+                    if raster_bands_config.unit is not None:
+                        new_band.unit = raster_bands_config.unit
+
+                    raster_bands.append(new_band)
+
         asset_raster.apply(raster_bands)
 
         # Add the alternate links for the Alternate-Asset extension
@@ -386,7 +417,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return asset_definitions
 
-    def _assets_config_for(self, asset_type: str) -> AssetConfig:
+    def _get_assets_config_for(self, asset_type: str) -> AssetConfig:
         """Create AssetDefinitions, according to the config in self.item_assets_configs"""
         if asset_type not in self.item_assets_configs:
             return None

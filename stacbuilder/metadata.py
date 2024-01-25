@@ -33,6 +33,12 @@ BoundingBoxList = List[Union[float, int]]
 
 @dataclass
 class BandMetadata:
+    """This class is temporary, will be refactored.
+    Right now the focus is just to get the data out of rasterio.
+    We do want a data structure that has everything we need for these extensions:
+    eo:bands and raster:bands.
+    """
+
     data_type: np.dtype
     nodata: Any
     index: int
@@ -227,8 +233,8 @@ class AssetMetadata:
     def asset_type(self) -> Optional[str]:
         # Default to the band name if it is not set
         # TODO: remove this fallback, and going to remove band as a property as well.
-        if not self._asset_type:
-            return self.band
+        # if not self._asset_type:
+        #     return self.band
         return self._asset_type
 
     @asset_type.setter

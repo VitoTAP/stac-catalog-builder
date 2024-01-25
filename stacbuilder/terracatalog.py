@@ -246,17 +246,19 @@ def main():
     config = CatalogueConfig.from_environment(CatalogueEnvironment.HRVPP)
     catalogue = tcc.Catalogue(config)
 
-    for stac_coll in create_stac_collections(catalogue):
-        pprint(stac_coll.to_dict())
+    # for stac_coll in create_stac_collections(catalogue):
+    #     pprint(stac_coll.to_dict())
 
     show_collections(catalogue)
 
     collections = list(catalogue.get_collections())
     coll = collections[0]
-    pprint(dir(coll))
+    # pprint(coll)
+    # pprint(dir(coll))
 
     list_products(catalogue, coll)
 
+    # ---
     # df = collections_to_dataframe(catalogue)
 
     # pprint(df)

@@ -156,7 +156,7 @@ def collection_test_config() -> CollectionConfig:
         "input_path_parser": InputPathParserConfig(
             classname="RegexInputPathParser",
             parameters={
-                "regex_pattern": r".*_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
+                "regex_pattern": r".*_(?P<asset_type>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
             },
         ),
         "item_assets": {
@@ -199,7 +199,7 @@ def grouped_collection_test_config() -> CollectionConfig:
         "input_path_parser": InputPathParserConfig(
             classname="RegexInputPathParser",
             parameters={
-                "regex_pattern": r".*_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
+                "regex_pattern": r".*_(?P<asset_type>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
             },
         ),
         "item_assets": {
