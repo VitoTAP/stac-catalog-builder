@@ -65,6 +65,7 @@ class TestAssetMetadata:
             "proj_epsg": None,
             "proj_geometry": None,
             "proj_geometry_as_wkt": None,
+            "raster_metadata": None,
             "shape": None,
             "start_datetime": None,
             "tags": [],
@@ -236,6 +237,7 @@ class TestAssetMetadata:
         expected_polygon = Polygon.from_bounds(min_x, min_y, max_x, max_y)
         assert meta.proj_bbox_as_polygon == expected_polygon
 
+    @pytest.mark.skip(reason="Test not yet implemented")
     @pytest.mark.xfail("Test not yet implemented")
     def test_process_href_info(self):
         # Important to cover this, so adding this it already as a nagging reminder.

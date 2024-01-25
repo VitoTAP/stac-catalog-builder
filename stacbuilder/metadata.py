@@ -11,6 +11,7 @@ Rationale:
 4) For unit testing it is a lot simpler to instantiate Metadata objects than
     to creating fake raster files, or fake API responses from a mock of the real API.
 """
+from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
 from types import NoneType
@@ -18,20 +19,46 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 import dateutil.parser
-import rasterio
+import numpy as np
 from shapely import to_wkt
 from shapely.geometry import box, mapping, Polygon
 from stactools.core.io import ReadHrefModifier
 
-from openeo.util import normalize_crs
-
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.pathparsers import InputPathParser
-from stacbuilder.projections import reproject_bounding_box
 
 
 BoundingBoxList = List[Union[float, int]]
+
+
+@dataclass
+class BandMetadata:
+    data_type: np.dtype
+    nodata: Any
+    index: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "data_type": self.data_type,
+            "nodata": self.nodata,
+            "index": self.index,
+        }
+
+
+@dataclass
+class RasterMetadata:
+    shape: Tuple[int, int]
+    tags: List[str]
+    bands: List[BandMetadata]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            # "nodata": self.nodata,
+            "shape": self.shape,
+            "tags": self.tags(),
+            "bands": [b.to_dict() for b in self.bands],
+        }
 
 
 # TODO: convert Metadata to a dataclass, and add method (or class) that fills it in from a GeoTIFF.
@@ -145,97 +172,32 @@ class AssetMetadata:
         # Tags in the raster.
         self.tags: List[str] = []
 
-    @staticmethod
-    def from_file_path(
-        asset_path: str,
-        extract_href_info: InputPathParser,
-        read_href_modifier: Optional[ReadHrefModifier] = None,
-    ) -> "AssetMetadata":
-        meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
-        meta._read_geotiff(asset_path)
-        return meta
+        self.raster_metadata: Optional[RasterMetadata] = None
 
-    @staticmethod
-    def from_url(
-        href: str,
-        extract_href_info: InputPathParser,
-        read_href_modifier: Optional[ReadHrefModifier] = None,
-    ) -> "AssetMetadata":
-        meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
-        from urllib.parse import ParseResult, urlparse
+    # @staticmethod
+    # def from_url(
+    #     href: str,
+    #     extract_href_info: InputPathParser,
+    #     read_href_modifier: Optional[ReadHrefModifier] = None,
+    # ) -> "AssetMetadata":
+    #     meta = AssetMetadata(extract_href_info=extract_href_info, read_href_modifier=read_href_modifier)
+    #     from urllib.parse import ParseResult, urlparse
 
-        parsed_url: ParseResult = urlparse(href)
-        if parsed_url.scheme and parsed_url.netloc:
-            # It is indeed a URL, do we need to download it or can rasterio handle URLs?
-            # Also the href modifier needs to do something different for local paths vs URLs.
-            import warnings
+    #     parsed_url: ParseResult = urlparse(href)
+    #     if parsed_url.scheme and parsed_url.netloc:
+    #         # It is indeed a URL, do we need to download it or can rasterio handle URLs?
+    #         # Also the href modifier needs to do something different for local paths vs URLs.
+    #         import warnings
 
-            warnings.showwarning(
-                "URL handling has not been implemented yet. Passing it directly to rasterio but it may not work"
-            )
-            meta._read_geotiff(Path(href))
+    #         warnings.showwarning(
+    #             "URL handling has not been implemented yet. Passing it directly to rasterio but it may not work"
+    #         )
+    #         meta._read_geotiff(Path(href))
 
-        else:
-            meta._read_geotiff(Path(href))
+    #     else:
+    #         meta._read_geotiff(Path(href))
 
-        return meta
-
-    def _read_geotiff(self, asset_path: Union[Path, str]) -> None:
-        if not asset_path:
-            raise ValueError(
-                f'Argument "asset_path" must have a value, it can not be None or the empty string. {asset_path=}'
-            )
-        if not isinstance(asset_path, (Path, str)):
-            raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
-
-        self.original_href = asset_path
-        self.asset_path = asset_path
-        self.asset_id = Path(asset_path).stem
-        self.item_id = Path(asset_path).stem
-        self.datetime = dt.datetime.utcnow()
-
-        if self._read_href_modifier:
-            self.href = self._read_href_modifier(asset_path)
-        else:
-            self.href = asset_path
-
-        with rasterio.open(self.asset_path) as dataset:
-            self.shape = dataset.shape
-            self.tags = dataset.tags()
-
-            if self._use_new_bbox_method:
-                self._bbox_lat_lon, self._bbox_projected, self._transform = RasterBBoxReader.from_rasterio_dataset(
-                    dataset
-                )
-                self._bbox_list = self._bbox_lat_lon.to_list()
-                self._proj_bbox = self._bbox_projected.to_list()
-                self._proj_epsg = self._bbox_projected.epsg
-            else:
-                self._proj_bbox = list(dataset.bounds)
-
-                # reset proj_epsg
-                self._proj_epsg = None
-                # TODO: once this works well, integrate normalize_crs into  proj_epsg
-                normalized_epsg = normalize_crs(dataset.crs)
-                if normalized_epsg is not None:
-                    self._proj_epsg = normalized_epsg
-                elif hasattr(dataset.crs, "to_epsg"):
-                    self._proj_epsg = dataset.crs.to_epsg()
-
-                if not self._proj_epsg:
-                    self._proj_epsg = 4326
-
-                if not self._proj_epsg or self._proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
-                    self._bbox_list = self._proj_bbox
-                else:
-                    west, south, east, north = self._proj_bbox[:4]
-                    self._bbox_list = reproject_bounding_box(
-                        west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326"
-                    )
-
-                self.transform = list(dataset.transform)[0:6]
-
-        self.process_href_info()
+    #     return meta
 
     def process_href_info(self):
         href_info = self._extract_href_info.parse(self.href)
@@ -507,6 +469,7 @@ class AssetMetadata:
             "geometry": self.geometry_as_dict,
             "proj_geometry": self.proj_geometry_as_dict,
             "proj_geometry_as_wkt": self.proj_geometry_as_wkt,
+            "raster_metadata": self.raster_metadata.to_dict() if self.raster_metadata else None,
         }
         # Include internal information for debugging.
         if include_internal:
@@ -516,48 +479,3 @@ class AssetMetadata:
 
     def __str__(self):
         return str(self.to_dict())
-
-
-class RasterBBoxReader:
-    """Reads bounding box info from a raster file format.
-
-    TODO: this is very much unfinished untested code.
-        This is an preliminary implementation, and completely UNTESTED.
-        We want to extract all the raster reading stuff out of the module `metadata`
-        into a separate module, and this class is the start of the process.
-        It is therefore more "thinking in writing" than finished code.
-    """
-
-    @classmethod
-    def from_raster_path(cls, path: Path) -> Tuple[BoundingBox, BoundingBox, List[float]]:
-        with rasterio.open(path) as dataset:
-            return cls.from_rasterio_dataset(dataset)
-
-    @staticmethod
-    def from_rasterio_dataset(dataset) -> Tuple[BoundingBox, BoundingBox, List[float]]:
-        bbox_lat_lon = None
-        bbox_projected = None
-        proj_epsg = None
-
-        # TODO: once this works well, integrate normalize_crs into  proj_epsg
-        normalized_epsg = normalize_crs(dataset.crs)
-        if normalized_epsg is not None:
-            proj_epsg = normalized_epsg
-        elif hasattr(dataset.crs, "to_epsg"):
-            proj_epsg = dataset.crs.to_epsg()
-
-        if not proj_epsg:
-            proj_epsg = 4326
-
-        bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
-
-        if proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
-            bbox_lat_lon = bbox_projected
-        else:
-            west, south, east, north = bbox_projected.to_list()
-            bbox_list = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
-            bbox_lat_lon = BoundingBox.from_list(bbox_list, epsg=4326)
-
-        transform = list(dataset.transform)[0:6]
-
-        return bbox_lat_lon, bbox_projected, transform

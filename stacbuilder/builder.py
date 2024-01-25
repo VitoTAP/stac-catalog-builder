@@ -11,10 +11,11 @@ import shutil
 import tempfile
 from itertools import islice
 from pathlib import Path
-from typing import Any, Dict, Hashable, Iterable, List, Optional, Protocol, Union
+from typing import Any, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
 
 
 import geopandas as gpd
+from openeo.util import normalize_crs
 import pandas as pd
 import rasterio
 import rio_stac.stac as rst
@@ -32,6 +33,7 @@ from pystac.extensions.projection import ItemProjectionExtension
 # from pystac.extensions.projection import ProjectionExtension
 from pystac.extensions.raster import RasterExtension
 from stactools.core.io import ReadHrefModifier
+from stacbuilder.boundingbox import BoundingBox
 
 
 from stacbuilder.exceptions import InvalidOperation
@@ -40,11 +42,16 @@ from stacbuilder.pathparsers import (
     InputPathParserFactory,
 )
 from stacbuilder.config import AssetConfig, CollectionConfig, FileCollectorConfig
-from stacbuilder.metadata import AssetMetadata, RasterBBoxReader
+from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
+from stacbuilder.projections import reproject_bounding_box
 from stacbuilder.timezoneformat import TimezoneFormatConverter
 
 
 _logger = logging.getLogger(__name__)
+
+
+CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
+ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
 
 
 class MakeRelativeToCollection:
@@ -55,28 +62,37 @@ class MakeRelativeToCollection:
         """This method must match the signature of ReadHrefModifier.
         ReadHrefModifier is a type alias for Callable[[str], str]
         """
-        # return str(self.get_path_relative_to_collection(asset_path, self.collection_root_dir))
-        return str(asset_path.relative_to(self.data_root_dir))
-
-    # @staticmethod
-    # def get_path_relative_to_collection(asset_path: Path, collection_path: Path):
-    #     return asset_path.relative_to(collection_path)
+        return str(Path(asset_path).relative_to(self.data_root_dir))
 
 
-class CreateAssetUrl:
-    def __init__(self, url_template: str, data_root: Path) -> None:
-        self.url_template = url_template
+class ModifyAssetHref:
+    def __init__(
+        self,
+        data_root_dir: Path,
+    ) -> None:
+        self.data_root_dir = data_root_dir
+
+    def __call__(self, asset_path: str) -> str:
+        """This method must match the signature of ReadHrefModifier.
+        ReadHrefModifier is a type alias for Callable[[str], str]
+        """
+        return str(Path(asset_path).relative_to(self.data_root_dir))
+
+
+class CreateAssetUrlFromPath:
+    def __init__(self, href_template: str, data_root: Path) -> None:
+        self.url_template = href_template
         self.data_root = data_root
 
     def __call__(self, asset_path: Path) -> str:
+        """This method must match the signature of ReadHrefModifier.
+        ReadHrefModifier is a type alias for Callable[[str], str]
+        """
         return self.get_url(asset_path)
 
     def get_url(self, asset_path: Path):
         rel_path: Path = asset_path.relative_to(self.data_root)
         return self.url_template.format(str(rel_path))
-
-
-CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
 
 
 def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file: Path):
@@ -251,6 +267,9 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
         return self._item_assets_configs
 
+    def create_alternate_links(self, metadata: AssetMetadata) -> Dict[str, Any]:
+        return {"alternate": {"MEP": {"href": str(metadata.asset_path)}}}
+
     def map(self, metadata: AssetMetadata) -> Item:
         if metadata.asset_type not in self.item_assets_configs:
             error_msg = (
@@ -287,9 +306,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
-        item.add_asset(metadata.asset_type, self._create_asset(metadata))
-        item.make_asset_hrefs_relative()
-
+        item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
+        # item.make_asset_hrefs_relative()
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
         item_proj.epsg = metadata.proj_epsg
         item_proj.bbox = metadata.proj_bbox_as_list
@@ -302,15 +320,54 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # grid = GridExtension.ext(item, add_if_missing=True)
         # grid.code = f"TILE-{metadata.tile}"
 
-        RasterExtension.add_to(item)
+        # TODO: Adding the eo:bands to the item this way below breaks the validation. Find out why.
+        # EOExtension.add_to(item)
+        # item_eo = EOExtension.ext(item, add_if_missing=True)
+        # item_eo.bands = []
+        # asset_config: AssetConfig = self._assets_config_for(metadata.asset_type)
+        # eo_bands = []
+        # for band_cfg in asset_config.eo_bands:
+        #     new_band: Band = Band.create(
+        #         name = band_cfg.name,
+        #         description=band_cfg.description,
+        #     )
+        #     eo_bands.append(new_band)
+        # item_eo.apply(eo_bands)
+
         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
+        item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
 
         return item
 
-    def _create_asset(self, metadata: AssetMetadata) -> Asset:
+    def _create_asset(self, metadata: AssetMetadata, item: Item) -> Asset:
         asset_defs = self._get_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.asset_type]
-        return asset_def.create_asset(metadata.href)
+        asset: Asset = asset_def.create_asset(metadata.href)
+        asset.set_owner(item)
+
+        # TODO: add info from RasterExtension
+        # Add import at top:
+        from pystac.extensions.raster import RasterBand
+
+        asset_raster = RasterExtension.ext(asset, add_if_missing=True)
+        raster_bands = []
+
+        if metadata.raster_metadata:
+            band_md = metadata.raster_metadata.bands[0]
+            new_band: RasterBand = RasterBand.create(
+                # TODO: need to get this information via rasterio.
+                data_type=band_md.data_type,
+                nodata=band_md.nodata,
+            )
+            raster_bands.append(new_band)
+        asset_raster.apply(raster_bands)
+
+        # Add the alternate links for the Alternate-Asset extension
+        # see: https://github.com/stac-extensions/alternate-assets
+        alternate_links = self.create_alternate_links(metadata)
+        asset.extra_fields.update(alternate_links)
+
+        return asset
 
         # asset = Asset(href=make_absolute_href(metadata.href))
         # asset.title = asset_def.title
@@ -341,56 +398,58 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return asset_definitions
 
+    def _assets_config_for(self, asset_type: str) -> AssetConfig:
+        """Create AssetDefinitions, according to the config in self.item_assets_configs"""
+        if asset_type not in self.item_assets_configs:
+            return None
+        return self.item_assets_configs[asset_type]
 
-# class MapGeoTiffToSTACItem:
-#     """Extracts STAC Items from each file.
 
-#     TODO: name could be better
-#     TODO: no usages detected anywhere => confirm this and remove it
-#     """
+# TODO: Probably better to eliminate RasterBBoxReader now.
+#    Putting all rester reading code inMapGeoTiffToAssetMetadata seems better.
+class RasterBBoxReader:
+    """Reads bounding box info from a raster file format.
 
-#     def __init__(
-#             self,
-#             path_parser: InputPathParser,
-#             map_metadata_to_stac_item: IMapMetadataToSTACItem,
-#             # extract_href_info: Optional[InputPathParser] = None,
-#             href_modifier: Optional[ReadHrefModifier] = None,
-#             collection_root_path: Optional[Path] = None,
-#         ) -> None:
-#         # Store dependencies: components that have to be provided to constructor
-#         self._path_parser = path_parser
-#         self._metadata_to_stac_item = map_metadata_to_stac_item
+    TODO: this is very much unfinished untested code.
+        This is an preliminary implementation, and completely UNTESTED.
+        We want to extract all the raster reading stuff out of the module `metadata`
+        into a separate module, and this class is the start of the process.
+        It is therefore more "thinking in writing" than finished code.
+    """
 
-#         # self._extract_href_info = extract_href_info
+    @classmethod
+    def from_raster_path(cls, path: Path) -> Tuple[BoundingBox, BoundingBox, List[float]]:
+        with rasterio.open(path) as dataset:
+            return cls.from_rasterio_dataset(dataset)
 
-#         # # TODO: remove MakeRelativeToCollection as default. This is a hack to test it quickly.
-#         self._href_modifier = href_modifier or MakeRelativeToCollection(self._collection_root_path)
-#         self._collection_root_path = collection_root_path or None
+    @staticmethod
+    def from_rasterio_dataset(dataset) -> Tuple[BoundingBox, BoundingBox, List[float]]:
+        bbox_lat_lon = None
+        bbox_projected = None
+        proj_epsg = None
 
-#     def to_stac_item(self, file: Path) -> Item:
-#         """Generate the STAC Item for the specified GeoTIFF path."""
-#         metadata = self.to_metadata(file)
-#         return self._metadata_to_stac_item.map(metadata)
+        # TODO: once this works well, integrate normalize_crs into  proj_epsg
+        normalized_epsg = normalize_crs(dataset.crs)
+        if normalized_epsg is not None:
+            proj_epsg = normalized_epsg
+        elif hasattr(dataset.crs, "to_epsg"):
+            proj_epsg = dataset.crs.to_epsg()
 
-#     def to_metadata(self, file: Path) -> AssetMetadata:
-#         """Generate the intermediate Metadata for the specified GeoTIFF path."""
-#         return AssetMetadata.from_file_path(
-#             asset_path=str(file),
-#             extract_href_info=self._path_parser,
-#             read_href_modifier=self._href_modifier,
-#         )
+        if not proj_epsg:
+            proj_epsg = 4326
 
-#     def to_metadata(self, file: Path) -> AssetMetadata:
-#         """Generate the intermediate Metadata for the specified GeoTIFF path."""
-#         return AssetMetadata.from_file_path(
-#             asset_path=str(file),
-#             extract_href_info=self._path_parser,
-#             read_href_modifier=self._href_modifier,
-#         )
+        bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
 
-#     def map_all(self, files: Iterable[Path]) -> Iterable[AssetMetadata]:
-#         """Return generator the converts all files to STAC Items"""
-#         return (self.to_stac_item(file) for file in files)
+        if proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
+            bbox_lat_lon = bbox_projected
+        else:
+            west, south, east, north = bbox_projected.to_list()
+            bbox_list = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
+            bbox_lat_lon = BoundingBox.from_list(bbox_list, epsg=4326)
+
+        transform = list(dataset.transform)[0:6]
+
+        return bbox_lat_lon, bbox_projected, transform
 
 
 class MapGeoTiffToAssetMetadata:
@@ -441,9 +500,17 @@ class MapGeoTiffToAssetMetadata:
             asset_meta.tags = dataset.tags()
             bboxes_result = RasterBBoxReader.from_rasterio_dataset(dataset)
             asset_meta.bbox_lat_lon, asset_meta.bbox_projected, asset_meta.transform = bboxes_result
-            # asset_meta._bbox_list = self._bbox_lat_lon.to_list()
-            # asset_meta._proj_bbox = self._bbox_projected.to_list()
-            # asset_meta._proj_epsg = self._bbox_projected.epsg
+
+            bands = []
+            for i in range(dataset.count):
+                band_md = BandMetadata(
+                    data_type=dataset.dtypes[i],
+                    index=i,
+                    nodata=dataset.nodatavals[i],
+                )
+                bands.append(band_md)
+            raster_meta = RasterMetadata(shape=dataset.shape, tags=dataset.tags, bands=bands)
+            asset_meta.raster_metadata = raster_meta
 
         asset_meta.process_href_info()
         return asset_meta
@@ -800,7 +867,6 @@ class GeoTiffPipeline:
         path_parser: InputPathParser,
         output_dir: Path,
         overwrite: Optional[bool] = False,
-        assets_relative: Optional[bool] = False,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
@@ -934,13 +1000,9 @@ class GeoTiffPipeline:
         group: str | int | None = None,
     ) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
-        # if self._collection_builder:
-        #     # It has already been set up => skip it.
-        #     # TODO: eliminate this issue or log a warning.
-        #     # TODO: fix logging, currently no longer works.
-        #     return
 
         href_modifier = None
+
         if self._collection_config.use_relative_asset_paths:
             href_modifier = MakeRelativeToCollection(data_root_dir=self._file_collector.input_dir)
 
@@ -968,7 +1030,6 @@ class GeoTiffPipeline:
         print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._collection_groups = {}
-        # self._collection_builder.reset()
         self._file_collector.reset()
 
     def get_input_files(self) -> Iterable[Path]:
@@ -982,11 +1043,6 @@ class GeoTiffPipeline:
     def get_metadata(self) -> Iterable[AssetMetadata]:
         """Generate the intermediate metadata objects, from the input files."""
         for file in self.get_input_files():
-            # yield AssetMetadata.from_file_path(
-            #     asset_path=str(file),
-            #     extract_href_info=self._path_parser,
-            #     read_href_modifier=None,
-            # )
             yield self._geotiff_to_metadata_mapper.to_metadata(file)
 
     @property
@@ -1012,11 +1068,6 @@ class GeoTiffPipeline:
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
         for file in self.get_input_files():
-            # metadata = AssetMetadata.from_file_path(
-            #     asset_path=str(file),
-            #     extract_href_info=self._path_parser,
-            #     read_href_modifier=None,
-            # )
             metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
 
             # TODO: implement grouping of several assets that belong to one item, here.
@@ -1025,6 +1076,7 @@ class GeoTiffPipeline:
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
+                stac_item.validate()
                 yield stac_item
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:

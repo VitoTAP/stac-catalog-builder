@@ -109,6 +109,8 @@ class AssetConfig(BaseModel):
                 "type": self.media_type,
                 "title": self.title,
                 "description": self.description,
+                # TODO: Switch to EOExtension to add eo:bands in the correct way.
+                #   Our content for eo:bands is no 10% standard: data_type belongs in raster:bands.
                 "eo:bands": bands,
                 "roles": self.roles,
             }
