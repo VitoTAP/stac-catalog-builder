@@ -1271,6 +1271,9 @@ class GeodataframeExporter:
     @classmethod
     def export_item_bboxes(cls, collection: Collection):
         out_dir: Path = cls.visualization_dir(collection)
+        if not out_dir.exists():
+            out_dir.mkdir(parents=True)
+
         items = collection.get_all_items()
         gdf: gpd.GeoDataFrame = cls.stac_items_to_geodataframe(items)
         cls.save_geodataframe(gdf, out_dir, "stac_item_bboxes")
@@ -1292,7 +1295,7 @@ class GeodataframeExporter:
 # ##############################################################################
 
 
-class CommandsNewPipeline:
+class CLICommands:
     """Putting the new versions of the command under this class for now to
     make switching between old and new easier for testing the conversion.
     This is temporary. Going to move the commands to a separate module.
@@ -1323,11 +1326,6 @@ class CommandsNewPipeline:
         if save_dataframe:
             GeodataframeExporter.export_item_bboxes(pipeline.collection)
 
-        # if save_dataframe:
-        #     df = pipeline.get_metadata_as_geodataframe()
-        #     out_dir = Path("tmp/visualization") / coll_cfg.collection_id
-        #     _save_geodataframe(df, out_dir, "metadata_table")
-
     @staticmethod
     def build_grouped_collections(
         collection_config_path: Path,
@@ -1336,7 +1334,7 @@ class CommandsNewPipeline:
         output_dir: Path,
         overwrite: bool,
         max_files: Optional[int] = -1,
-        # save_dataframe: Optional[bool] = False,
+        save_dataframe: Optional[bool] = False,
     ):
         collection_config_path = Path(collection_config_path).expanduser().absolute()
         coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -1350,10 +1348,9 @@ class CommandsNewPipeline:
 
         pipeline.build_grouped_collections()
 
-        # if save_dataframe:
-        #     df = pipeline.get_metadata_as_geodataframe()
-        #     out_dir = Path("tmp/visualization") / coll_cfg.collection_id
-        #     _save_geodataframe(df, out_dir, "metadata_table")
+        if save_dataframe:
+            for collection in pipeline.collection_groups.values():
+                GeodataframeExporter.export_item_bboxes(collection)
 
     @staticmethod
     def extract_item_bboxes(collection_file: Path):
@@ -1379,12 +1376,12 @@ class CommandsNewPipeline:
             print(file)
 
     @staticmethod
-    def list_metadata(
+    def list_asset_metadata(
         collection_config_path: Path,
         glob: str,
         input_dir: Path,
         max_files: Optional[int] = -1,
-        save_dataframe: bool = True,
+        save_dataframe: bool = False,
     ):
         """Build a STAC collection from a directory of geotiff files."""
 
@@ -1410,7 +1407,8 @@ class CommandsNewPipeline:
 
         if save_dataframe:
             df = pipeline.get_metadata_as_geodataframe()
-            out_dir = Path("tmp/visualization") / coll_cfg.collection_id
+            # TODO: Want better directory to save geodata, maybe use save_dataframe as path instead of flag.
+            out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-assetmetadata"
             GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
 
     @staticmethod
@@ -1419,7 +1417,7 @@ class CommandsNewPipeline:
         glob: str,
         input_dir: Path,
         max_files: Optional[int] = -1,
-        save_dataframe: bool = True,
+        save_dataframe: bool = False,
     ):
         """Build a STAC collection from a directory of geotiff files."""
 
@@ -1447,7 +1445,8 @@ class CommandsNewPipeline:
 
         if save_dataframe:
             df = pipeline.get_stac_items_as_geodataframe()
-            out_dir = Path("tmp/visualization") / coll_cfg.collection_id
+            # TODO: Want better directory to save geodata, maybe use save_dataframe as path instead of flag.
+            out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-stac-items"
             GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
 
     @staticmethod

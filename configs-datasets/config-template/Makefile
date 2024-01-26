@@ -401,13 +401,13 @@ ls-test-out:
 
 .PHONY: ls-publish-dir
 ls-publish-dir:
-## List the files in the test pulbish directory.
+## List the files in the test publish directory.
 	ls -la $(PUBLISH_DIR)
 
 
 .PHONY: ls-test-openeo
 ls-test-openeo:
-## List the files in the test pulbish directory.
+## List the files in the test publish directory.
 	ls -la $(TEST_OPENEO_DIR)
 
 

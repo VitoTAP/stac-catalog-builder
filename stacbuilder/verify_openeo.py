@@ -383,6 +383,7 @@ def verify_in_openeo(
 
         out_path = job.download_results(output_dir)
         print(f"{out_path=}")
+        get_logs(job, job_log_file)
 
     print("DONE")
 

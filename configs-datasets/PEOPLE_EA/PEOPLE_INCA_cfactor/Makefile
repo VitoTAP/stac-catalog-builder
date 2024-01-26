@@ -264,7 +264,6 @@ list-metadata:
 		$(TIFF_INPUT_DIR)
 
 
-
 .PHONY: list-items
 list-items:
 ## For each tiff file, show what the STAC Item looks like.
@@ -289,17 +288,6 @@ validate:
 ## Validate the contents of the STAC collection file.
 	$(PYTHON) stacbuilder validate "$(TEST_OUTPUT_DIR)/collection.json"
 
-
-.PHONY: profile-validate
-profile-validate:
-## Profile the validation, large collections take surprisingly long.
-	$(PYTHON) -m cProfile -o stacbuilder-validate.stats stacbuilder/__main__.py validate "$(TEST_OUTPUT_DIR)/collection.json"
-
-
-.PHONY: profile-loadcollection
-profile-loadcollection:
-## Profile loading (showing) a collection, large collections take surprisingly long.
-	$(PYTHON) -m cProfile -o stacbuilder-show-collection.stats stacbuilder/__main__.py show-collection "$(TEST_OUTPUT_DIR)/collection.json"
 
 
 .PHONY: test-openeo
@@ -386,13 +374,13 @@ ls-test-out:
 
 .PHONY: ls-publish-dir
 ls-publish-dir:
-## List the files in the test pulbish directory.
+## List the files in the test publish directory.
 	ls -la $(PUBLISH_DIR)
 
 
 .PHONY: ls-test-openeo
 ls-test-openeo:
-## List the files in the test pulbish directory.
+## List the files in the test publish directory.
 	ls -la $(TEST_OPENEO_DIR)
 
 

@@ -130,12 +130,13 @@ class RasterBandConfig(BaseModel):
     )
     # TODO: maybe use a numpy type or make an Enum for data_type
     data_type: Optional[str] = Field(
+        default=None,
         description=(
             "The data type of the pixels in the band. "
             + "One of the data types as described in this section of the "
             + "Raster Extension's README : "
             + "https://github.com/stac-extensions/raster#data-types"
-        )
+        ),
     )
 
     sampling: Optional[str] = Field(
@@ -281,3 +282,15 @@ class CollectionConfig(BaseModel):
         cfg_path = Path(path)
         contents = cfg_path.read_text()
         return cls.from_json_str(contents)
+
+
+class GeotTIFFPipelineConfig(BaseModel):
+    collection_config: CollectionConfig
+    input_files_config: FileCollectorConfig
+    output_dir: Path
+
+
+class OpenSearchPipelineConfig(BaseModel):
+    collection_config: CollectionConfig
+    # ??? Don't know yet what setup we need to connect to OpenSearch and ingest this input.
+    output_dir: Path

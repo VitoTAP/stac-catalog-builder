@@ -23,6 +23,10 @@ from terracatalogueclient.config import CatalogueConfig
 from terracatalogueclient.config import CatalogueEnvironment
 
 
+from stacbuilder.metadata import AssetMetadata
+from stacbuilder.boundingbox import BoundingBox
+
+
 def show_collections(catalogue: tcc.Catalogue):
     # make sure to retrieve config for the HRVPP catalogue
     collections = list(catalogue.get_collections())
@@ -242,6 +246,67 @@ def create_stac_item(product: tcc.Product) -> pystac.Item:
     #         alternates (List[ProductFile]) – metadata description in an alternative format
 
 
+def collect_products_to_dataframe(catalogue, collection: tcc.Collection) -> pd.DataFrame:
+    num_prods = catalogue.get_product_count(collection.id)
+    pprint(f"product count for coll_id{collection.id}: {num_prods}")
+
+    dt_start, dt_end = get_coll_temporal_extent(collection)
+    dt_range_years = pd.date_range(dt_start, dt_end, freq="YS")
+    dt_range_months = pd.date_range(dt_start, dt_end, freq="MS")
+
+    pprint(dt_range_years)
+    pprint(dt_range_months)
+
+    slot_start = dt_range_months[0]
+    for i, slot_start in enumerate(dt_range_months[:-1]):
+        slot_end = dt_range_months[i + 1]
+
+        count = catalogue.get_product_count(
+            collection.id,
+            start=slot_start,
+            end=slot_end,
+        )
+        print(f"from {slot_start} to {slot_end}: num products: {count}")
+
+        products = catalogue.get_products(collection.id, start=slot_start, end=slot_end)
+        for product in products:
+            print(product.title)
+            pprint(product.properties)
+
+            asset_metadata = create_asset_metadata(product)
+            pprint(asset_metadata.to_dict())
+            breakpoint()
+
+            break
+
+        if i > 3:
+            break
+
+
+def create_asset_metadata(product: tcc.Product) -> pystac.Item:
+    data_links = product.properties.get("links", {}).get("data", [])
+    href = data_links[0].get("href") if data_links else None
+
+    # In this case we should get the title and description from the source in
+    # opensearch rather than our own collecton config file
+    # TODO: Add title + description to AssetMetadata, or some other intermediate for STAC items.
+    # title = product.title
+    # description = product.title
+    product_type = product.properties["productInformation"]["productType"]
+
+    asset_metadata = AssetMetadata()
+    asset_metadata.asset_id = product.id
+    asset_metadata.asset_type = product_type
+
+    asset_metadata.href = href
+    asset_metadata.original_href = href
+    asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=4326)
+    asset_metadata.datetime = product.beginningDateTime
+    asset_metadata.start_datetime = product.beginningDateTime
+    asset_metadata.end_datetime = product.endingDateTime
+    return asset_metadata
+
+
 def main():
     config = CatalogueConfig.from_environment(CatalogueEnvironment.HRVPP)
     catalogue = tcc.Catalogue(config)
@@ -256,12 +321,9 @@ def main():
     # pprint(coll)
     # pprint(dir(coll))
 
-    list_products(catalogue, coll)
+    # list_products(catalogue, coll)
 
-    # ---
-    # df = collections_to_dataframe(catalogue)
-
-    # pprint(df)
+    collect_products_to_dataframe(catalogue, coll)
 
 
 if __name__ == "__main__":

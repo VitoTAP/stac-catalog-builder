@@ -24,7 +24,7 @@ from pystac.collection import Collection
 
 from stacbuilder.builder import (
     GeoTiffPipeline,
-    CommandsNewPipeline,
+    CLICommands,
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
 
@@ -42,6 +42,16 @@ def collection_config_from_file(collection_config_path: Path) -> CollectionConfi
 @pytest.fixture
 def file_collector_config(geotiff_input_dir: Path) -> FileCollectorConfig:
     return FileCollectorConfig(input_dir=geotiff_input_dir, glob="*/*.tif")
+
+
+@pytest.fixture
+def collection_output_dir(tmp_path) -> Path:
+    return tmp_path / "collection-no-groups"
+
+
+@pytest.fixture
+def grouped_collection_output_dir(tmp_path) -> Path:
+    return tmp_path / "collections-per-group"
 
 
 @pytest.fixture
@@ -263,12 +273,29 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.build_collection(
+        CLICommands.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
             overwrite=True,
+            save_dataframe=True,
+        )
+        # TODO: how to verify the output? For now this is just a smoke test.
+        #   The underlying functionality can actually be tested more directly.
+
+    def test_command_build_grouped_collections(self, data_dir, tmp_path):
+        config_file = data_dir / "config/config-test-collection.json"
+        input_dir = data_dir / "geotiff/mock-geotiffs"
+        output_dir = tmp_path / "out-mock-geotiffs"
+
+        CLICommands.build_grouped_collections(
+            collection_config_path=config_file,
+            glob="*/*.tif",
+            input_dir=input_dir,
+            output_dir=output_dir,
+            overwrite=True,
+            save_dataframe=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
@@ -279,7 +306,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.build_collection(
+        CLICommands.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -292,21 +319,21 @@ class TestCommandAPI:
     def command_list_input_files(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        CLICommands.list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
-    def test_command_list_metadata(self, data_dir):
+    def test_command_list_asset_metadata(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.list_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        CLICommands.list_asset_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
     def test_command_list_items(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        CommandsNewPipeline.list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        CLICommands.list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
@@ -315,7 +342,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.build_collection(
+        CLICommands.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -323,7 +350,7 @@ class TestCommandAPI:
             overwrite=True,
         )
         collection_file = output_dir / "collection.json"
-        CommandsNewPipeline.load_collection(collection_file=collection_file)
+        CLICommands.load_collection(collection_file=collection_file)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
@@ -332,7 +359,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.build_collection(
+        CLICommands.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -340,7 +367,7 @@ class TestCommandAPI:
             overwrite=True,
         )
         collection_file = output_dir / "collection.json"
-        CommandsNewPipeline.validate_collection(collection_file=collection_file)
+        CLICommands.validate_collection(collection_file=collection_file)
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
 
@@ -349,7 +376,7 @@ class TestCommandAPI:
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
 
-        CommandsNewPipeline.build_collection(
+        CLICommands.build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
@@ -359,7 +386,7 @@ class TestCommandAPI:
         collection_file = output_dir / "collection.json"
         post_proc_dir = tmp_path / "post-processed"
 
-        CommandsNewPipeline.postprocess_collection(
+        CLICommands.postprocess_collection(
             collection_file=collection_file, collection_config_path=config_file, output_dir=post_proc_dir
         )
         # TODO: how to verify the output? For now this is just a smoke test.
