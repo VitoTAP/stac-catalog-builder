@@ -54,24 +54,10 @@ CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0
 ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
 
 
-class ModifyAssetHref:
-    def __init__(
-        self,
-        data_root_dir: Path,
-    ) -> None:
-        self.data_root_dir = data_root_dir
-
-    def __call__(self, asset_path: str) -> str:
-        """This method must match the signature of ReadHrefModifier.
-        ReadHrefModifier is a type alias for Callable[[str], str]
-        """
-        return str(Path(asset_path).relative_to(self.data_root_dir))
-
-
 class CreateAssetUrlFromPath:
     def __init__(self, href_template: str, data_root: Path) -> None:
         self.url_template = href_template
-        self.data_root = data_root
+        self.data_root = Path(data_root)
 
     def __call__(self, asset_path: Path) -> str:
         """This method must match the signature of ReadHrefModifier.
@@ -342,8 +328,9 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         raster_bands = []
 
         if metadata.raster_metadata:
-            # TODO: HACK: making assumptions here that each bans in the raster appear in the same order as in our config.
-            #    Would be better if we could identify the band by name.
+            # TODO: HACK: making assumptions here that each band in the raster appears in the same order as in our config.
+            #   Would be better if we could identify the band by name,
+            #   but the raster metadata may not even have any band names.
             if not asset_config.raster_bands:
                 # There is no information to fill in default values for raster:bands
                 # Just fill in what we do have.
@@ -1044,6 +1031,11 @@ class GeoTiffPipeline:
 
         # TODO: implement href modified that translates file path to a URL with a configurable base URL
         href_modifier = None
+        cfg_href_modifier = self._collection_config.asset_href_modifier
+        if cfg_href_modifier:
+            href_modifier = CreateAssetUrlFromPath(
+                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
+            )
 
         self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
             path_parser=self._path_parser, href_modifier=href_modifier

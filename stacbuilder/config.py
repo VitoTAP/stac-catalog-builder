@@ -41,8 +41,11 @@ class ProviderModel(BaseModel):
 
 
 class InputPathParserConfig(BaseModel):
-    """Configuration for InputPathParser,
-    which parse the paths of input files to extract metadata from the path.
+    """Configuration for the InputPathParser,
+    which parses the paths of input files to extract metadata from the path.
+
+    Which class to instantiate, and optionally, which parameters to pass to
+    its constructor.
     """
 
     classname: str
@@ -50,7 +53,11 @@ class InputPathParserConfig(BaseModel):
 
 
 class ItemConfig(BaseModel):
-    """Configuration for fixed-value fields of STAC items."""
+    """Configuration for fixed-value fields of STAC items.
+
+    This is mainly intended for fields that we can not automatically extract
+    from the raster/source data.
+    """
 
     description: str
 
@@ -91,6 +98,11 @@ class EOBandConfig(BaseModel):
 
 
 class SamplingType(enum.StrEnum):
+    """Choices for the value of `sampling` in the RasterBand object of the Raster STAC extension
+
+    This is used in `RasterBandConfig`, the configuration class for raster:band values.
+    """
+
     AREA = "area"
     POINT = "point"
 
@@ -99,23 +111,10 @@ class SamplingType(enum.StrEnum):
 
 
 class RasterBandConfig(BaseModel):
-    """Default values for the Raster Band Object from the Raster extension
+    """Default values for the Raster Band Object from the Raster extension,
+    i.e. the raster:band section in a STAC asset.
 
     See also: https://github.com/stac-extensions/raster
-
-    When specifying a raster band object at asset level, it is recommended to use the projection extension to specify information about the raster projection, especially proj:shape to specify the height and width of the raster.
-
-    Field Name 	Type 	Description
-    nodata 	number|string 	Pixel values used to identify pixels that are nodata in the band either by the pixel value as a number or nan, inf or -inf (all strings).
-    sampling 	string 	One of area or point. Indicates whether a pixel value should be assumed to represent a sampling over the region of the pixel or a point sample at the center of the pixel.
-    data_type 	string 	The data type of the pixels in the band. One of the data types as described below.
-    bits_per_sample 	number 	The actual number of bits used for this band. Normally only present when the number of bits is non-standard for the datatype, such as when a 1 bit TIFF is represented as byte.
-    spatial_resolution 	number 	Average spatial resolution (in meters) of the pixels in the band.
-    statistics 	Statistics Object 	Statistics of all the pixels in the band.
-    unit 	string 	Unit denomination of the pixel value.
-    scale 	number 	Multiplicator factor of the pixel value to transform into the value (i.e. translate digital number to reflectance).
-    offset 	number 	Number to be added to the pixel value (after scaling) to transform into the value (i.e. translate digital number to reflectance).
-    histogram 	Histogram Object 	Histogram distribution information of the pixels values in the band.
     """
 
     # not part of the extension but we need a a way to identify the band
@@ -124,28 +123,66 @@ class RasterBandConfig(BaseModel):
     # TODO: how do we store NaN in JSON?
     nodata: Optional[Union[int, float, str]] = Field(
         default=None,
-        description='What value is used to represent "NO DATA" in the raster',
+        description=(
+            "Pixel values used to identify pixels that are nodata in the band "
+            + "either by the pixel value as a number or nan, inf or -inf (all strings).",
+        ),
     )
     # TODO: maybe use a numpy type or make an Enum for data_type
-    data_type: Optional[str] = Field(description="which data type this raster band has, use the same names as numpy.")
+    data_type: Optional[str] = Field(
+        description=(
+            "The data type of the pixels in the band. "
+            + "One of the data types as described in this section of the "
+            + "Raster Extension's README : "
+            + "https://github.com/stac-extensions/raster#data-types"
+        )
+    )
 
-    # TODO: check what were the other allowed values for `sampling`.
     sampling: Optional[str] = Field(
-        default=SamplingType.AREA, description="Whether sampling is `area` or `point`", type=SamplingType
+        default=SamplingType.AREA,
+        description=(
+            "One of area or point. "
+            + "Indicates whether a pixel value should be assumed to represent a sampling "
+            + "over the region of the pixel or a point sample at the center of the pixel."
+        ),
+        type=SamplingType,
     )
 
     # TODO: bits_per_sample
-
-    spatial_resolution: Optional[int] = Field(
-        default=None, description="Spatial resolution, usually in meter, but possibly in degrees, depending on the CRS."
+    bits_per_sample: Optional[int] = Field(
+        default=None,
+        description=(
+            "The actual number of bits used for this band. "
+            + "Normally only present when the number of bits is non-standard for "
+            + "the datatype, such as when a 1 bit TIFF is represented as byte."
+        ),
     )
 
-    unit: Optional[str] = None
-    scale: Optional[float] = None
-    offset: Optional[float] = None
+    spatial_resolution: Optional[int] = Field(
+        default=None, description="Average spatial resolution (in meters) of the pixels in the band."
+    )
+
+    unit: Optional[str] = Field(default=None, description="Unit denomination of the pixel value.")
+    scale: Optional[Union[float, int]] = Field(
+        default=None,
+        description=(
+            "Multiplicator factor of the pixel value to transform into the value "
+            + "(i.e. translate digital number to reflectance)."
+        ),
+    )
+    offset: Optional[Union[float, int]] = Field(
+        default=None,
+        description=(
+            "Number to be added to the pixel value (after scaling) to transform "
+            + "into the value (i.e. translate digital number to reflectance)."
+        ),
+    )
 
     # statistics and histogram: Can not define defaults for these fields
     #   They have to be read from the raster, with rasterio.
+    # Excerpt from Raster extension's docs:
+    # - statistics 	Statistics Object 	Statistics of all the pixels in the band.
+    # - histogram 	Histogram Object 	Histogram distribution information of the pixels values in the band.
 
 
 class AssetConfig(BaseModel):
@@ -189,6 +226,11 @@ class FileCollectorConfig(BaseModel):
     max_files: int = -1
 
 
+class AssetHrefModifierConfig(BaseModel):
+    url_template: str
+    data_root: str
+
+
 class CollectionConfig(BaseModel):
     """Model, store configuration of a STAC collection"""
 
@@ -212,6 +254,8 @@ class CollectionConfig(BaseModel):
 
     # Defines what assets items have, and what bands the assets contain.
     item_assets: Optional[Dict[str, AssetConfig]] = {}
+
+    asset_href_modifier: Optional[AssetHrefModifierConfig] = None
 
     # TODO: links (urls)
 
