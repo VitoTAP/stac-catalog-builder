@@ -241,7 +241,7 @@ def verify_in_openeo(
     collection_path: Union[str, Path],
     output_dir: Union[str, Path],
     backend_url: Optional[str] = None,
-    max_spatial_ext_size: float = 0.1,
+    max_spatial_ext_size: float = None,
     bbox: Optional[Union[List[float], Dict[str, float]]] = None,
     epsg: Optional[int] = 4326,
     start_datetime: Optional[dt.datetime] = None,
@@ -307,7 +307,8 @@ def verify_in_openeo(
         proj_bbox, proj_epsg = find_proj_bbox(collection)
         west, south, east, north = proj_bbox[:4]
 
-    west, south, east, north = limit_spatial_extent(west, south, east, north, max_range=max_spatial_ext_size)
+    if max_spatial_ext_size:
+        west, south, east, north = limit_spatial_extent(west, south, east, north, max_range=max_spatial_ext_size)
     print(f"final spatial extent for filtering: {[west, south, east, north]}, {proj_epsg=}")
 
     abort = False

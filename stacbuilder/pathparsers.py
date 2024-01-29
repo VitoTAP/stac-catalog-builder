@@ -205,7 +205,7 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
             "day": int,
         }
         regex_pattern = ".*/PEOPLE_INCA_c-factor_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2}).*\\.tif$"
-        fixed_values = {"band": "cfactor"}
+        fixed_values = {"asset_type": "cfactor"}
         super().__init__(
             regex_pattern=regex_pattern, type_converters=type_converters, fixed_values=fixed_values, *args, **kwargs
         )
@@ -221,7 +221,6 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
         year = self._data.get("year")
         month = self._data.get("month")
         day = self._data.get("day")
-        print(f"DEBUG: {year=}, {month=}, {day=}, {self._data=}, {self._path=}")
 
         if not (year and month and day):
             print(
@@ -246,6 +245,15 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
 
 
 class ERA5LandInputPathParser(RegexInputPathParser):
+    """Path parser for 2 datasets:
+    reanalysis-era5-land_southafrica and
+    ERA5-Land-monthly-averaged-data-v2
+
+    See also:
+        configs-datasets/ANIN/reanalysis-era5-land_southafrica
+        configs-datasets/ANIN/reanalysis-era5-land_southafrica
+    """
+
     def __init__(self, *args, **kwargs) -> None:
         type_converters = {
             "year": int,
@@ -269,40 +277,3 @@ class ERA5LandInputPathParser(RegexInputPathParser):
         month = start_dt.month
         end_month = calendar.monthrange(year, month)[1]
         return dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
-
-
-class ANINPathParser(InputPathParser):
-    # TODO: Seems like this is deprecated, check and remove it.
-    def parse(self, input_file: Path) -> Dict[str, Any]:
-        #
-        # Example:
-        #
-        # filename:  reanalysis-era5-land-monthly-means_2m_temperature_monthly_19800101.tif
-        # root: reanalysis-era5-land-monthly-means_2m_temperature_monthly_19800101
-        # item_id is same as root
-        # start_date = 1980-01-01
-        # start_datetime = 1980-01-01T00:00:00Z
-        # end_datetime = last second of the end of the month
-
-        input_file = Path(input_file)
-        root = input_file.stem
-        file_parts = root.split("_")
-        band = "_".join(file_parts[1:4])
-
-        date_string = file_parts[-1]
-        year = int(date_string[0:4])
-        month = int(date_string[4:6])
-        day = int(date_string[6:8])
-        start_datetime = dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
-        end_month = calendar.monthrange(year, month)[1]
-        end_datetime = dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
-
-        info = {}
-        info["item_id"] = root
-        info["datetime"] = start_datetime
-        info["start_datetime"] = start_datetime
-        info["end_datetime"] = end_datetime
-        info["band"] = band
-        info["item_type"] = band
-
-        return info

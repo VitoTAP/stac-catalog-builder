@@ -336,9 +336,9 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
                 # Just fill in what we do have.
                 for band_md in metadata.raster_metadata.bands:
                     new_band: RasterBand = RasterBand.create(
-                        # TODO: need to get this information via rasterio.
                         data_type=band_md.data_type,
                         nodata=band_md.nodata,
+                        unit=band_md.units,
                     )
                     raster_bands.append(new_band)
             else:
@@ -347,9 +347,10 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
                     band_md = metadata.raster_metadata.bands[i]
 
                     new_band: RasterBand = RasterBand.create(
-                        # TODO: need to get this information via rasterio.
+                        # TODO: need to get this information via rasterio as much as possible.
                         data_type=band_md.data_type or raster_bands_config.data_type,
                         nodata=band_md.nodata or raster_bands_config.nodata,
+                        unit=band_md.units or raster_bands_config.unit,
                     )
                     if raster_bands_config.sampling is not None:
                         new_band.sampling = raster_bands_config.sampling.__str__()
@@ -361,8 +362,9 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
                     if raster_bands_config.spatial_resolution is not None:
                         new_band.spatial_resolution = raster_bands_config.spatial_resolution
-                    if raster_bands_config.unit is not None:
-                        new_band.unit = raster_bands_config.unit
+
+                    # if not new_band.unit and raster_bands_config.unit is not None:
+                    #     new_band.unit = raster_bands_config.unit
 
                     raster_bands.append(new_band)
 
@@ -500,19 +502,20 @@ class MapGeoTiffToAssetMetadata:
 
         with rasterio.open(asset_path) as dataset:
             asset_meta.shape = dataset.shape
-            asset_meta.tags = dataset.tags()
             bboxes_result = RasterBBoxReader.from_rasterio_dataset(dataset)
             asset_meta.bbox_lat_lon, asset_meta.bbox_projected, asset_meta.transform = bboxes_result
 
             bands = []
+            tags = dataset.tags() or {}
+            units = tags.get("units")
             for i in range(dataset.count):
-                band_md = BandMetadata(
-                    data_type=dataset.dtypes[i],
-                    index=i,
-                    nodata=dataset.nodatavals[i],
-                )
+                # TODO: if tags contains unit, add the unit
+                band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
                 bands.append(band_md)
-            raster_meta = RasterMetadata(shape=dataset.shape, tags=dataset.tags, bands=bands)
+            raster_meta = RasterMetadata(shape=dataset.shape, bands=bands)
+            # TODO: Decide: do we really need the raster tags. If so, where is the best place to store them.
+            asset_meta.tags = dataset.tags()
+            # TODO: currently there are two places to store tags. That is confusing, pick one.
             asset_meta.raster_metadata = raster_meta
 
         asset_meta.process_href_info()
@@ -1155,6 +1158,267 @@ class GeoTiffPipeline:
             coll_file = self._collection_builder.collection_file
             post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
             post_processor.process_collection(coll_file)
+
+
+class HRLVPPMetadataCollector(IMetadataCollector):
+    def __init__(self):
+        super().__init__()
+
+    def collect(self):
+        pass
+
+
+class AssetMetadataPipeline:
+    """Converts AssetMetadata to STAC collections."""
+
+    def __init__(
+        self,
+        metadata_collector: IMetadataCollector,
+        output_dir: Path,
+        overwrite: Optional[bool] = False,
+    ) -> None:
+        # Components / dependencies that must be provided
+        self._metadata_collector: IMetadataCollector = metadata_collector
+
+        # Settings: these are just data, not components we delegate work to.
+        self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
+        self._collection_dir: Path = None
+        self._overwrite: bool = overwrite
+
+        # Components / dependencies that we set up internally
+        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
+        self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
+        self._metadata_group_creator: IGroupMetadataBy = None
+
+        self._collection_builder: STACCollectionBuilder = None
+
+        # results
+        self._collection: Optional[Collection] = None
+        self._collection_groups: Dict[Hashable, Collection] = {}
+
+    @property
+    def collection(self) -> Collection | None:
+        return self._collection
+
+    @property
+    def collection_file(self) -> Path | None:
+        if not self.collection:
+            return None
+
+        return Path(self.collection.self_href)
+
+    @property
+    def collection_groups(self) -> Dict[Hashable, Collection] | None:
+        return self._collection_groups
+
+    @property
+    def collection_config(self) -> CollectionConfig:
+        return self._collection_config
+
+    @property
+    def item_assets_configs(self) -> Dict[str, AssetConfig]:
+        return self._collection_config.item_assets or {}
+
+    @property
+    def collection_builder(self) -> STACCollectionBuilder:
+        return self._collection_builder
+
+    @property
+    def file_collector(self) -> FileCollector:
+        return self._file_collector
+
+    @property
+    def path_parser(self) -> InputPathParser:
+        return self._path_parser
+
+    @property
+    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
+        return self._geotiff_to_metadata_mapper
+
+    @property
+    def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
+        return self._meta_to_stac_item_mapper
+
+    @staticmethod
+    def from_config(
+        collection_config: CollectionConfig,
+        output_dir: Optional[Path] = None,
+        overwrite: Optional[bool] = False,
+    ) -> "GeoTiffPipeline":
+        """Creates a GeoTiffPipeline from configurations.
+
+        We want the two configuration objects to remain separate, because one is the
+        general collection configuration which is typically read from a JSON file
+        and the other defines what paths to read from and write too.
+        Especially the options about output path can change a lot so these are
+        specified via CLI options.
+
+        For example they can be different for testing versus for final output,
+        and each user would typically work in their own home or user data folders
+        for test output.
+
+        Also we do not want to mix these (volatile) path settings with the
+        stable/fixed settings in the general config file.
+        """
+        pipeline = GeoTiffPipeline(None, None, None, None)
+        pipeline.setup(
+            collection_config=collection_config,
+            output_dir=output_dir,
+            overwrite=overwrite,
+        )
+        return pipeline
+
+    def setup(
+        self,
+        collection_config: CollectionConfig,
+        output_dir: Optional[Path] = None,
+        overwrite: Optional[bool] = False,
+    ) -> None:
+        # Settings: these are just data, not components we delegate work to.
+        if collection_config is None:
+            raise ValueError('Argument "input_path_parser" can not be None, must be a CollectionConfig instance.')
+
+        self._collection_config = collection_config
+        self._output_base_dir = GeoTiffPipeline._get_output_dir_or_default(output_dir)
+        self._overwrite = overwrite
+
+        self._setup_internals()
+
+    @staticmethod
+    def _get_output_dir_or_default(output_dir: Path | str | None) -> Path:
+        return Path(output_dir) if output_dir else Path(tempfile.gettempdir())
+
+    def _setup_internals(
+        self,
+        # group: str | int | None = None,
+    ) -> None:
+        """Setup the internal components based on the components that we receive via dependency injection."""
+
+        # TODO: implement href modified that translates file path to a URL with a configurable base URL
+        href_modifier = None
+        cfg_href_modifier = self._collection_config.asset_href_modifier
+        if cfg_href_modifier:
+            href_modifier = CreateAssetUrlFromPath(
+                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
+            )
+
+        self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
+            path_parser=self._path_parser, href_modifier=href_modifier
+        )
+        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
+        self._metadata_group_creator = GroupMetadataByYear()
+
+        # if group and not self.has_grouping:
+        #     raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
+
+        # if group:
+        #     self._collection_dir = self.get_collection_file_for_group(group)
+        # else:
+        #     self._collection_dir = self._output_base_dir
+
+        self._collection_builder = STACCollectionBuilder(
+            collection_config=self._collection_config,
+            overwrite=self._overwrite,
+            output_dir=self._collection_dir,
+        )
+
+    def reset(self) -> None:
+        print(f"resetting {self.__class__.__name__} instance: {self}")
+        self._collection = None
+        self._collection_groups = {}
+
+    # def get_input_files(self) -> Iterable[Path]:
+    #     """Collect the input files for processing."""
+    #     if not self._file_collector.has_collected():
+    #         self._file_collector.collect()
+
+    #     for file in self._file_collector.input_files:
+    #         yield file
+
+    def get_metadata(self) -> Iterable[AssetMetadata]:
+        """Generate the intermediate metadata objects, from the input files."""
+        for file in self.get_input_files():
+            yield self._geotiff_to_metadata_mapper.to_metadata(file)
+
+    # @property
+    # def has_grouping(self):
+    #     return self._metadata_group_creator is not None
+
+    # def get_metadata_groups(self) -> Dict[Hashable, List[AssetMetadata]]:
+    #     if not self.has_grouping:
+    #         return None
+    #     return self._metadata_group_creator.group_by(self.get_metadata())
+
+    # def get_item_groups(self) -> Dict[Hashable, List[Item]]:
+    #     if not self.has_grouping:
+    #         return None
+
+    #     group_to_stac_items = {}
+    #     for group, list_metadata in self.get_metadata_groups().items():
+    #         list_items = list(self._meta_to_stac_item_mapper.map_all(list_metadata))
+    #         group_to_stac_items[group] = list_items
+
+    #     return group_to_stac_items
+
+    def collect_stac_items(self):
+        """Generate the intermediate STAC Item objects."""
+        for file in self.get_input_files():
+            metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
+
+            # TODO: implement grouping of several assets that belong to one item, here.
+
+            stac_item = self._meta_to_stac_item_mapper.map(metadata)
+            # Ignore the asset when the file was not a known asset type, for example it is
+            # not a GeoTIFF or it is not one of the assets or bands we want to include.
+            if stac_item:
+                stac_item.validate()
+                yield stac_item
+
+    def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
+        """Return a GeoDataFrame representing the intermediate metadata."""
+        return GeodataframeExporter.metadata_to_geodataframe(list(self.get_metadata()))
+
+    def get_metadata_as_dataframe(self) -> pd.DataFrame:
+        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
+        return GeodataframeExporter.metadata_to_dataframe(list(self.get_metadata()))
+
+    def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
+        """Return a GeoDataFrame representing the STAC Items."""
+        return GeodataframeExporter.stac_items_to_geodataframe(list(self.collect_stac_items()))
+
+    def get_stac_items_as_dataframe(self) -> pd.DataFrame:
+        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
+        return GeodataframeExporter.stac_items_to_dataframe(list(self.collect_stac_items()))
+
+    def build_collection(self):
+        """Build the entire STAC collection."""
+        self.reset()
+
+        self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection = self._collection_builder.collection
+
+        coll_file = self._collection_builder.collection_file
+        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        post_processor.process_collection(coll_file)
+
+    # def get_collection_file_for_group(self, group: str | int):
+    #     return self._output_base_dir / str(group)
+
+    # def build_grouped_collections(self):
+    #     self.reset()
+
+    #     if not self.has_grouping:
+    #         raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
+
+    #     for group, metadata_list in sorted(self.get_item_groups().items()):
+    #         self._setup_internals(group=group)
+
+    #         self._collection_builder.build_collection(metadata_list)
+    #         self._collection_groups[group] = self._collection_builder.collection
+
+    #         coll_file = self._collection_builder.collection_file
+    #         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+    #         post_processor.process_collection(coll_file)
 
 
 class GeodataframeExporter:

@@ -23,7 +23,7 @@
         "parameters": {
             "regex_pattern": ".*/NDWI_(?P<year>\\d{4})_(?P<tile_row>\\d+)_(?P<tile_col>\\d+).tif$",
             "fixed_values": {
-                "band": "NDWI"
+                "asset_type": "NDWI"
             }
         }
     },

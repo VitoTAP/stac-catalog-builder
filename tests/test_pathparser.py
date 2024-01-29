@@ -19,7 +19,6 @@ def test_factory():
             "NoopInputPathParser",
             "RegexInputPathParser",
             "ERA5LandInputPathParser",
-            "ANINPathParser",
             "LandsatNDWIInputPathParser",
             "PeopleEAIncaCFactorInputPathParser",
         ]
@@ -101,7 +100,6 @@ class TestRegexInputPathParser:
 
 
 class TestERA5LandInputPathParser:
-
     REGEX_PATTERN = ".*/reanalysis-era5-land-monthly-means_(?P<band>[a-zA-Z0-9\\_]+_monthly)_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})\\.tif$"
 
     @pytest.fixture

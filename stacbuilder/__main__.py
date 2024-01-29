@@ -270,7 +270,7 @@ def post_process(outputdir, collection_config, collection_file):
 @click.option("--bbox", type=click.STRING, default="", help="bounding box")
 @click.option("-e", "--epsg", type=int, help="CRS of bbox as an EPSG code")
 @click.option(
-    "-m", "--max-extent-size", type=float, default=0.1, help="Maximum size of the spatial extent (in degrees)"
+    "-m", "--max-extent-size", type=float, default=0.0, help="Maximum size of the spatial extent (in degrees)"
 )
 @click.option("--start-dt", type=click.STRING, help="Start date+time of the temporal extent")
 @click.option("--end-dt", type=click.STRING, help="End date+time of the temporal extent")

@@ -15,6 +15,7 @@ class TestAssetMetadata:
         meta.asset_id is None
         meta.item_id is None
         meta.asset_type is None
+        meta.title is None
 
         meta.href is None
         meta.original_href is None
@@ -36,9 +37,6 @@ class TestAssetMetadata:
 
         meta.version == "1.0.0"
 
-        # TODO: band will be removed
-        meta.band is None
-
         meta.datetime is None
         meta.start_datetime is None
         meta.end_datetime is None
@@ -49,27 +47,23 @@ class TestAssetMetadata:
 
         expected_dict = {
             "asset_id": None,
+            "item_id": None,
+            "collection_id": None,
+            "tile_id": None,
+            "title": None,
+            "href": None,
+            "original_href": None,
             "asset_path": None,
             "asset_type": None,
-            "band": None,
-            "bbox": None,
             "datetime": None,
-            "day": None,
-            "end_datetime": None,
-            "geometry": None,
-            "href": None,
-            "item_id": None,
-            "original_href": None,
-            "month": None,
-            "proj_bbox": None,
-            "proj_epsg": None,
-            "proj_geometry": None,
-            "proj_geometry_as_wkt": None,
-            "raster_metadata": None,
-            "shape": None,
             "start_datetime": None,
+            "end_datetime": None,
+            "shape": None,
             "tags": [],
-            "year": None,
+            "bbox_lat_lon": None,
+            "bbox_projected": None,
+            "geometry_lat_lon": None,
+            "raster_metadata": None,
         }
 
         assert expected_dict == meta.to_dict()

@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 import dateutil.parser
+import geopandas as gpd
 import numpy as np
 from shapely.geometry import Polygon
 
@@ -37,30 +38,36 @@ class BandMetadata:
     Right now the focus is just to get the data out of rasterio.
     We do want a data structure that has everything we need for these extensions:
     eo:bands and raster:bands.
+
+    The inputs from HRL VPP (terracatalogueclient) are very different.
+    Probably will need to add a propery "bands" to AssetMetadata.
     """
 
     data_type: np.dtype
     nodata: Any
     index: int
+    units: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "data_type": self.data_type,
             "nodata": self.nodata,
             "index": self.index,
         }
+        if self.units:
+            result["units"] = self.units
+        return result
 
 
+# TODO: elimnate RasterMetadata if possbible and keep only the bands.
 @dataclass
 class RasterMetadata:
     shape: Tuple[int, int]
-    tags: List[str]
     bands: List[BandMetadata]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "shape": self.shape,
-            "tags": self.tags(),
             "bands": [b.to_dict() for b in self.bands],
         }
 
@@ -87,7 +94,6 @@ class AssetMetadata:
     # - path or href (How do we handle URLs?)
     # - asset_type:
     #       We use this to find the corresponding asset definition config in the CollectionConfig
-    # - band(s)
     # - everything to do with the date and time.
     #       "datetime" is the standard name (To be confirmed)
     #       But this could correspond to either the start datetime or end datetime, usually the start datetime.
@@ -99,6 +105,22 @@ class AssetMetadata:
     #   - geometry of the bounding box
     # - raster shape (height & width in pixels)
     # - raster tags
+    #    TODO: Do we use raster tags in the STAC Items or collections? If not, can we remove this?
+    # - Metadata from the raster about the bands,
+    #       for the EO and Raster STAC extensions (eo:bands and raster:bands)
+    # TODO: will probably also need the spatial resolution.
+
+    # TODO: more explicit handling of data extracted from path or href, should be a class perhaps.
+    PROPS_FROM_HREFS = [
+        "href",
+        "original_href",
+        "item_id",
+        "asset_id",
+        "asset_type",
+        "datetime",
+        "start_datetime",
+        "end_datetime",
+    ]
 
     def __init__(
         self,
@@ -137,8 +159,6 @@ class AssetMetadata:
         asset_id.
         """
 
-        self._band: Optional[str] = None
-
         # TODO: item_type is currently a misnomer, more like an asset type.
         # We use this to find the corresponding asset definition config in the CollectionConfig
         self._asset_type: Optional[str] = None
@@ -148,13 +168,15 @@ class AssetMetadata:
         self._datetime = None
         self._start_datetime: Optional[dt.datetime] = None
         self._end_datetime: Optional[dt.datetime] = None
-        self._year: Optional[int] = None
-        self._month: Optional[int] = None
-        self._day: Optional[int] = None
 
         # The bounding boxes, in latitude-longitude and also the projected version.
         self._bbox_lat_lon: Optional[BoundingBox] = None
         self._bbox_projected: Optional[BoundingBox] = None
+
+        # The geometry is sometimes provided by the source data, and its coordinates
+        # might have more decimals than we get in the bounding box.
+        # TODO How to deal with this duplicate data in a consistent and understandable way?
+        self._geometry_lat_lon: Optional[Polygon] = None
 
         # Affine transform as the raster file states it, in case we need it for CRS conversions.
         self.transform: Optional[List[float]] = None
@@ -167,13 +189,27 @@ class AssetMetadata:
 
         self.raster_metadata: Optional[RasterMetadata] = None
 
+        self.title: Optional[str] = None
+        self.collection_id: Optional[str] = None
+        self.tile_id: Optional[str] = None
+
+        # TODO: add some properties that need to trickle up to the collection level, or not?
+        # These properties are really at the collection level, but in HRL VPP
+        # we might have to extract them from the products.
+        # Have to figure out what is the best way to handle this.
+        # self.platforms: Optional[List[str]] = None
+        # self.instruments: Optional[List[str]] = None
+        # self.missions: Optional[List[str]] = None
+
     def process_href_info(self):
         href_info = self._extract_href_info.parse(self.href)
         self._info_from_href = href_info
         for key, value in href_info.items():
-            # Ignore keys that do not match any attribute.
-            if hasattr(self, key):
+            # Ignore keys that do not match any attribute that should come from the href.
+            if key in self.PROPS_FROM_HREFS:
                 setattr(self, key, value)
+            # if hasattr(self, key):
+            #     setattr(self, key, value)
 
     @property
     def version(self) -> str:
@@ -202,7 +238,7 @@ class AssetMetadata:
 
     @asset_path.setter
     def asset_path(self, value: Union[Path, str]) -> None:
-        self._asset_path = Path(value)
+        self._asset_path = Path(value) if value else None
 
     @property
     def asset_id(self) -> Optional[str]:
@@ -219,15 +255,6 @@ class AssetMetadata:
     @item_id.setter
     def item_id(self, value: str) -> None:
         self._item_id = value
-
-    # TODO: Remove property "band" b/c there may be > 1 band in 1 asset and we don't read them from the raster anyway.
-    @property
-    def band(self) -> Optional[str]:
-        return self._band
-
-    @band.setter
-    def band(self, value: str) -> None:
-        self._band = value
 
     @property
     def asset_type(self) -> Optional[str]:
@@ -282,6 +309,23 @@ class AssetMetadata:
         if not isinstance(value, (int, NoneType)):
             raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
         self._proj_epsg = value
+
+    @property
+    def geometry_lat_lon(self) -> Polygon:
+        # If a value was not set explicitly, then derive it from
+        # bbox_lat_lon, if possible.
+        if not self._geometry_lat_lon and self._bbox_lat_lon:
+            self._geometry_lat_lon = self._bbox_lat_lon.as_polygon()
+        return self._geometry_lat_lon
+
+    @geometry_lat_lon.setter
+    def geometry_lat_lon(self, geometry: Polygon):
+        if not isinstance(geometry, (Polygon, NoneType)):
+            raise TypeError(
+                "geometry must be of type shapely.geometry.Polygon or else be None "
+                + f"but the type is {type(geometry)}, {geometry=}"
+            )
+        self._geometry_lat_lon = geometry
 
     @property
     def geometry_as_dict(self) -> Optional[Dict[str, Any]]:
@@ -363,29 +407,23 @@ class AssetMetadata:
 
     @property
     def year(self) -> Optional[int]:
-        return self._year
-
-    @year.setter
-    def year(self, value: int) -> None:
-        self._year = value
+        if not self._datetime:
+            return None
+        return self._datetime.year
 
     @property
     def month(self) -> Optional[int]:
-        return self._month
-
-    @month.setter
-    def month(self, value: int) -> None:
-        self._month = value
+        if not self._datetime:
+            return None
+        return self._datetime.month
 
     @property
     def day(self) -> Optional[int]:
-        return self._day
+        if not self._datetime:
+            return None
+        return self._datetime.day
 
-    @day.setter
-    def day(self, value: int) -> None:
-        self._day = value
-
-    def to_dict(self, include_internal=False):
+    def to_dict(self, include_internal=False) -> Dict[str, Any]:
         """Convert to a dictionary for troubleshooting (output) or for other processing.
 
         :param include_internal:
@@ -393,27 +431,23 @@ class AssetMetadata:
         :return: A dictionary that represents the same metadata.
         """
         data = {
-            "item_id": self.item_id,
             "asset_id": self.asset_id,
+            "item_id": self.item_id,
+            "collection_id": self.collection_id,
+            "tile_id": self.tile_id,
+            "title": self.title,
             "href": self.href,
             "original_href": self.original_href,
             "asset_path": self.asset_path,
             "asset_type": self.asset_type,
-            "band": self.band,
             "datetime": self.datetime,
             "start_datetime": self.start_datetime,
             "end_datetime": self.end_datetime,
-            "year": self.year,
-            "month": self.month,
-            "day": self.day,
             "shape": self.shape,
             "tags": self.tags,
-            "bbox": self.bbox_as_list,
-            "proj_epsg": self.proj_epsg,
-            "proj_bbox": self.proj_bbox_as_list,
-            "geometry": self.geometry_as_dict,
-            "proj_geometry": self.proj_geometry_as_dict,
-            "proj_geometry_as_wkt": self.proj_geometry_as_wkt,
+            "bbox_lat_lon": self.bbox_lat_lon.to_dict() if self.bbox_lat_lon else None,
+            "bbox_projected": self.bbox_projected.to_dict() if self.bbox_projected else None,
+            "geometry_lat_lon": self.geometry_lat_lon,
             "raster_metadata": self.raster_metadata.to_dict() if self.raster_metadata else None,
         }
         # Include internal information for debugging.
@@ -421,6 +455,118 @@ class AssetMetadata:
             data["_info_from_href"] = self._info_from_href
 
         return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AssetMetadata":
+        metadata = AssetMetadata()
+        metadata.asset_id = cls.__get_str_from_dict("asset_id", data)
+        metadata.item_id = cls.__get_str_from_dict("item_id", data)
+        metadata.collection_id = cls.__get_str_from_dict("collection_id", data)
+        metadata.tile_id = cls.__get_str_from_dict("tile_id", data)
+        metadata.title = cls.__get_str_from_dict("title", data)
+        metadata.href = cls.__get_str_from_dict("href", data)
+        metadata.original_href = cls.__get_str_from_dict("original_href", data)
+        metadata.asset_path = cls.__as_type_from_dict("asset_path", Path, data)
+        metadata.asset_type = cls.__get_str_from_dict("asset_type", data)
+
+        import pandas as pd
+
+        pd.Timestamp
+        metadata.datetime = cls.__as_type_from_dict("datetime", pd.Timestamp.to_pydatetime, data)
+        metadata.start_datetime = cls.__as_type_from_dict("start_datetime", pd.Timestamp.to_pydatetime, data)
+        metadata.end_datetime = cls.__as_type_from_dict("end_datetime", pd.Timestamp.to_pydatetime, data)
+
+        metadata.shape = data.get("shape")
+        metadata.tags = data.get("tags")
+
+        bbox_dict = data.get("bbox_lat_lon")
+        if bbox_dict:
+            bbox = BoundingBox.from_dict(bbox_dict)
+            assert bbox.epsg in (4326, None)
+            metadata.bbox_lat_lon = bbox
+        else:
+            metadata.bbox_lat_lon = None
+
+        # geom_dict = data.get("geometry")
+        # from shapely import from_geojson
+        # import json
+        # metadata.geometry_lat_lon = from_geojson(json.dumps(geom_dict))
+        metadata.geometry_lat_lon = data.get("geometry_lat_lon")
+
+        proj_bbox_dict = data.get("bbox_projected")
+        if proj_bbox_dict:
+            proj_bbox = BoundingBox.from_dict(proj_bbox_dict, 4326)
+            metadata.bbox_projected = proj_bbox
+        else:
+            metadata.bbox_projected = None
+
+        metadata.raster_metadata = data.get("raster_metadata")
+
+        return metadata
+
+    @classmethod
+    def from_geoseries(cls, series: gpd.GeoSeries) -> "AssetMetadata":
+        # return cls.from_dict(series.to_dict())
+
+        metadata = AssetMetadata()
+        metadata.asset_id = series["asset_id"]
+        metadata.item_id = series["item_id"]
+        metadata.collection_id = series["collection_id"]
+        metadata.tile_id = series["tile_id"]
+        metadata.title = series["title"]
+        metadata.href = series["href"]
+        metadata.original_href = series["original_href"]
+
+        asset_path = series["asset_path"]
+        metadata.asset_path = Path(asset_path) if asset_path else None
+
+        metadata.asset_type = series["asset_type"]
+
+        metadata.datetime = series["datetime"].to_pydatetime()
+        metadata.start_datetime = series["start_datetime"].to_pydatetime()
+        metadata.end_datetime = series["end_datetime"].to_pydatetime()
+
+        metadata.shape = series["shape"]
+        metadata.tags = series["tags"]
+
+        bbox_dict = series["bbox_lat_lon"]
+        if bbox_dict:
+            bbox = BoundingBox.from_dict(bbox_dict)
+            assert bbox.epsg in (4326, None)
+            metadata.bbox_lat_lon = bbox
+        else:
+            metadata.bbox_lat_lon = None
+
+        metadata.geometry_lat_lon = series["geometry"]
+
+        proj_bbox_dict = series["bbox_projected"]
+        if proj_bbox_dict:
+            proj_bbox = BoundingBox.from_dict(proj_bbox_dict, 4326)
+            metadata.bbox_projected = proj_bbox
+        else:
+            metadata.bbox_projected = None
+
+        metadata.raster_metadata = series["raster_metadata"]
+
+        return metadata
+
+    @staticmethod
+    def __get_str_from_dict(key: str, data: Dict[str, Any]) -> Optional[str]:
+        value = data.get(key)
+        # preserve None, convert everything else to string.
+        # return str(value) if value is not None else None
+        if value is None:
+            return None
+        return str(value)
+
+    @staticmethod
+    def __as_type_from_dict(key: str, to_type: callable, data: Dict[str, Any]) -> Any:
+        value = data.get(key)
+        # preserve None, convert everything else to string.
+        # return to_type(value) if value is not None else None
+        if value is None:
+            return None
+        return to_type(value)
 
     def __str__(self):
         return str(self.to_dict())
