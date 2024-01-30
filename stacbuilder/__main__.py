@@ -21,7 +21,7 @@ import pydantic.errors
 from openeo.util import rfc3339
 
 
-from stacbuilder.builder import CLICommands
+from stacbuilder.commandapi import CLICommands, HRLVVPCliCommands
 from stacbuilder.config import CollectionConfig
 from stacbuilder.verify_openeo import verify_in_openeo
 
@@ -29,7 +29,7 @@ from stacbuilder.verify_openeo import verify_in_openeo
 _logger = logging.getLogger(__name__)
 
 
-@click.group()
+@click.group
 @click.option("-v", "--verbose", is_flag=True, help="show debug output")
 def cli(verbose):
     """Main CLI group. This is the base command.
@@ -55,7 +55,7 @@ def cli(verbose):
     _logger.addHandler(ch)
 
 
-@cli.command()
+@cli.command
 @click.option(
     "-g",
     "--glob",
@@ -93,7 +93,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, sa
     )
 
 
-@cli.command()
+@cli.command
 @click.option(
     "-g",
     "--glob",
@@ -131,7 +131,7 @@ def build_grouped_collections(glob, collection_config, overwrite, max_files, sav
     )
 
 
-@cli.command()
+@cli.command
 @click.option(
     "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the GeoTIFF files. example */*.tif"
 )
@@ -145,7 +145,7 @@ def list_tiffs(glob, inputdir, max_files):
     CLICommands.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
 
 
-@cli.command()
+@cli.command
 @click.option(
     "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the GeoTIFF files. example */*.tif"
 )
@@ -176,7 +176,7 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     )
 
 
-@cli.command()
+@cli.command
 @click.option(
     "-g", "--glob", default="*", type=click.STRING, help="glob pattern to collect the GeoTIFF files. example */*.tif"
 )
@@ -207,7 +207,7 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
     )
 
 
-@cli.command()
+@cli.command
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def show_collection(collection_file):
     """Read the STAC collection file and display its contents.
@@ -217,21 +217,21 @@ def show_collection(collection_file):
     CLICommands.load_collection(collection_file)
 
 
-@cli.command()
+@cli.command
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
     """Run STAC validation on the collection file."""
     CLICommands.validate_collection(collection_file)
 
 
-@cli.command()
+@cli.command
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def extract_item_bboxes(collection_file):
     """Extract and save the bounding boxes of the STAC items in the collection, to both ShapeFile and GeoParquet format."""
     CLICommands.extract_item_bboxes(collection_file)
 
 
-@cli.command()
+@cli.command
 @click.option(
     "-o",
     "--outputdir",
@@ -307,25 +307,70 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
 
 
 #
+# Subcommands for working with the HRL VPP pipeline"""
+#
+
+
+@cli.group
+def hrlvpp():
+    """Subcommands for the HRL VPP pipeline"""
+    pass
+
+
+@hrlvpp.command
+def vpp_list_metadata():
+    """Show the AssetMetadata objects that are generated for each VPP product.
+
+    This is used to test the conversion and check the configuration files.
+    """
+    HRLVVPCliCommands.list_metadata()
+
+
+@hrlvpp.command
+@click.option(
+    "-c",
+    "--collection-config",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    help="Configuration file for the collection",
+)
+@click.option(
+    "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
+)
+# @click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
+def vpp_list_items(collection_config: str, max_products: int):
+    """Show the STAC items that are generated for each VPP product.
+
+    This is used to test the conversion and check the configuration files.
+    """
+    HRLVVPCliCommands.list_stac_items(collection_config_path=collection_config, max_products=max_products)
+
+
+@hrlvpp.command
+def vpp_build():
+    """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
+    HRLVVPCliCommands.build_hrlvpp_collection()
+
+
+#
 # Subcommands for working with the collection configuration file.
 # Mostly to validate and troubleshoot the configuration.
 #
 
 
-@cli.group()
+@cli.group
 def config():
     """Subcommands for collection configuration."""
     pass
 
 
-@config.command()
+@config.command
 def schema():
     """Show the JSON schema for CollectionConfig files or objects."""
     schema = CollectionConfig.model_json_schema()
     click.echo(pprint.pformat(schema, indent=2))
 
 
-@config.command()
+@config.command
 @click.argument("config_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate_config(config_file):
     """Check whether a collection configuration file is in the correct format.
@@ -343,7 +388,7 @@ def validate_config(config_file):
         click.echo(click.style("OK: is valid configuration file", fg="green"))
 
 
-@config.command()
+@config.command
 @click.argument("config_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def show_config(config_file):
     """Read the config file and show how the parsed contents.
@@ -364,7 +409,7 @@ def show_config(config_file):
         # print(json.dumps(configuration.model_dump(), indent=2))
 
 
-@config.command()
+@config.command
 def docs():
     click.echo(CollectionConfig.__doc__)
 
