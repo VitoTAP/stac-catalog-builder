@@ -325,10 +325,25 @@ def verify_in_openeo(
         print(
             "This STAC collection has a large number of items and the "
             + "spatial/temporal extents are probably too large for a reasonable test\n."
-            + "Please try again with a smaller extent (temporal and/or spatial)"
         )
         print("ABORTED")
         return
+
+    intervals = collection.extent.temporal.intervals
+    if len(intervals) == 1:
+        coll_start, coll_end = intervals[0]
+        print(f"{coll_start=}, {coll_end=}")
+        print(f"{dt_start=}, {dt_end=}")
+
+        if dt_start < coll_start:
+            raise ValueError(
+                "Start datetime is before the start of the collection: dt_start < coll_start"
+                + f"{dt_start=}, {coll_start=}"
+            )
+        if dt_end > coll_end:
+            raise ValueError(
+                f"End datetime is after the start of the collection: dt_end > coll_end, {dt_end=}, {coll_end=}"
+            )
 
     connection = connect(backend_url)
 

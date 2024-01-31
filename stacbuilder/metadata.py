@@ -59,7 +59,7 @@ class BandMetadata:
         return result
 
 
-# TODO: elimnate RasterMetadata if possbible and keep only the bands.
+# TODO: Eliminate RasterMetadata if possible and keep only the bands.
 @dataclass
 class RasterMetadata:
     shape: Tuple[int, int]

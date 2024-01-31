@@ -6,7 +6,7 @@ functionality underneath without dealing directly with the CLI.
 
 The functions you find in this module should remain very simple.
 """
-
+import datetime as dt
 import json
 import logging
 import pprint
@@ -14,11 +14,9 @@ from pathlib import Path
 
 
 import click
+import dateutil.parser
 import pydantic
 import pydantic.errors
-
-
-from openeo.util import rfc3339
 
 
 from stacbuilder.commandapi import CLICommands, HRLVVPCliCommands
@@ -289,8 +287,32 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
     if bbox:
         bbox = json.loads(bbox)
 
-    start_datetime = rfc3339.parse_datetime(start_dt) if start_dt else None
-    end_datetime = rfc3339.parse_datetime(end_dt) if end_dt else None
+    temp_start_dt = dateutil.parser.parse(start_dt) if start_dt else None
+    temp_end_dt = dateutil.parser.parse(end_dt) if end_dt else None
+
+    start_datetime = dt.datetime(
+        temp_start_dt.year,
+        temp_start_dt.month,
+        temp_start_dt.day,
+        temp_start_dt.hour,
+        temp_start_dt.minute,
+        temp_start_dt.second,
+        temp_start_dt.microsecond,
+        tzinfo=dt.timezone.utc,
+    )
+    end_datetime = dt.datetime(
+        temp_end_dt.year,
+        temp_end_dt.month,
+        temp_end_dt.day,
+        temp_end_dt.hour,
+        temp_end_dt.minute,
+        temp_end_dt.second,
+        temp_end_dt.microsecond,
+        tzinfo=dt.timezone.utc,
+    )
+
+    print(f"CLI test_openeo:: {start_datetime=}")
+    print(f"CLI test_openeo:: {end_datetime=}")
 
     verify_in_openeo(
         backend_url=backend_url,

@@ -249,8 +249,13 @@ class CollectionConfig(BaseModel):
     mission: Optional[List[str]] = []
     instruments: Optional[List[str]] = []
 
+    # layout strategy: defines what sub folders are created to save the STAC items, relative to the collection.json
+    # See also: https://pystac.readthedocs.io/en/stable/api/layout.html#pystac.layout.TemplateLayoutStrategy
     layout_strategy_item_template: Optional[str] = "${collection}/${year}"
+
     input_path_parser: Optional[InputPathParserConfig] = None
+
+    # What the media type is of the raster files, typically either MediaType.GEOTIFF or MediaType.COG.
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
     # Defines what assets items have, and what bands the assets contain.
