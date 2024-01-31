@@ -57,7 +57,7 @@ The `conda` command itself can be rather slow, but there is a drop-in replacemen
 #### Create the Conda Environment:
 
 ```bash
-conda create --name stac-catalog-builder python=3.11
+conda create --channel conda-forge --name stac-catalog-builder python=3.11
 ```
 
 #### Activate the Environment:
@@ -146,5 +146,5 @@ There are three requirements files, a main one for the application itself and tw
 When you change the dependencies
 
 ```bash
-conda env export -f conda-environment.yaml
+conda env export --no-builds -f conda-environment.yaml
 ```
