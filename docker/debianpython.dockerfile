@@ -42,16 +42,16 @@ RUN --mount=type=cache,target=/var/cache/apt/ \
 
 # TODO: DECIDE: pip package versions for reproducibility or prefer to have the latest, at least for pip?
 #   normally it is best to pin package versions for reproducibility but maybe not for pip.
-RUN --mount=type=cache,target=~/.cache/pip \
+RUN --mount=type=cache,target=/var/cache/apt \
     python3 -m pip install --no-cache-dir --upgrade pip==23.3 wheel==0.41 pip-tools==7.3
 
 
 # GDAL is always a difficult one to install properly so we do this early on.
-RUN --mount=type=cache,target=~/.cache/pip \
+RUN --mount=type=cache,target=/var/cache/apt \
     python3 -m pip install --no-cache-dir pygdal=="$(gdal-config --version).*"
 
 
-from base as dependencies
+FROM base as dependencies
 
 ENV SRC_DIR=/src
 WORKDIR ${SRC_DIR}
@@ -59,16 +59,15 @@ VOLUME ${SRC_DIR}}
 
 COPY requirements/ ${SRC_DIR}/requirements
 
-RUN --mount=type=cache,target=~/.cache/pip \
+RUN --mount=type=cache,target=/var/cache/apt \
     python3 -m  pip install --no-cache-dir -r ${SRC_DIR}/requirements/requirements-dev.txt --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple
 
 
-
-from dependencies as finalstage
+FROM dependencies as finalstage
 
 COPY . ${SRC}
 
-RUN --mount=type=cache,target=~/.cache/pip \
+RUN --mount=type=cache,target=/var/cache/apt \
     python3 -m  pip install -e .
 
 ENTRYPOINT ["python3"]
