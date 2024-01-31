@@ -11,8 +11,6 @@ There are three dockerfiles for three types of environments:
 - [miniconda.dockerfile](miniconda.dockerfile): Installs the packages in miniconda, starting from the [continuumio/miniconda3 image](https://hub.docker.com/r/continuumio/miniconda3).
 - [miniforge.dockerfile](miniforge.dockerfile): Installs the packages in miniforge, the Open Source alternative to miniconda, and start from the [condaforge/miniforge3 docker image](https://hub.docker.com/r/condaforge/miniforge3)
 
-TODO: The miniforge.dockerfile still has build problems.
-
 ## How to build the images
 
 ### Example for debianpython.dockerfile
@@ -59,6 +57,13 @@ Example for the example above with debianpython.dockerfile, using the same image
 docker run --rm -ti stac-catalog-builder-debianpython:latest
 ```
 
+Open a bash shell inside the running docker container:
+
+```bash
+docker run --rm -ti --entrypoint bash stac-catalog-builder-debianpython:latest
+```
+
+
 ## Examples for miniconda
 
 ### Build the image for miniconda
@@ -78,8 +83,28 @@ B) In the root of your git repository:
     docker build -t stac-catalog-builder-miniconda:latest -f docker/miniconda.dockerfile .
     ```
 
-### Run the tests with the Docker container
+### miniconda: Run the tests with the Docker container
 
-```shell```
+```shell
 docker run --rm -ti stac-catalog-builder-miniconda:latest
+```
+
+### miniconda: Open a bash shell inside the running docker container
+
+```shell
+docker run --rm -ti --entrypoint bash stac-catalog-builder-miniconda:latest
+```
+
+If you also want R/W access your source code inside the container, then you have to add `-v` option to add a bind-mount from your working directory to the folder with the source code. The source code is also the working directory defined in the docker image.
+
+In Bash:
+
+```bash
+docker run --rm -ti -v ${PWD}:/src --entrypoint bash stac-catalog-builder-miniconda:latest
+```
+
+In Powershell:
+
+```powershell
+docker run --rm -ti -v ${pwd}:/src --entrypoint bash stac-catalog-builder-miniconda:latest
 ```
