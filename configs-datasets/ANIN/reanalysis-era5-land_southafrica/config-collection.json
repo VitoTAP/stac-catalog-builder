@@ -1,0 +1,102 @@
+{
+    "collection_id": "reanalysis-era5-land_southafrica",
+    "title": "reanalysis-era5-land_southafrica",
+    "description": "ERA5 is the fifth generation ECMWF atmospheric reanalysis of the global climate covering the period from January 1940 to present1. It is produced by the Copernicus Climate Change Service (C3S) at ECMWF and provides hourly estimates of a large number of atmospheric, land and oceanic climate variables. The data cover the Earth on a 31km grid and resolve the atmosphere using 137 levels from the surface up to a height of 80km. ERA5 includes an ensemble component at half the resolution to provide information on synoptic uncertainty of its products.\nERA5.1 is a dedicated product with the same horizontal and vertical resolution that was produced for the years 2000 to 2006 inclusive to significantly improve a discontinuity in global-mean temperature in the stratosphere and uppermost troposphere that ERA5 suffers from during that period. Users that are interested in this part of the atmosphere in this era are advised to access ERA5.1 rather than ERA5.\nERA5 and ERA5.1 use a state-of-the-art numerical weather prediction model to assimilate a variety of observations, including satellite and ground-based measurements, and produces a comprehensive and consistent view of the Earth's atmosphere. These products are widely used by researchers and practitioners in various fields, including climate science, weather forecasting, energy production and machine learning among others, to understand and analyse past and current weather and climate conditions. See also: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land",
+    "instruments": [],
+    "keywords": [
+        "ERA5", "climate", "atmosphere", "reanalysis", "Copernicus", "Copernicus Climate Change Service (C3S)", "ECMW"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Copernicus Climate Data Store (CDS)",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://cds.climate.copernicus.eu/"
+        },
+        {
+            "name": "VITO",
+            "roles": [
+                "processor"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/${year}/${month}",
+    "input_path_parser": {
+        "classname": "ERA5LandInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/reanalysis-era5-land_(?P<asset_type>[a-zA-Z0-9\\_]+)_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})\\.tif$"
+        }
+    },
+    "item_assets": {
+        "2m_temperature_min": {
+            "title": "2m temperature min 24h",
+            "description": "Daily minimum of temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temperature_min",
+                    "description": "temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temperature_min",
+                    "unit": "K"
+                }
+            ]
+        },
+        "2m_temperature_max": {
+            "title": "2m temperature max 24h",
+            "description": "Daily maximum of temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temperature_max",
+                    "description": "temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temperature_max",
+                    "unit": "K"
+                }
+            ]
+        },
+        "2m_temperature_mean": {
+            "title": "2m temperature mean 24h",
+            "description": "Daily mean of temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temperature_mean",
+                    "description": "temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temperature_mean",
+                    "unit": "K"
+                }
+            ]
+        },
+        "total_precipitation": {
+            "title": "total precipitation min 24h",
+            "description": "total precipitation per day (m)",
+            "eo_bands": [
+                {
+                    "name": "total_precipitation",
+                    "description": "total precipitation per month (m)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "total_precipitation",
+                    "unit": "m"
+                }
+            ]
+        }
+    }
+}

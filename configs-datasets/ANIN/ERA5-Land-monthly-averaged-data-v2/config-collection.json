@@ -1,0 +1,154 @@
+{
+    "collection_id": "ERA5-Land-monthly-averaged-data-v2",
+    "title": "ERA5 Land monthly averaged-data v2",
+    "description": "ERA5-Land is a reanalysis dataset providing a consistent view of the evolution of land variables over several decades at an enhanced resolution compared to ERA5. ERA5-Land has been produced by replaying the land component of the ECMWF ERA5 climate reanalysis. Reanalysis combines model data with observations from across the world into a globally complete and consistent dataset using the laws of physics. Reanalysis produces data that goes several decades back in time, providing an accurate description of the climate of the past.\n\nERA5-Land provides a consistent view of the water and energy cycles at surface level during several decades. It contains a detailed record from 1950 onwards, with a temporal resolution of 1 hour. The native spatial resolution of the ERA5-Land reanalysis dataset is 9km on a reduced Gaussian grid (TCo1279). The data in the CDS has been regridded to a regular lat-lon grid of 0.1x0.1 degrees.\n\nThe data presented here is a post-processed subset of the full ERA5-Land dataset. Monthly-mean averages have been pre-calculated to facilitate many applications requiring easy and fast access to the data, when sub-monthly fields are not required.\n\nHourly fields can be found in the ERA5-Land hourly fields CDS page. Documentation can be found in the online ERA5-Land documentation.\n\nhttps://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land-monthly-means?tab=overview",
+    "instruments": [],
+    "keywords": ["ERA5", "CDS", "Copernicus", "climate"],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Copernicus Climate Data Store (CDS)",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://cds.climate.copernicus.eu/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/${year}",
+    "input_path_parser": {
+        "classname": "ERA5LandInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})_(?P<asset_type>[a-zA-Z0-9\\_]+)\\.tiff$"
+        }
+    },
+    "item_assets": {
+        "10_metre_u_wind_component": {
+            "title": "10m u-component of wind speed, monthly mean",
+            "description": "Eastward component of the 10m wind. It is the horizontal speed of air moving towards the east, at a height of ten metres above the surface of the Earth, in metres per second. Care should be taken when comparing this variable with observations, because wind observations vary on small space and time scales and are affected by the local terrain, vegetation and buildings that are represented only on average in the ECMWF Integrated Forecasting System. This variable can be combined with the V component of 10m wind to give the speed and direction of the horizontal 10m wind. (m/s)",
+            "eo_bands": [
+                {
+                    "name": "10_metre_u_wind_component_mean",
+                    "description": "Eastward component of the 10m wind. It is the horizontal speed of air moving towards the east, at a height of ten metres above the surface of the Earth, in metres per second. Care should be taken when comparing this variable with observations, because wind observations vary on small space and time scales and are affected by the local terrain, vegetation and buildings that are represented only on average in the ECMWF Integrated Forecasting System. This variable can be combined with the V component of 10m wind to give the speed and direction of the horizontal 10m wind. (m/s)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "10_metre_u_wind_component_mean",
+                    "data_type": "int16",
+                    "unit": "m*s-1"
+                }
+            ]
+        },
+        "10_metre_v_wind_component": {
+            "title": "10m v-component of wind, monthly mean (m/s)",
+            "description": "Northward component of the 10m wind. It is the horizontal speed of air moving towards the north, at a height of ten metres above the surface of the Earth, in metres per second. Care should be taken when comparing this variable with observations, because wind observations vary on small space and time scales and are affected by the local terrain, vegetation and buildings that are represented only on average in the ECMWF Integrated Forecasting System. This variable can be combined with the U component of 10m wind to give the speed and direction of the horizontal 10m wind. (m/s)",
+            "eo_bands": [
+                {
+                    "name": "10_metre_u_wind_component_mean",
+                    "description": "Northward component of the 10m wind. It is the horizontal speed of air moving towards the north, at a height of ten metres above the surface of the Earth, in metres per second. Care should be taken when comparing this variable with observations, because wind observations vary on small space and time scales and are affected by the local terrain, vegetation and buildings that are represented only on average in the ECMWF Integrated Forecasting System. This variable can be combined with the U component of 10m wind to give the speed and direction of the horizontal 10m wind. (m/s)",
+                    "data_type": "int16"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "10_metre_u_wind_component_mean",
+                    "data_type": "int16",
+                    "unit": "m*s-1"
+                }
+            ]
+        },
+        "2_metre_dewpoint_temperature": {
+            "title": "2m dewpoint temperature, monthly mean (Kelvin)",
+            "description": "Mean dewpoint temperature at a height of 2 metres above the surface over the period 00h-24h local time. The dew point is the temperature to which air must be cooled to become saturated with water vapor. In combination with the air temperature it is used to assess relative humidity. (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_dewpoint_temp_mean",
+                    "description": "Daily mean of temperature 2m above ground (Kelvin)",
+                    "data_type": "int16"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_dewpoint_temp_mean",
+                    "data_type": "int16",
+                    "unit": "K"
+                }
+            ]
+        },
+        "2_metre_temperature": {
+            "title": "2m temperature, monthly mean (Kelvin)",
+            "description": "Air temperature at a height of 2 metres above the surface. Monthly mean. (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temp_mean",
+                    "description": "Air temperature at a height of 2 metres above the surface. Monthly mean. (Kelvin)",
+                    "data_type": "int16"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temp_mean",
+                    "data_type": "int16",
+                    "unit": "K"
+                }
+            ]
+        },
+        "surface_pressure": {
+            "title": "surface pressure, monthly mean (Pa)",
+            "description": "Pressure (force per unit area) of the atmosphere on the surface of land, sea and in-land water. It is a measure of the weight of all the air in a column vertically above the area of the Earth's surface represented at a fixed point. Surface pressure is often used in combination with temperature to calculate air density. The strong variation of pressure with altitude makes it difficult to see the low and high pressure systems over mountainous areas, so mean sea level pressure, rather than surface pressure, is normally used for this purpose. The units of this variable are Pascals (Pa). Surface pressure is often measured in hPa and sometimes is presented in the old units of millibars, mb (1 hPa = 1 mb = 100 Pa). (Pa)",
+            "eo_bands": [
+                {
+                    "name": "surface_pressure",
+                    "description": "Pressure (force per unit area) of the atmosphere on the surface of land, sea and in-land water. It is a measure of the weight of all the air in a column vertically above the area of the Earth's surface represented at a fixed point. Surface pressure is often used in combination with temperature to calculate air density. The strong variation of pressure with altitude makes it difficult to see the low and high pressure systems over mountainous areas, so mean sea level pressure, rather than surface pressure, is normally used for this purpose. The units of this variable are Pascals (Pa). Surface pressure is often measured in hPa and sometimes is presented in the old units of millibars, mb (1 hPa = 1 mb = 100 Pa). (Pa)",
+                    "data_type": "int16"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "surface_pressure",
+                    "data_type": "int16",
+                    "unit": "Pa"
+                }
+            ]
+        },
+        "surface_solar_radiation_downwards": {
+            "title": "total precipitation (J / m^2) ",
+            "description": "Amount of solar radiation (also known as shortwave radiation) reaching the surface of the Earth. This variable comprises both direct and diffuse solar radiation. Radiation from the Sun (solar, or shortwave, radiation) is partly reflected back to space by clouds and particles in the atmosphere (aerosols) and some of it is absorbed. The rest is incident on the Earth's surface (represented by this variable). To a reasonably good approximation, this variable is the model equivalent of what would be measured by a pyranometer (an instrument used for measuring solar radiation) at the surface. However, care should be taken when comparing model variables with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box and model time step. This variable is accumulated from the beginning of the for (J / m^2)",
+            "eo_bands": [
+                {
+                    "name": "surface_solar_radiation_downwards",
+                    "description": "Amount of solar radiation (also known as shortwave radiation) reaching the surface of the Earth. This variable comprises both direct and diffuse solar radiation. Radiation from the Sun (solar, or shortwave, radiation) is partly reflected back to space by clouds and particles in the atmosphere (aerosols) and some of it is absorbed. The rest is incident on the Earth's surface (represented by this variable). To a reasonably good approximation, this variable is the model equivalent of what would be measured by a pyranometer (an instrument used for measuring solar radiation) at the surface. However, care should be taken when comparing model variables with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box and model time step. This variable is accumulated from the beginning of the for (J / m^2)",
+                    "data_type": "int16"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "surface_solar_radiation_downwards",
+                    "data_type": "int16",
+                    "unit": "J*m-2"
+                }
+            ]
+        },
+        "total_precipitation": {
+            "title": "total precipitation (m)",
+            "description": "Accumulated liquid and frozen water, including rain and snow, that falls to the Earth's surface. It is the sum of large-scale precipitation (that precipitation which is generated by large-scale weather patterns, such as troughs and cold fronts) and convective precipitation (generated by convection which occurs when air at lower levels in the atmosphere is warmer and less dense than the air above, so it rises). Precipitation variables do not include fog, dew or the precipitation that evaporates in the atmosphere before it lands at the surface of the Earth. This variable is accumulated from the beginning of the forecast time to the end of the forecast step. The units of precipitation are depth in metres. It is the depth the water would have if it were spread evenly over the grid box. Care should be taken when comparing model variables with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box and model time step. (m)",
+            "eo_bands": [
+                {
+                    "name": "total_precipitation",
+                    "description": "Accumulated liquid and frozen water, including rain and snow, that falls to the Earth's surface. It is the sum of large-scale precipitation (that precipitation which is generated by large-scale weather patterns, such as troughs and cold fronts) and convective precipitation (generated by convection which occurs when air at lower levels in the atmosphere is warmer and less dense than the air above, so it rises). Precipitation variables do not include fog, dew or the precipitation that evaporates in the atmosphere before it lands at the surface of the Earth. This variable is accumulated from the beginning of the forecast time to the end of the forecast step. The units of precipitation are depth in metres. It is the depth the water would have if it were spread evenly over the grid box. Care should be taken when comparing model variables with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box and model time step. (m)",
+                    "data_type": "int16"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "total_precipitation",
+                    "data_type": "int16",
+                    "unit": "m"
+                }
+            ]
+        }
+    }
+}
