@@ -180,7 +180,7 @@ ifndef MAX_TIFF_FILES
 	MAX_TIFF_FILES := -1
 endif
 
-
+# TODO: You need to set this extent to a small enough area for running a test, so it will donwnload just one or just a few assets.
 BBOX_VERIFICATION := "[3220000.0, 3950700.0, 3230000.0, 3960700.0]"
 BBOX_VERIFICATION_EPSG := 3035
 

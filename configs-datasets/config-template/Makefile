@@ -81,7 +81,7 @@ WORKSPACE = $(realpath  $(MK_PARENT)../)
 #
 # Typically the name of the folder where you read the input files.
 # ------------------------------------------------------------------------------
-DATASET_NAME := PEOPLE_INCA_cfactor
+DATASET_NAME := demo_dataset
 
 
 # ------------------------------------------------------------------------------
@@ -102,7 +102,7 @@ COLLECTION_CONFIG := $(WORKSPACE)/${DATASET_NAME}/config-collection.json
 # This can be one of its parents / ancesters, because we also use a glob pattern
 # to find the files. This allows us to work with files that are grouped per
 # per, or per date.
-TIFF_INPUT_DIR := /data/MTDA/PEOPLE_EA/PEOPLE_INCA_cfactor/
+TIFF_INPUT_DIR := $(HOME)/data/demo_dataset
 
 
 # ------------------------------------------------------------------------------
@@ -180,11 +180,14 @@ ifndef MAX_TIFF_FILES
 	MAX_TIFF_FILES := -1
 endif
 
-# TODO: need to check this extent
+# TODO: You need to set this extent to a small enough area for running a test, so it will download just one or just a few assets.
 BBOX_VERIFICATION := "[-180.0, -90.0, 180.0, 90.0]"
+# This EPSG code means latitude-longitude (AKA WGS84 the world's standard geographic CRS)
 BBOX_VERIFICATION_EPSG := 4326
 
-# max size of spatial extent: 2000 meter
+# max size of spatial extent when proj:bbox is a projected CRS: 2000 meter
+# MAX_SPATIAL_EXTENT_SIZE := 2000
+# max size of spatial extent when proj:bbox is a lat-lon: 0.01 degree
 MAX_SPATIAL_EXTENT_SIZE := 0.01
 
 TEMPORAL_EXTENT_START := 2020-01-01T00:00:00Z
@@ -217,20 +220,8 @@ show-config:
 	@echo "TEST_OUTPUT_DIR=$(TEST_OUTPUT_DIR)"
 	@echo "TEST_OPENEO_DIR=$(TEST_OPENEO_DIR)"
 	@echo "PUBLISH_DIR=$(PUBLISH_DIR)"
+	@echo "OPENEO_BACKEND_URL=$(OPENEO_BACKEND_URL)"
 .PHONY: show-config
-
-
-.PHONY: build-collection
-build-collection-old-pipeline:
-## Build the STAC collection
-	$(PYTHON) stacbuilder \
-		-v build-collection-old-pipeline \
-		-g "$(GLOB_PATTERN)" \
-		-c $(COLLECTION_CONFIG) \
-		--overwrite \
-		--max-files $(MAX_TIFF_FILES) \
-		$(TIFF_INPUT_DIR) \
-		$(TEST_OUTPUT_DIR)
 
 
 .PHONY: build-collection
@@ -246,7 +237,7 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
-.PHONY: build_grouped_collections
+.PHONY: build-grouped-collections
 build-grouped-collections:
 ## Build the STAC collections, grouped per year
 	$(PYTHON) stacbuilder \
@@ -280,7 +271,6 @@ list-metadata:
 		$(TIFF_INPUT_DIR)
 
 
-
 .PHONY: list-items
 list-items:
 ## For each tiff file, show what the STAC Item looks like.
@@ -304,17 +294,6 @@ validate:
 ## Validate the contents of the STAC collection file.
 	$(PYTHON) stacbuilder validate "$(TEST_OUTPUT_DIR)/collection.json"
 
-
-.PHONY: profile-validate
-profile-validate:
-## Profile the validation, large collections take surprisingly long.
-	$(PYTHON) -m cProfile -o stacbuilder-validate.stats stacbuilder/__main__.py validate "$(TEST_OUTPUT_DIR)/collection.json"
-
-
-.PHONY: profile-loadcollection
-profile-loadcollection:
-## Profile loading (showing) a collection, large collections take surprisingly long.
-	$(PYTHON) -m cProfile -o stacbuilder-show-collection.stats stacbuilder/__main__.py show-collection "$(TEST_OUTPUT_DIR)/collection.json"
 
 
 .PHONY: test-openeo

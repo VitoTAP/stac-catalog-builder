@@ -176,12 +176,14 @@ ifndef MAX_TIFF_FILES
 	MAX_TIFF_FILES := -1
 endif
 
-# TODO: need to check this extent
+# TODO: You need to set this extent to a small enough area for running a test, so it will donwnload just one or just a few assets.
 BBOX_VERIFICATION := "[3220000.0, 3950700.0, 3230000.0, 3960700.0]"
 BBOX_VERIFICATION_EPSG := 3035
 
-# max size of spatial extent: 2000 meter
+# max size of spatial extent when proj:bbox is a projected CRS: 2000 meter
 MAX_SPATIAL_EXTENT_SIZE := 2000
+# max size of spatial extent when proj:bbox is a lat-lon: 0.01 degree
+# MAX_SPATIAL_EXTENT_SIZE := 0.01
 
 TEMPORAL_EXTENT_START := 2020-01-01T00:00:00Z
 TEMPORAL_EXTENT_END := 2020-02-01T00:00:00Z
@@ -229,7 +231,7 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
-.PHONY: build_grouped_collections
+.PHONY: build-grouped-collections
 build-grouped-collections:
 ## Build the STAC collections, grouped per year
 	$(PYTHON) stacbuilder \
@@ -260,7 +262,6 @@ list-metadata:
 		-g "$(GLOB_PATTERN)" \
 		--max-files $(MAX_TIFF_FILES) \
 		-c $(COLLECTION_CONFIG) \
-		--save-dataframe \
 		$(TIFF_INPUT_DIR)
 
 
@@ -272,7 +273,6 @@ list-items:
 		-g "$(GLOB_PATTERN)" \
 		--max-files $(MAX_TIFF_FILES) \
 		-c $(COLLECTION_CONFIG) \
-		--save-dataframe \
 		$(TIFF_INPUT_DIR)
 
 
