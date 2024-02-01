@@ -71,6 +71,7 @@ docker run --rm -ti --entrypoint bash stac-catalog-builder-debianpython:latest
 Image name and tag: `stac-catalog-builder-miniconda:latest`
 
 A) Inside the the subdirectory `docker`
+
     ```bash
     docker build -t stac-catalog-builder-miniconda:latest -f miniconda.dockerfile ..
     ```
