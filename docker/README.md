@@ -1,17 +1,36 @@
 # Dockerfiles for testing the package installation
 
-With some work you could use these for testing or even developing.
+First and foremost these dockerfiles are intended for testing the package installation, i.e.
+do the pip requirements files and the `conda-environment.yaml` work correctly.
 
-This may be useful if you are on Windows or Mac, because the tool is currently only being used and tested on Linux.
+The idea is that if the installation succeeds and the test suite with pytest passes, > Tthan the requirements / conda env should be good enough for development.
+This is not (yet) a production setup that should have locked down version to get reproducible builds.
 
+Compare this to using `requirements.in` with pip-tools/pip-compile to get a fully resolved requirement.txt.
+We are specifying and testing the first type of file here: `requirements.in`, not the requirement.txt.
+
+> - TODO: (1) Maybe rename the requirements files for clarity: extension `.in` instead of `.txt`
+> - TODO: (2) Decided if we want tooling to resolved full and locked dependencies, and which one: pip-tools, pip-env, poetry, or another,
+> - TODO: (3) Can Hatch already do the job for `todo (2)`?
+
+## Possible use in future: CI/testing/dev in docker container
+
+That said, with some work you could also use these containers for testing or even developing.
+We might be able to use it for CI / Jenkins in the near future.
+
+Further, this may be useful if you are on Windows or Mac, because the tool is currently only being used and tested on Linux and this would give you a Linux environment.
+
+Though for Windows, working in either a conda environment, or inside WSL, are another options and frankly that is less work than a Docker setup.
+
+## Three environments to verify
 
 There are three dockerfiles for three types of environments:
 
-- [debianpython.dockerfile](debianpython.dockerfile): Uses only pip in a Debian docker image.
+- [debianpython.dockerfile](debianpython.dockerfile): Uses only pip, in a Debian docker image.
 - [miniconda.dockerfile](miniconda.dockerfile): Installs the packages in miniconda, starting from the [continuumio/miniconda3 image](https://hub.docker.com/r/continuumio/miniconda3).
 - [miniforge.dockerfile](miniforge.dockerfile): Installs the packages in miniforge, the Open Source alternative to miniconda, and start from the [condaforge/miniforge3 docker image](https://hub.docker.com/r/condaforge/miniforge3)
 
-## How to build the images
+## How to build the Docker images
 
 ### Example for debianpython.dockerfile
 
@@ -62,7 +81,6 @@ Open a bash shell inside the running docker container:
 ```bash
 docker run --rm -ti --entrypoint bash stac-catalog-builder-debianpython:latest
 ```
-
 
 ## Examples for miniconda
 
