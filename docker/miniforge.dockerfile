@@ -1,4 +1,4 @@
-FROM condaforge/miniforge3 as base
+FROM condaforge/miniforge3:23.11.0-0 as base
 
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     conda install --yes -c conda-forge mamba \
