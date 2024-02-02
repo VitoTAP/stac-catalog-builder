@@ -1,8 +1,4 @@
 # STAC Catalog Builder
-- [STAC Catalog Builder](#stac-catalog-builder)
-  - [Setup - Installation](#setup---installation)
-  - [Running the Stacbuilder Tool](#running-the-stacbuilder-tool)
-
 
 This tool generates a STAC collection from a set of GeoTiff images.
 
@@ -13,9 +9,9 @@ It requires a some configuration for the fields we need to fill in, but the goal
 For now it only supports GeoTIFFs. For example, netCDF is not supported yet, because it can be a lot more complex to extract info from than GeoTIFF.
 We wanted to start with GeoTIFF and we can see about other needs later.
 
-- [Setup - Installation](docs/installation.md)
-- [How to run the STAC builder](#running-the-stacbuilder-tool)
-- [Goals and User Stories](docs/goals-and-user-stories.md): A longer explanation of the goals or use case for the STAC catalog builder.
+Support for uploading to a STAC API is in the making.
+
+See also: [Goals and User Stories](docs/goals-and-user-stories.md): A longer explanation of the goals or use case for the STAC catalog builder.
 
 ## Setup - Installation
 
@@ -24,3 +20,7 @@ See: [docs/installation.md](docs/installation.md)
 ## Running the Stacbuilder Tool
 
 See: [docs/how-to-run-stacbuilder.md](docs/how-to-run-stacbuilder.md)
+
+## Software Development Guidelines
+
+See [docs/developer-guidelines.md](docs/developer-guidelines.md)
