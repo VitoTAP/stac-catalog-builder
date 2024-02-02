@@ -4,6 +4,7 @@
   - [Goal: testing the requirements files and conda environment](#goal-testing-the-requirements-files-and-conda-environment)
   - [**NOT** a goal: these are not dockerfiles for production deployment](#not-a-goal-these-are-not-dockerfiles-for-production-deployment)
   - [Principle: Specify only direct dependencies, and let package manager resolve the rest](#principle-specify-only-direct-dependencies-and-let-package-manager-resolve-the-rest)
+    - [Why separate direct from fully resolved dependencies?](#why-separate-direct-from-fully-resolved-dependencies)
   - [Possible use in future: CI/testing/dev in docker container](#possible-use-in-future-citestingdev-in-docker-container)
 - [Contents: Three environments to verify](#contents-three-environments-to-verify)
 - [Usage: 1) How to build the Docker images](#usage-1-how-to-build-the-docker-images)
@@ -38,14 +39,17 @@ A production setup has different demands from what we want to achieve here. For 
 However, that is not at all what we want to achieve with the current requirements files and `conda-environment.yaml`. Here we deliberately specify only the dependencies that we depend on **directly**, and we are keeping it OS independent as well.
 Then we let the package manager resolve the other so-called "transitive" dependencies.
 
-This avoids problems when we want to upgrade our direct dependencies or when we want the environment to work on different operating systems. If there is no indication which are our direct dependencies, then a lot more dependencies might conflict with each other and we can not see which ones we can upgrade.
-This can be very cumbersome to figure out. Also on different OSs or different machines you may require some different packages because of OS-dependent packages. Troubleshooting all of this is a lot of hassle but we can avoid that hassle by keeping the list of direct dependencies separate from the fully resolved dependencies, that may be OS dependent.
-
 If you happen to know the way [pip-tools](https://pip-tools.readthedocs.io/en/latest/) works, then you could compare this way of working to specifying the `requirements.in` file that pip-compile fully resolves to `requirement.txt`. We are specifying and testing the first type of file here: `requirements.in`, not the requirement.txt.
 
 > - TODO: (1) Maybe rename the requirements files for clarity: extension `.in` instead of `.txt`
 > - TODO: (2) Decided if we want tooling to resolved full and locked dependencies, and which one: pip-tools, pip-env, poetry, or another,
 > - TODO: (3) Can Hatch already do the job for `todo (2)`?
+
+#### Why separate direct from fully resolved dependencies?
+
+This approach avoids problems when we want to upgrade our dependencies or when we want the environment to work on different operating systems. If there is no indication which are our direct dependencies, then a lot more dependencies might conflict with each other and we can not easily see which ones we can upgrade and which ones have to stay at a certain version. And that can be very cumbersome to figure out.
+
+Moreover, on different OSs you may also require different packages because some Python packages do depend on things that are OS-dependent (They require an package, or they rely on native libraries, etc.). Troubleshooting all of this can be a lot of hassle, but we can avoid that hassle by keeping the list of direct dependencies separate from the fully resolved dependencies, that may be OS dependent.
 
 ### Possible use in future: CI/testing/dev in docker container
 
@@ -54,7 +58,7 @@ We might be able to use it for CI / Jenkins in the near future.
 
 Further, this may be useful if you are on Windows or Mac, because the tool is currently only being used and tested on Linux and this would give you a Linux environment.
 
-Though for Windows, working in either a conda environment, or inside WSL, are another options and frankly that is less work than a Docker setup.
+Though for Windows, working in either a conda environment, or inside WSL, are alternatives and frankly those options require less work than a Docker setup.
 
 ---
 
