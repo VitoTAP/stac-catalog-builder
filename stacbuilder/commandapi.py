@@ -112,7 +112,7 @@ class CLICommands:
         collector.glob = glob
         collector.max_files = max_files
         collector.collect()
-
+        print(f"Found {len(collector.input_files)} files:")
         for file in collector.input_files:
             print(file)
 
