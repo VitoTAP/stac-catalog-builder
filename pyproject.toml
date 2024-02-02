@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 # TODO: consider making the name lower case. Does PyPI make any difference based on casing?
-name = "STAC-Catalog-Builder"
-version = "0.0.1"
+name = "stac-catalog-builder"
 authors = [
   { name="Johan Schreurs", email="johan.schreurs.ext@vito.be" },
   { name="Jeroen Dries", email="jeroen.dries@vito.be" },
+  { name="Victor Verhaert", email="victor.verhaert@vito.be" },
 ]
 description = """Tool to build a STAC collection from a directory of GeoTiff files
 STAC: SpatioTemporal Asset Catalogs
@@ -21,6 +21,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/VitoTAP/stac-catalog-builder"
@@ -32,19 +33,9 @@ Source = "https://github.com/VitoTAP/stac-catalog-builder"
 packages = ["stacbuilder"]
 
 [tool.hatch.build.targets.sdist]
-# TODO: switch to only-include and test the build. NOPE does not work
 only-include = [
   "/stacbuilder",
 ]
-# include = [
-#   "/stacbuilder",
-# ]
-# exclude = [
-#   "/.github",
-#   "/docs",
-#   "/tests",
-#   "/configs-datasets",
-# ]
 
 [tool.hatch.version]
 path = "stacbuilder/_version.py"
