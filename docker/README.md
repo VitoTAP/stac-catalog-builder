@@ -3,11 +3,16 @@
 First and foremost these dockerfiles are intended for testing the package installation, i.e.
 do the pip requirements files and the `conda-environment.yaml` work correctly.
 
-The idea is that if the installation succeeds and the test suite with pytest passes, > Tthan the requirements / conda env should be good enough for development.
-This is not (yet) a production setup that should have locked down version to get reproducible builds.
+The idea is that if the installation succeeds and the test suite with pytest passes, then the requirements / conda env should be good enough for development.
 
-Compare this to using `requirements.in` with pip-tools/pip-compile to get a fully resolved requirement.txt.
-We are specifying and testing the first type of file here: `requirements.in`, not the requirement.txt.
+This is not (yet) a production setup, because that environment should specify locked down versions for all dependencies in order to get reproducible builds.
+
+However, that is not what we want to achieve with the requirements files and `conda-environment.yaml`. Here we deliberately specify only the dependencies that we depend on **directly**, and we are keeping it OS independent as well.
+Then we let the package manager resolve the other so-called "transitive" dependencies.
+
+This avoids that we have to figure out what dependencies are conflicting when we want to upgrade something, or why the environment can install on one OS or one machine but it breaks on another.
+
+If you happen to know the way [pip-tools](https://pip-tools.readthedocs.io/en/latest/) works, then you could compare this way of working to specifying the `requirements.in` file that pip-compile fully resolves to `requirement.txt`. We are specifying and testing the first type of file here: `requirements.in`, not the requirement.txt.
 
 > - TODO: (1) Maybe rename the requirements files for clarity: extension `.in` instead of `.txt`
 > - TODO: (2) Decided if we want tooling to resolved full and locked dependencies, and which one: pip-tools, pip-env, poetry, or another,

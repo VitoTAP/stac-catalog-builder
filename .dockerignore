@@ -8,9 +8,26 @@ config-datasets/*
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
-__pycache__/
+
+__pycache__
 *.py[cod]
 *$py.class
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
 
 
 ### IDEs ###
@@ -41,30 +58,6 @@ venv.bak/
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
 .python-version
-
-
-### Python related files/folders ###
-
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-env
-pip-log.txt
-pip-delete-this-directory.txt
-.tox
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
 
 
 ### Distribution / packaging ###
