@@ -1,1 +1,2 @@
-from .__main__ import *
+from stacbuilder._version import __version__  # noqa
+
