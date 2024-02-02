@@ -19,7 +19,17 @@ import pydantic
 import pydantic.errors
 
 
-from stacbuilder.commandapi import CLICommands, HRLVVPCliCommands
+from stacbuilder.commandapi import (
+    build_collection,
+    list_asset_metadata,
+    list_input_files,
+    list_stac_items,
+    load_collection,
+    postprocess_collection,
+    validate_collection,
+    vpp_build_collection,
+    vpp_list_stac_items,
+)
 from stacbuilder.config import CollectionConfig
 from stacbuilder.verify_openeo import verify_in_openeo
 
@@ -80,7 +90,7 @@ def cli(verbose):
 )
 def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, save_dataframe):
     """Build a STAC collection from a directory of GeoTIFF files."""
-    CLICommands.build_collection(
+    build_collection(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -118,7 +128,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, sa
 )
 def build_grouped_collections(glob, collection_config, overwrite, max_files, save_dataframe, inputdir, outputdir):
     """Build a STAC collection from a directory of GeoTIFF files."""
-    CLICommands.build_grouped_collections(
+    build_grouped_collections(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -140,7 +150,7 @@ def build_grouped_collections(glob, collection_config, overwrite, max_files, sav
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 def list_tiffs(glob, inputdir, max_files):
     """List which GeoTIFF files will be selected with this input dir and glob pattern."""
-    CLICommands.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
+    list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
 
 
 @cli.command
@@ -165,7 +175,7 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    CLICommands.list_asset_metadata(
+    list_asset_metadata(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -196,7 +206,7 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    CLICommands.list_stac_items(
+    list_stac_items(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -212,21 +222,21 @@ def show_collection(collection_file):
 
     You can use this to see if it can be loaded.
     """
-    CLICommands.load_collection(collection_file)
+    load_collection(collection_file)
 
 
 @cli.command
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
     """Run STAC validation on the collection file."""
-    CLICommands.validate_collection(collection_file)
+    validate_collection(collection_file)
 
 
 @cli.command
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def extract_item_bboxes(collection_file):
     """Extract and save the bounding boxes of the STAC items in the collection, to both ShapeFile and GeoParquet format."""
-    CLICommands.extract_item_bboxes(collection_file)
+    extract_item_bboxes(collection_file)
 
 
 @cli.command
@@ -251,7 +261,7 @@ def post_process(outputdir, collection_config, collection_file):
     You make have to do that many times when debugging postpreocessing
     and waiting for collections to be build is annoying.
     """
-    CLICommands.postprocess_collection(
+    postprocess_collection(
         collection_file=collection_file, collection_config_path=collection_config, output_dir=outputdir
     )
 
@@ -345,7 +355,7 @@ def vpp_list_metadata():
 
     This is used to test the conversion and check the configuration files.
     """
-    HRLVVPCliCommands.list_metadata()
+    vpp_list_metadata()
 
 
 @hrlvpp.command
@@ -364,13 +374,13 @@ def vpp_list_items(collection_config: str, max_products: int):
 
     This is used to test the conversion and check the configuration files.
     """
-    HRLVVPCliCommands.list_stac_items(collection_config_path=collection_config, max_products=max_products)
+    vpp_list_stac_items(collection_config_path=collection_config, max_products=max_products)
 
 
 @hrlvpp.command
 def vpp_build():
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
-    HRLVVPCliCommands.build_hrlvpp_collection()
+    vpp_build_collection()
 
 
 #
