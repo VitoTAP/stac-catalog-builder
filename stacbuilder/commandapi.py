@@ -282,7 +282,6 @@ def vpp_list_metadata(
 
 
 def vpp_list_stac_items(
-    collection_config_path: Path,
     max_products: Optional[int] = -1,
 ):
     """Show the STAC items that are generated for each VPP product.
@@ -300,8 +299,7 @@ def vpp_list_stac_items(
     collector.max_products = max_products
     collector.collect()
 
-    collection_config_path = Path(collection_config_path).expanduser().absolute()
-    coll_cfg = CollectionConfig.from_json_file(collection_config_path)
+    coll_cfg = collector.get_collection_config()
     pipeline = AssetMetadataPipeline.from_config(
         metadata_collector=collector,
         collection_config=coll_cfg,

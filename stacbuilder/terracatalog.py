@@ -10,13 +10,13 @@ At present, all code in this module is still very experimental (d.d. 2024-01-29)
 import datetime as dt
 import logging
 from pprint import pprint
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 import geopandas as gpd
 import pandas as pd
-import pystac
-
+import pystac.media_type
+from pystac.provider import ProviderRole
 
 import terracatalogueclient as tcc
 from terracatalogueclient.config import CatalogueConfig
@@ -27,50 +27,10 @@ from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import IMetadataCollector
 
+from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
+
 
 _logger = logging.getLogger(__name__)
-
-
-def create_stac_collection(collection_info: tcc.Collection):
-    """
-    First attempt to build an (empty) collection from the terracatalog Collection.
-    Experimental and will be replaced.
-
-    We need to get some of the properties for the STAC Collection from the terracatalog Collection.
-    The missing once can still be filled in from a CollectionConfig.
-
-    """
-    props = collection_info.properties
-
-    title = props.get("title") or collection_info.id
-    description = props.get("abstract") or collection_info.id
-
-    # Note: in the terracatalogue keyword is singular!
-    keywords = collection_info.properties.get("keyword")
-
-    dt_start, dt_end = get_coll_temporal_extent(collection_info)
-    bbox = collection_info.bbox
-    extent = pystac.Extent(
-        pystac.SpatialExtent(bbox),
-        pystac.TemporalExtent([[dt_start, dt_end]]),
-    )
-
-    stac_coll = pystac.Collection(
-        id=collection_info.id,
-        title=title,
-        description=description,
-        keywords=keywords,
-        providers=None,
-        extent=extent,
-    )
-
-    # item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
-    # item_assets_ext.item_assets = self.get_item_assets_definitions()
-
-    # RasterExtension.add_to(collection)
-    # collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
-
-    return stac_coll
 
 
 def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | None, dt.datetime | None]:
@@ -90,6 +50,112 @@ def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | 
         dt_end = dt.datetime.fromisoformat(dt_end)
 
     return dt_start, dt_end
+
+
+class CollectionConfigBuilder:
+    def __init__(self, tcc_collection: tcc.Collection):
+        self.tcc_collection = tcc_collection
+
+    def get_collection_config(self) -> CollectionConfig:
+        coll = self.tcc_collection
+        collection_id = coll.id
+        title = coll.properties.get("title")
+        description = coll.properties.get("abstract")
+
+        keywords = coll.properties.get("keyword")
+        providers = [
+            ProviderModel(
+                name="VITO",
+                roles=[ProviderRole.LICENSOR, ProviderRole.PRODUCER, ProviderRole.PROCESSOR],
+                url="https://www.vito.be/",
+            )
+        ]
+
+        platforms = self.get_platforms()
+        instrument = [self.get_instruments()]
+        # mission = Optional[List[str]] = []
+
+        layout_strategy_item_template = "${collection}/${year}/${month}/${day}"
+        item_assets = self.get_asset_config()
+
+        return CollectionConfig(
+            collection_id=collection_id,
+            title=title,
+            description=description,
+            keywords=keywords or None,
+            providers=providers or None,
+            platform=platforms or None,
+            instrument=instrument or None,
+            layout_strategy_item_template=layout_strategy_item_template,
+            item_assets=item_assets,
+        )
+
+    def get_platforms(
+        self,
+    ) -> Optional[List[str]]:
+        platforms = []
+        acq_info = self.get_acquisition_info()
+        for info in acq_info:
+            platform = info.get("platform")
+            if platform:
+                platforms.append(platform.get("platformShortName"))
+
+        return list(set(platforms))
+
+    def get_instruments(self) -> Optional[List[str]]:
+        instruments = []
+        acq_info = self.get_acquisition_info()
+        for info in acq_info:
+            instrument = info.get("instrument", {})
+            if instrument:
+                instruments.append(instrument.get("instrumentShortName"))
+
+        return list(set(instruments))
+
+    def get_acquisition_info(self) -> Dict[str, Any]:
+        return self.tcc_collection.properties.get("acquisitionInformation", [])
+
+    def get_product_info(self) -> Dict[str, Any]:
+        return self.tcc_collection.properties.get("productInformation", {})
+
+    def get_format(self) -> Optional[str]:
+        prod_info = self.get_product_info()
+        return prod_info.get("format")
+
+    def get_asset_config(self) -> List[AssetConfig]:
+        media_type = self.get_media_type()
+
+        asset_configs = {}
+        band_info = self.tcc_collection.properties.get("bands")
+        for band in band_info:
+            title = band.get("title")
+            offset = band.get("offset")
+            scale_factor = band.get("scaleFactor")
+            bit_per_value = band.get("bitPerValue")
+            resolution = band.get("resolution")
+
+            raster_cfg = RasterBandConfig(
+                name=title, offset=offset, scale=scale_factor, resolution=resolution, bits_per_sample=bit_per_value
+            )
+            eo_band = ([],)
+            asset_cfg = AssetConfig(
+                title=title,
+                description=title,
+                media_type=media_type,
+                raster_bands=[raster_cfg],
+            )
+            asset_configs[title] = asset_cfg
+
+        return asset_configs
+
+    def get_media_type(self) -> pystac.media_type.MediaType:
+        format = self.get_format()
+        media_type = None
+        if format.lower() in ["geotif", "geotif", "tiff"]:
+            media_type = pystac.media_type.MediaType.GEOTIFF
+        elif format.lower() == "COG":
+            media_type = pystac.media_type.MediaType.COG
+        return media_type
 
 
 class HRLVPPMetadataCollector(IMetadataCollector):
@@ -124,7 +190,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._max_products = int(value) if value else -1
 
     def collect(self):
-        pprint(f"{self.__class__.__name__}.collect ...")
         if self.has_collected():
             _logger.info("Already collected data. Returning")
             return
@@ -148,6 +213,14 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             if coll.id == self.collection_id:
                 return coll
         return None
+
+    def get_collection_config(self) -> CollectionConfig:
+        tcc_collection = self.get_tcc_collection()
+        if not tcc_collection:
+            return None
+
+        cfg_builder = CollectionConfigBuilder(self.get_tcc_collection())
+        return cfg_builder.get_collection_config()
 
     def get_products_as_dataframe(self) -> gpd.GeoDataFrame:
         catalogue = self.get_tcc_catalogue()
@@ -234,8 +307,15 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         asset_metadata = AssetMetadata()
         asset_metadata.asset_id = product.id
-        asset_metadata.asset_type = product_type
         asset_metadata.title = product.title
+
+        # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
+        #   Is each line a separate asset in STAC terms?
+        links_data: List[Dict] = product.properties.get("links", {}).get("data", [])
+        if links_data:
+            asset_metadata.asset_type = links_data[0].get("title")
+        # asset_metadata.asset_type = product_type
+        asset_metadata.file_size = links_data[0].get("length")
 
         # item_id is the asset_id without the product_type/band name at the end
         num_chars_to_remove = 1 + len(product_type)
@@ -290,10 +370,13 @@ def main():
     COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
     collector.collection_id = COLLECTION_ID
 
-    collector.collect()
+    for coll in collector.get_tcc_collections():
+        print(coll.id)
+        pprint(coll.properties)
+        print("-" * 50)
 
-    for md in collector.metadata_list:
-        pprint(md.to_dict())
+        conf_builder = CollectionConfigBuilder(coll)
+        print(conf_builder.get_collection_config().model_dump())
 
 
 if __name__ == "__main__":

@@ -12,38 +12,40 @@ class TestAssetMetadata:
     def test_constructor_sets_defaults(self):
         meta = AssetMetadata(extract_href_info=None)
 
-        meta.asset_id is None
-        meta.item_id is None
-        meta.asset_type is None
-        meta.title is None
+        assert meta.asset_id is None
+        assert meta.item_id is None
+        assert meta.asset_type is None
+        assert meta.title is None
 
-        meta.href is None
-        meta.original_href is None
+        assert meta.href is None
+        assert meta.original_href is None
 
-        meta.shape is None
-        meta.tags == []
+        assert meta.shape is None
+        assert meta.tags == []
 
-        meta.transform is None
-        meta.bbox_lat_lon is None
-        meta.bbox_projected is None
+        assert meta.transform is None
+        assert meta.bbox_lat_lon is None
+        assert meta.bbox_projected is None
 
-        meta.bbox_as_list is None
-        meta.proj_bbox_as_list is None
-        meta.proj_epsg is None
+        assert meta.bbox_as_list is None
+        assert meta.proj_bbox_as_list is None
+        assert meta.proj_epsg is None
 
-        meta.geometry_as_dict is None
-        meta.proj_geometry_as_dict is None
-        meta.proj_geometry_as_wkt is None
+        assert meta.geometry_as_dict is None
+        assert meta.proj_geometry_as_dict is None
+        assert meta.proj_geometry_as_wkt is None
 
-        meta.version == "1.0.0"
+        assert meta.version == "1.0.0"
 
-        meta.datetime is None
-        meta.start_datetime is None
-        meta.end_datetime is None
+        assert meta.datetime is None
+        assert meta.start_datetime is None
+        assert meta.end_datetime is None
 
-        meta.year is None
-        meta.month is None
-        meta.day is None
+        assert meta.year is None
+        assert meta.month is None
+        assert meta.day is None
+
+        assert meta.file_size is None
 
         expected_dict = {
             "asset_id": None,
@@ -64,6 +66,7 @@ class TestAssetMetadata:
             "bbox_projected": None,
             "geometry_lat_lon": None,
             "raster_metadata": None,
+            "file_size": None,
         }
 
         assert expected_dict == meta.to_dict()

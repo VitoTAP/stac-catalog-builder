@@ -184,6 +184,9 @@ class AssetMetadata:
         # Raster shape in pixels
         self.shape: Optional[List[int]] = None
 
+        # file size, corresponds to file:size from FileInfo STAC extension
+        self.file_size: Optional[int] = None
+
         # Tags in the raster.
         self.tags: List[str] = []
 
@@ -449,6 +452,7 @@ class AssetMetadata:
             "bbox_projected": self.bbox_projected.to_dict() if self.bbox_projected else None,
             "geometry_lat_lon": self.geometry_lat_lon,
             "raster_metadata": self.raster_metadata.to_dict() if self.raster_metadata else None,
+            "file_size": self.file_size,
         }
         # Include internal information for debugging.
         if include_internal:

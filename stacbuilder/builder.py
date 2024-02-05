@@ -26,13 +26,12 @@ from pystac.layout import TemplateLayoutStrategy
 
 
 # TODO: add the GridExtension support again
-# from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
+from pystac.extensions.file import FileExtension
 
 
 # TODO: add the GridExtension support again
-# from pystac.extensions.projection import ProjectionExtension
 from pystac.extensions.raster import RasterExtension, RasterBand
 from stactools.core.io import ReadHrefModifier
 
@@ -407,8 +406,13 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
         #    that is not always the case.
-        # grid = GridExtension.ext(item, add_if_missing=True)
-        # grid.code = f"TILE-{metadata.tile}"
+        #
+        # The tile ID is not always the format that GridExtension expects.
+        # TODO: investigate when/when not to include the GridExtension.
+        #
+        # if metadata.tile_id:
+        #     grid = GridExtension.ext(item, add_if_missing=True)
+        #     grid.code = metadata.tile_id
 
         # TODO: Adding the eo:bands to the item this way below breaks the validation. Find out why.
         # EOExtension.add_to(item)
@@ -435,6 +439,10 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         asset_config = self._get_assets_config_for(metadata.asset_type)
         asset: Asset = asset_def.create_asset(metadata.href)
         asset.set_owner(item)
+
+        if metadata.file_size:
+            file_info = FileExtension.ext(asset, add_if_missing=True)
+            file_info.size = metadata.file_size
 
         if metadata.raster_metadata:
             asset_raster = RasterExtension.ext(asset, add_if_missing=True)
@@ -629,6 +637,10 @@ class MapGeoTiffToAssetMetadata:
             asset_meta.raster_metadata = raster_meta
 
         asset_meta.process_href_info()
+
+        file_stat = asset_path.stat()
+        asset_meta.file_size = file_stat.st_size
+
         return asset_meta
 
     # TODO: [decide] Do we need to be able to read GeoTIFFs from URLs as well?
