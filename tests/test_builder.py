@@ -25,6 +25,7 @@ from pystac.collection import Collection
 from stacbuilder.builder import (
     AlternateLinksGenerator,
     MEPAlternateLinksGenerator,
+    S3AlternateLinksGenerator,
     GeoTiffPipeline,
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
@@ -322,9 +323,6 @@ class TestMEPAlternateLinksGenerator:
         alternate_generator = MEPAlternateLinksGenerator()
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}
-
-
-from stacbuilder.builder import S3AlternateLinksGenerator
 
 
 class TestS3AlternateLinksGenerator:

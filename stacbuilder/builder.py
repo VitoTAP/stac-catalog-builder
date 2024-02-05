@@ -8,16 +8,17 @@ import json
 import logging
 import shutil
 import tempfile
+from functools import partial
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
 
 
 import geopandas as gpd
-from openeo.util import normalize_crs
 import pandas as pd
 import rasterio
 import rio_stac.stac as rst
+from openeo.util import normalize_crs
 from shapely.geometry import shape
 from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
 from pystac.errors import STACValidationError
@@ -108,9 +109,6 @@ class MEPAlternateLinksGenerator(AlternateLinksGenerator):
     def __init__(self):
         super().__init__()
         self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
-
-
-from functools import partial
 
 
 class S3AlternateLinksGenerator(AlternateLinksGenerator):
