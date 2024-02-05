@@ -140,7 +140,7 @@ def build_grouped_collections(glob, collection_config, overwrite, max_files, sav
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 def list_tiffs(glob, inputdir, max_files):
     """List which GeoTIFF files will be selected with this input dir and glob pattern."""
-    list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
+    commandapi.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
 
 
 @cli.command
