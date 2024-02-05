@@ -1,0 +1,53 @@
+{
+    "collection_id": "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01",
+    "title": "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01",
+    "description": "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/{year}",
+    "input_path_parser": {
+        "classname": "RegexInputPathParser"
+    },
+    "item_assets": {
+        "PPI": {
+            "title": "PPI",
+            "description": "PPI",
+            "eo_bands": [
+                {
+                    "name": "PPI",
+                    "description": "PPI",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 100
+                }
+            ]
+        },
+        "QFLAG": {
+            "title": "QFLAG",
+            "description": "QFLAG",
+            "eo_bands": [
+                {
+                    "name": "QFLAG",
+                    "description": "QFLAG",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 100
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
