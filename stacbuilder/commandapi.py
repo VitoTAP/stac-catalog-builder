@@ -264,7 +264,9 @@ def validate_collection(
     collection.validate_all()
 
 
-def vpp_list_metadata():
+def vpp_list_metadata(
+    max_products: Optional[int] = -1,
+):
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
@@ -272,9 +274,10 @@ def vpp_list_metadata():
     collector = HRLVPPMetadataCollector()
     COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
     collector.collection_id = COLLECTION_ID
+    collector.max_products = max_products
     collector.collect()
 
-    for md in collector.metadata:
+    for md in collector.metadata_list:
         pprint.pprint(md.to_dict())
 
 
@@ -286,6 +289,11 @@ def vpp_list_stac_items(
 
     This is used to test the conversion and check the configuration files.
     """
+
+    # In the end the HRLVPPMetadataCollector would not really need configuration
+    # We do need to process all collections, but perhaps we we want to
+    # keep the collection ID as a parameter so we can run it selectively.
+    # We would just need a list of all collection IDs we want to process.
     collector = HRLVPPMetadataCollector()
     COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
     collector.collection_id = COLLECTION_ID
