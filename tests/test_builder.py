@@ -23,9 +23,12 @@ from pystac.collection import Collection
 
 
 from stacbuilder.builder import (
+    AlternateLinksGenerator,
+    MEPAlternateLinksGenerator,
     GeoTiffPipeline,
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
+from stacbuilder.metadata import AssetMetadata
 
 
 @pytest.fixture
@@ -264,3 +267,58 @@ class TestGeoTiffPipeline:
 
             collection = Collection.from_file(coll_path)
             collection.validate_all()
+
+
+@pytest.fixture
+def simple_asset_metadata() -> AssetMetadata:
+    asset_md = AssetMetadata()
+    asset_md.asset_id = "asset123"
+    asset_md.item_id = "item456"
+    asset_md.collection_id = "collection789"
+    asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
+
+    return asset_md
+
+
+class TestAlternateLinksGenerator:
+    def test_it_registers_callbacks(self):
+        alternate_generator = AlternateLinksGenerator()
+
+        def fake_call_back(asset_md: AssetMetadata) -> str:
+            return f"foo://bar/{asset_md.asset_id}"
+
+        assert alternate_generator.has_alternate_key("FOO") is False
+        alternate_generator.register_callback("FOO", fake_call_back)
+        assert alternate_generator.has_alternate_key("FOO") is True
+
+        assert alternate_generator._callbacks["FOO"] is fake_call_back
+
+    def test_get_alternate_href_for(self, simple_asset_metadata):
+        alternate_generator = AlternateLinksGenerator()
+
+        def fake_call_back(asset_md: AssetMetadata) -> str:
+            return f"foo://bar/{asset_md.asset_id}"
+
+        alternate_generator.register_callback("FOO", fake_call_back)
+
+        alternate_href = alternate_generator.get_alternate_href_for("FOO", simple_asset_metadata)
+        assert alternate_href == "foo://bar/asset123"
+
+    def test_get_alternates(self, simple_asset_metadata):
+        alternate_generator = AlternateLinksGenerator()
+
+        def fake_call_back(asset_md: AssetMetadata) -> str:
+            return f"foo://bar/{asset_md.asset_id}"
+
+        alternate_generator.register_callback("FOO", fake_call_back)
+
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+
+        assert alternates == {"alternate": {"FOO": {"href": "foo://bar/asset123"}}}
+
+
+class TestMEPAlternateLinksGenerator:
+    def test_get_alternates(self, simple_asset_metadata):
+        alternate_generator = MEPAlternateLinksGenerator()
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+        assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}

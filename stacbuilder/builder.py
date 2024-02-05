@@ -10,7 +10,7 @@ import shutil
 import tempfile
 from itertools import islice
 from pathlib import Path
-from typing import Any, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
 
 
 import geopandas as gpd
@@ -67,6 +67,47 @@ class CreateAssetUrlFromPath:
     def get_url(self, asset_path: Path):
         rel_path: Path = asset_path.relative_to(self.data_root)
         return self.url_template.format(str(rel_path))
+
+
+AssetMetadataToURL = Callable[[AssetMetadata], str]
+
+
+class AlternateLinksGenerator:
+    """Generates the alternate links for assets."""
+
+    # TODO: Make it configurable so we can have MEP, S3, etc.
+    # TODO: Do we have only a few types of alternates and can we do that with one class?
+    #   Maybe we can have one class that generate all of them but looks at the config to
+    #   select which ones need to be added.
+
+    def __init__(self):
+        self._callbacks: Dict[str, AssetMetadataToURL] = {}
+
+    def register_callback(self, key, converter=AssetMetadataToURL):
+        self._callbacks[key] = converter
+
+    def has_alternate_key(self, key: str) -> bool:
+        return key in self._callbacks
+
+    def get_alternates(self, asset_metadata: AssetMetadata) -> Dict[str, Dict[str, Dict[str, str]]]:
+        alternates = {}
+        for key in self._callbacks:
+            alternates[key] = {"href": self.get_alternate_href_for(key, asset_metadata)}
+
+        return {"alternate": alternates}
+
+    def get_alternate_href_for(self, key: str, asset_metadata: AssetMetadata) -> Dict[str, str]:
+        if not self.has_alternate_key(key):
+            return None
+        return self._callbacks[key](asset_metadata)
+
+
+class MEPAlternateLinksGenerator(AlternateLinksGenerator):
+    """A simple CreateAlternateLinks that only generates the MEP link, which is a POSIX path"""
+
+    def __init__(self):
+        super().__init__()
+        self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
 
 
 def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file: Path):
@@ -242,7 +283,15 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         return self._item_assets_configs
 
     def create_alternate_links(self, metadata: AssetMetadata) -> Dict[str, Any]:
-        return {"alternate": {"MEP": {"href": str(metadata.asset_path)}}}
+        """Create the alternate links.
+
+        TODO: make this configurable so we can handle both MEP, S3 and anything else.
+        """
+        if not metadata.asset_path:
+            return None
+
+        alt_links = MEPAlternateLinksGenerator()
+        return alt_links.get_alternates(metadata)
 
     def map(self, metadata: AssetMetadata) -> Item:
         if metadata.asset_type not in self.item_assets_configs:
@@ -371,8 +420,10 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         # Add the alternate links for the Alternate-Asset extension
         # see: https://github.com/stac-extensions/alternate-assets
-        alternate_links = self.create_alternate_links(metadata)
-        asset.extra_fields.update(alternate_links)
+        if metadata.asset_path:
+            alternate_links = self.create_alternate_links(metadata)
+            if alternate_links:
+                asset.extra_fields.update(alternate_links)
 
         return asset
 
