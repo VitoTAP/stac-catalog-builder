@@ -19,17 +19,7 @@ import pydantic
 import pydantic.errors
 
 
-from stacbuilder.commandapi import (
-    build_collection,
-    list_asset_metadata,
-    list_input_files,
-    list_stac_items,
-    load_collection,
-    postprocess_collection,
-    validate_collection,
-    vpp_build_collection,
-    vpp_list_stac_items,
-)
+from stacbuilder import commandapi
 from stacbuilder.config import CollectionConfig
 from stacbuilder.verify_openeo import verify_in_openeo
 
@@ -90,7 +80,7 @@ def cli(verbose):
 )
 def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, save_dataframe):
     """Build a STAC collection from a directory of GeoTIFF files."""
-    build_collection(
+    commandapi.build_collection(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -128,7 +118,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, sa
 )
 def build_grouped_collections(glob, collection_config, overwrite, max_files, save_dataframe, inputdir, outputdir):
     """Build a STAC collection from a directory of GeoTIFF files."""
-    build_grouped_collections(
+    commandapi.build_grouped_collections(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -175,7 +165,7 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    list_asset_metadata(
+    commandapi.list_asset_metadata(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -206,7 +196,7 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    list_stac_items(
+    commandapi.list_stac_items(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
@@ -222,14 +212,14 @@ def show_collection(collection_file):
 
     You can use this to see if it can be loaded.
     """
-    load_collection(collection_file)
+    commandapi.load_collection(collection_file)
 
 
 @cli.command
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def validate(collection_file):
     """Run STAC validation on the collection file."""
-    validate_collection(collection_file)
+    commandapi.validate_collection(collection_file)
 
 
 @cli.command
@@ -261,7 +251,7 @@ def post_process(outputdir, collection_config, collection_file):
     You make have to do that many times when debugging postpreocessing
     and waiting for collections to be build is annoying.
     """
-    postprocess_collection(
+    commandapi.postprocess_collection(
         collection_file=collection_file, collection_config_path=collection_config, output_dir=outputdir
     )
 
@@ -350,12 +340,15 @@ def hrlvpp():
 
 
 @hrlvpp.command
-def vpp_list_metadata():
+@click.option(
+    "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
+)
+def vpp_list_metadata(max_products: int):
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
-    vpp_list_metadata()
+    commandapi.vpp_list_metadata(max_products=max_products)
 
 
 @hrlvpp.command
@@ -374,13 +367,13 @@ def vpp_list_items(collection_config: str, max_products: int):
 
     This is used to test the conversion and check the configuration files.
     """
-    vpp_list_stac_items(collection_config_path=collection_config, max_products=max_products)
+    commandapi.vpp_list_stac_items(collection_config_path=collection_config, max_products=max_products)
 
 
 @hrlvpp.command
 def vpp_build():
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
-    vpp_build_collection()
+    commandapi.vpp_build_collection()
 
 
 #
