@@ -159,7 +159,7 @@ class FileCollector(IDataCollector):
         return self._input_files is not None
 
     def reset(self):
-        print(f"resetting {self.__class__.__name__} instance: {self}")
+        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._input_files = None
 
     @property
@@ -615,7 +615,7 @@ class STACCollectionBuilder:
         self._collection: Collection = None
 
     def reset(self):
-        print(f"resetting {self.__class__.__name__} instance: {self}")
+        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._stac_items = None
 
@@ -1060,7 +1060,7 @@ class GeoTiffPipeline:
         )
 
     def reset(self) -> None:
-        print(f"resetting {self.__class__.__name__} instance: {self}")
+        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._collection_groups = {}
         self._file_collector.reset()
@@ -1332,7 +1332,7 @@ class AssetMetadataPipeline:
         )
 
     def reset(self) -> None:
-        print(f"resetting {self.__class__.__name__} instance: {self}")
+        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._collection_groups = {}
 
