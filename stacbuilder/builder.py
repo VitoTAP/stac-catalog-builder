@@ -110,6 +110,43 @@ class MEPAlternateLinksGenerator(AlternateLinksGenerator):
         self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
 
 
+from functools import partial
+
+
+class S3AlternateLinksGenerator(AlternateLinksGenerator):
+    """A simple CreateAlternateLinks that only generates the MEP link, which is a POSIX path"""
+
+    def __init__(self, s3_bucket: str, s3_root_path: Optional[str] = None):
+        super().__init__()
+
+        self._s3_bucket = self.remove_leading_trailing_slash(s3_bucket)
+        self._s3_root_path = self.remove_leading_trailing_slash(s3_root_path) if s3_root_path else None
+
+        convert = partial(self.to_s3_url, s3_bucket=s3_bucket, s3_root_path=s3_root_path)
+        self.register_callback("S3", convert)
+
+    @staticmethod
+    def remove_leading_trailing_slash(path: str):
+        if path.startswith("/"):
+            result = path[1:]
+        else:
+            result = path
+
+        if result.endswith("/"):
+            result = result[:-1]
+
+        return result
+
+    @classmethod
+    def to_s3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
+        path = cls.remove_leading_trailing_slash(str(asset_md.asset_path))
+        if s3_root_path:
+            s3_url = f"s3://{s3_bucket}/{s3_root_path}/{path}"
+        else:
+            s3_url = f"s3://{s3_bucket}/{path}"
+        return s3_url
+
+
 def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file: Path):
     """Creates a STAC item from a GeoTIFF file, using rio-stac.
 

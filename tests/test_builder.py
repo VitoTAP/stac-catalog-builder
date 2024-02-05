@@ -322,3 +322,22 @@ class TestMEPAlternateLinksGenerator:
         alternate_generator = MEPAlternateLinksGenerator()
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}
+
+
+from stacbuilder.builder import S3AlternateLinksGenerator
+
+
+class TestS3AlternateLinksGenerator:
+    def test_get_alternates_only_s3_bucket(self, simple_asset_metadata):
+        alternate_generator = S3AlternateLinksGenerator(s3_bucket="test-bucket")
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+        assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
+
+    def test_get_alternates_only_with_root_path(self, simple_asset_metadata):
+        alternate_generator = S3AlternateLinksGenerator(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+        assert alternates == {
+            "alternate": {
+                "S3": {"href": "s3://test-bucket/test/data-root/path/data/collection789/item456/asset123.tif"}
+            }
+        }
