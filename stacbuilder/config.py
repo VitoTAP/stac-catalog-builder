@@ -328,4 +328,8 @@ class GeotTIFFPipelineConfig(BaseModel):
 class OpenSearchPipelineConfig(BaseModel):
     collection_config: CollectionConfig
     # ??? Don't know yet what setup we need to connect to OpenSearch and ingest this input.
+
+    # for now: output it as static STAC collection
+    # This will be replaced with settings to upload it to a STAC API.
     output_dir: Path
+    max_products: Optional[int] = -1

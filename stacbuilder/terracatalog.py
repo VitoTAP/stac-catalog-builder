@@ -8,6 +8,7 @@ At present, all code in this module is still very experimental (d.d. 2024-01-29)
 """
 
 import datetime as dt
+import logging
 from pprint import pprint
 from typing import List, Optional, Tuple
 
@@ -25,6 +26,9 @@ from terracatalogueclient.config import CatalogueEnvironment
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import IMetadataCollector
+
+
+_logger = logging.getLogger(__name__)
 
 
 def create_stac_collection(collection_info: tcc.Collection):
@@ -93,7 +97,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         super().__init__()
         self._df_products: Optional[gpd.GeoDataFrame] = None
         self._collection_id: Optional[str] = None
-        self._max_products = 10
+        self._max_products = -1
 
     @property
     def collection_id(self) -> Optional[str]:
@@ -120,16 +124,14 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._max_products = int(value) if value else -1
 
     def collect(self):
+        pprint(f"{self.__class__.__name__}.collect ...")
         if self.has_collected():
+            _logger.info("Already collected data. Returning")
             return
 
         if not self._df_products:
-            catalogue = self.get_tcc_catalogue()
-            collection = self.get_tcc_collection()
-            self._df_products = self.get_products_as_dataframe(
-                catalogue=catalogue,
-                collection=collection,
-            )
+            _logger.debug(f"Downloading products to dataframe. Max products to retrieve: {self.max_products}")
+            self._df_products = self.get_products_as_dataframe()
 
         self._metadata_list = self._convert_to_asset_metadata(self._df_products)
 
@@ -147,15 +149,16 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 return coll
         return None
 
-    def get_products_as_dataframe(self, catalogue, collection: tcc.Collection) -> gpd.GeoDataFrame:
+    def get_products_as_dataframe(self) -> gpd.GeoDataFrame:
+        catalogue = self.get_tcc_catalogue()
+        collection = self.get_tcc_collection()
         num_prods = catalogue.get_product_count(collection.id)
-        pprint(f"product count for coll_id{collection.id}: {num_prods}")
+        pprint(f"product count for coll_id {collection.id}: {num_prods}")
 
         dt_start, dt_end = get_coll_temporal_extent(collection)
         dt_range_months = pd.date_range(dt_start, dt_end, freq="MS")
 
-        # pprint(dt_range_years)
-        # pprint(dt_range_months)
+        pprint(dt_range_months)
 
         data_frames = []
         slot_start = dt_range_months[0]
@@ -166,8 +169,12 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
             products = catalogue.get_products(collection.id, start=slot_start, end=slot_end)
             assets_md = []
-            for p, product in enumerate(products):
-                # print("-" * 50)
+            for product in products:
+                num_products_processed += 1
+                if self._max_products > 0 and num_products_processed > self._max_products:
+                    break
+
+                print("-" * 50)
                 # print(product.id)
                 # print(product.title)
                 # print("product properties:")
@@ -176,17 +183,13 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
                 asset_metadata = self.create_asset_metadata(product)
                 assets_md.append(asset_metadata)
-                # pprint(asset_metadata.to_dict())
+                pprint(asset_metadata.to_dict())
 
-                # asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
-                # print(f"{asset_bbox.as_polygon()=}")
-                # print(f"{product.geometry}")
-                # print(asset_bbox.as_polygon() == product.geometry)
-                # print("-" * 50)
-
-                num_products_processed += 1
-                if self._max_products > 0 and num_products_processed > self._max_products:
-                    break
+                asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
+                print(f"{asset_bbox.as_polygon()=}")
+                print(f"{product.geometry}")
+                print(asset_bbox.as_polygon() == product.geometry)
+                print("-" * 50)
 
             data = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
 
@@ -289,7 +292,7 @@ def main():
 
     collector.collect()
 
-    for md in collector.metadata:
+    for md in collector.metadata_list:
         pprint(md.to_dict())
 
 
