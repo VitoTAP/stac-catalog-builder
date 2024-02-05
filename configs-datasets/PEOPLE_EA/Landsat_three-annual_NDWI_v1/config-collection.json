@@ -21,7 +21,7 @@
     "input_path_parser": {
         "classname": "LandsatNDWIInputPathParser",
         "parameters": {
-            "regex_pattern": ".*/NDWI_(?P<year>\\d{4})_(?P<tile_row>\\d+)_(?P<tile_col>\\d+).tif$",
+            "regex_pattern": ".*NDWI_(?P<year>\\d{4})_(?P<tile_row>\\d+)_(?P<tile_col>\\d+).tif$",
             "fixed_values": {
                 "asset_type": "NDWI"
             }
