@@ -389,21 +389,14 @@ def vpp_list_metadata(max_products: int):
 
 @hrlvpp.command
 @click.option(
-    "-c",
-    "--collection-config",
-    type=click.Path(exists=True, dir_okay=False, file_okay=True),
-    help="Configuration file for the collection",
-)
-@click.option(
     "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
 )
-# @click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
-def vpp_list_items(collection_config: str, max_products: int):
+def vpp_list_items(max_products: int):
     """Show the STAC items that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
-    commandapi.vpp_list_stac_items(collection_config_path=collection_config, max_products=max_products)
+    commandapi.vpp_list_stac_items(max_products=max_products)
 
 
 @hrlvpp.command

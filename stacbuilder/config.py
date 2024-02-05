@@ -207,7 +207,10 @@ class AssetConfig(BaseModel):
 
     def to_asset_definition(self) -> AssetDefinition:
         """Create an AssetDefinition object from this configuration."""
-        bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
+        if self.eo_bands:
+            bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
+        else:
+            bands = []
         return AssetDefinition(
             properties={
                 "type": self.media_type,
