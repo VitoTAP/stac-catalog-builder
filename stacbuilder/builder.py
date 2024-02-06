@@ -77,9 +77,10 @@ class AlternateLinksGenerator:
     """Generates the alternate links for assets."""
 
     # TODO: Make it configurable so we can have MEP, S3, etc.
-    # TODO: Do we have only a few types of alternates and can we do that with one class?
-    #   Maybe we can have one class that generate all of them but looks at the config to
-    #   select which ones need to be added.
+    # TODO: Would like AlternateLinksGenerator system to be simpler, maybe without subclasses.
+    #   - Do we have only a few types of alternates and can we do that with one class?
+    #   - Maybe we can have one class that generate all of them but looks at the config to
+    #       select which ones need to be added.
 
     def __init__(self):
         self._callbacks: Dict[str, AssetMetadataToURL] = {}
@@ -102,6 +103,52 @@ class AlternateLinksGenerator:
             return None
         return self._callbacks[key](asset_metadata)
 
+    def add_mep(self):
+        self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
+
+    def add_basic_s3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
+        """Add a S3 with an S3 bucket and the asset's file path concatenated to that bucket.
+
+        For example:
+            /my/data/folder/some-collection/some-asset.tif
+        becomes:
+            s3://my-bucket/my/data/folder/some-collection/some-asset.tif
+
+        If you need to translate the file path in a more sophisticated wat you have to write your
+        own handler.
+
+        For example when the root of the path needs to be replaced by something else
+        for the S3 urls. You need write a callback for that:
+
+            /my/data/folder/some-collection/some-asset.tif -> s3://my-bucket/different-data-root/some-asset.tif
+        """
+        s3_bucket = self.remove_leading_trailing_slash(s3_bucket)
+        s3_root_path = self.remove_leading_trailing_slash(s3_root_path) if s3_root_path else None
+
+        convert = partial(self.to_s3_url, s3_bucket=s3_bucket, s3_root_path=s3_root_path)
+        self.register_callback("S3", convert)
+
+    @classmethod
+    def to_s3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
+        path = cls.remove_leading_trailing_slash(str(asset_md.asset_path))
+        if s3_root_path:
+            s3_url = f"s3://{s3_bucket}/{s3_root_path}/{path}"
+        else:
+            s3_url = f"s3://{s3_bucket}/{path}"
+        return s3_url
+
+    @staticmethod
+    def remove_leading_trailing_slash(path: str):
+        if path.startswith("/"):
+            result = path[1:]
+        else:
+            result = path
+
+        if result.endswith("/"):
+            result = result[:-1]
+
+        return result
+
 
 class MEPAlternateLinksGenerator(AlternateLinksGenerator):
     """A simple CreateAlternateLinks that only generates the MEP link, which is a POSIX path"""
@@ -112,7 +159,24 @@ class MEPAlternateLinksGenerator(AlternateLinksGenerator):
 
 
 class S3AlternateLinksGenerator(AlternateLinksGenerator):
-    """A simple CreateAlternateLinks that only generates the MEP link, which is a POSIX path"""
+    """A simple CreateAlternateLinks that generates the S3 links.
+
+    This implementation simply concatenates the S3 bucket and the asset's file path,
+    and removes any leading or trailing slashes that would lead to a double slash `//`.
+
+    For example:
+        /my/data/folder/some-collection/some-asset.tif
+    becomes:
+        s3://my-bucket/my/data/folder/some-collection/some-asset.tif
+
+    If you need to translate the file path in a more sophisticated wat you have to write your
+    own handler.
+
+    For example when the root of the path needs to be replaced by something else
+    for the S3 urls. You need write a callback for that:
+
+        /my/data/folder/some-collection/some-asset.tif -> s3://my-bucket/different-data-root/some-asset.tif
+    """
 
     def __init__(self, s3_bucket: str, s3_root_path: Optional[str] = None):
         super().__init__()
