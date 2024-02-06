@@ -321,7 +321,7 @@ class TestAlternateLinksGenerator:
         alternate_generator = AlternateLinksGenerator()
 
         assert alternate_generator.has_alternate_key("MEP") is False
-        alternate_generator.add_mep()
+        alternate_generator.add_MEP()
         assert alternate_generator.has_alternate_key("MEP") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
@@ -332,7 +332,7 @@ class TestAlternateLinksGenerator:
         alternate_generator = AlternateLinksGenerator()
 
         assert alternate_generator.has_alternate_key("S3") is False
-        alternate_generator.add_basic_s3("test-bucket")
+        alternate_generator.add_basic_S3("test-bucket")
         assert alternate_generator.has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
@@ -344,8 +344,8 @@ class TestAlternateLinksGenerator:
         assert alternate_generator.has_alternate_key("MEP") is False
         assert alternate_generator.has_alternate_key("S3") is False
 
-        alternate_generator.add_mep()
-        alternate_generator.add_basic_s3("test-bucket")
+        alternate_generator.add_MEP()
+        alternate_generator.add_basic_S3("test-bucket")
         assert alternate_generator.has_alternate_key("MEP") is True
         assert alternate_generator.has_alternate_key("S3") is True
 

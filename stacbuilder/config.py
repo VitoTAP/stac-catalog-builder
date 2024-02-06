@@ -234,6 +234,8 @@ class AssetHrefModifierConfig(BaseModel):
 
 # TODO add config class for AlternateLinksGenerator and its descendants.
 #   Problem is that the AlternateLinksGenerator system could be simpler I think.
+#   However, having subclasses would make it easier to load the right
+#   implementation from a configuration.
 # class AlternateHrefConfig(BaseModel):
 #     pass
 

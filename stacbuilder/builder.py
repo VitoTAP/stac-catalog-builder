@@ -103,10 +103,10 @@ class AlternateLinksGenerator:
             return None
         return self._callbacks[key](asset_metadata)
 
-    def add_mep(self):
+    def add_MEP(self):
         self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
 
-    def add_basic_s3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
+    def add_basic_S3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
         """Add a S3 with an S3 bucket and the asset's file path concatenated to that bucket.
 
         For example:
@@ -125,11 +125,11 @@ class AlternateLinksGenerator:
         s3_bucket = self.remove_leading_trailing_slash(s3_bucket)
         s3_root_path = self.remove_leading_trailing_slash(s3_root_path) if s3_root_path else None
 
-        convert = partial(self.to_s3_url, s3_bucket=s3_bucket, s3_root_path=s3_root_path)
+        convert = partial(self.to_S3_url, s3_bucket=s3_bucket, s3_root_path=s3_root_path)
         self.register_callback("S3", convert)
 
     @classmethod
-    def to_s3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
+    def to_S3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
         path = cls.remove_leading_trailing_slash(str(asset_md.asset_path))
         if s3_root_path:
             s3_url = f"s3://{s3_bucket}/{s3_root_path}/{path}"
