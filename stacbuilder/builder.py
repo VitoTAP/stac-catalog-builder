@@ -155,7 +155,7 @@ class AlternateHrefGenerator:
         alt_link_gen = AlternateHrefGenerator()
         if not config:
             return alt_link_gen
-        
+
         if config.add_MEP:
             alt_link_gen.add_MEP()
 
