@@ -984,11 +984,14 @@ class GeoTiffPipeline:
         Also we do not want to mix these (volatile) path settings with the
         stable/fixed settings in the general config file.
         """
+        if output_dir and not isinstance(output_dir, Path):
+            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
+
         pipeline = GeoTiffPipeline(None, None, None, None)
         pipeline.setup(
             collection_config=collection_config,
             file_coll_cfg=file_coll_cfg,
-            output_dir=output_dir.absolute() if output_dir else None,
+            output_dir=output_dir.expanduser().absolute() if output_dir else None,
             overwrite=overwrite,
         )
         return pipeline

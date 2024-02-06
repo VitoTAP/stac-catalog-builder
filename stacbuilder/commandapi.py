@@ -53,6 +53,10 @@ def build_collection(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
+
+    if output_dir and not isinstance(output_dir, Path):
+        output_dir = Path(output_dir).expanduser().absolute()
+
     pipeline = GeoTiffPipeline.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
