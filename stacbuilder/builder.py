@@ -24,24 +24,31 @@ from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, 
 from pystac.errors import STACValidationError
 from pystac.layout import TemplateLayoutStrategy
 
+
 # TODO: add the GridExtension support again
 # from pystac.extensions.grid import GridExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
 
+
 # TODO: add the GridExtension support again
 # from pystac.extensions.projection import ProjectionExtension
 from pystac.extensions.raster import RasterExtension
 from stactools.core.io import ReadHrefModifier
+
+
 from stacbuilder.boundingbox import BoundingBox
-
-
-from stacbuilder.exceptions import InvalidOperation
+from stacbuilder.exceptions import InvalidOperation, InvalidConfiguration
 from stacbuilder.pathparsers import (
     InputPathParser,
     InputPathParserFactory,
 )
-from stacbuilder.config import AssetConfig, CollectionConfig, FileCollectorConfig
+from stacbuilder.config import (
+    AssetConfig,
+    AlternateHrefConfig,
+    CollectionConfig,
+    FileCollectorConfig,
+)
 from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
 from stacbuilder.projections import reproject_bounding_box
 from stacbuilder.timezoneformat import TimezoneFormatConverter
@@ -73,7 +80,7 @@ class CreateAssetUrlFromPath:
 AssetMetadataToURL = Callable[[AssetMetadata], str]
 
 
-class AlternateLinksGenerator:
+class AlternateHrefGenerator:
     """Generates the alternate links for assets."""
 
     # TODO: Make it configurable so we can have MEP, S3, etc.
@@ -149,8 +156,21 @@ class AlternateLinksGenerator:
 
         return result
 
+    @classmethod
+    def from_config(cls, config: AlternateHrefConfig) -> "AlternateHrefGenerator":
+        alt_link_gen = AlternateHrefGenerator()
+        if config.add_MEP:
+            alt_link_gen.add_MEP()
 
-class MEPAlternateLinksGenerator(AlternateLinksGenerator):
+        if config.add_S3:
+            if not config.s3_bucket:
+                raise InvalidConfiguration(
+                    "AlternateHrefConfig specifies S3 links need to be added but there is no value for s3_bucket"
+                )
+            alt_link_gen.add_basic_S3(s3_bucket=config.s3_bucket, s3_root_path=config.s3_root_path)
+
+
+class MEPAlternateLinksGenerator(AlternateHrefGenerator):
     """A simple CreateAlternateLinks that only generates the MEP link, which is a POSIX path"""
 
     def __init__(self):
@@ -158,7 +178,7 @@ class MEPAlternateLinksGenerator(AlternateLinksGenerator):
         self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
 
 
-class S3AlternateLinksGenerator(AlternateLinksGenerator):
+class S3AlternateLinksGenerator(AlternateHrefGenerator):
     """A simple CreateAlternateLinks that generates the S3 links.
 
     This implementation simply concatenates the S3 bucket and the asset's file path,
@@ -376,6 +396,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         # Settings: these are just data, not components we delegate work to.
         self._item_assets_configs: item_assets_configs = item_assets_configs
+        self._alternate_href_generator: Optional[AlternateHrefGenerator] = None
 
     @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
@@ -386,11 +407,13 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         TODO: make this configurable so we can handle both MEP, S3 and anything else.
         """
+        if not self._alternate_href_generator:
+            return None
+
         if not metadata.asset_path:
             return None
 
-        alt_links = MEPAlternateLinksGenerator()
-        return alt_links.get_alternates(metadata)
+        return self._alternate_href_generator.get_alternates(metadata)
 
     def map(self, metadata: AssetMetadata) -> Item:
         if metadata.asset_type not in self.item_assets_configs:

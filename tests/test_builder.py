@@ -23,7 +23,7 @@ from pystac.collection import Collection
 
 
 from stacbuilder.builder import (
-    AlternateLinksGenerator,
+    AlternateHrefGenerator,
     MEPAlternateLinksGenerator,
     S3AlternateLinksGenerator,
     GeoTiffPipeline,
@@ -283,7 +283,7 @@ def simple_asset_metadata() -> AssetMetadata:
 
 class TestAlternateLinksGenerator:
     def test_it_registers_callbacks(self):
-        alternate_generator = AlternateLinksGenerator()
+        alternate_generator = AlternateHrefGenerator()
 
         def fake_call_back(asset_md: AssetMetadata) -> str:
             return f"foo://bar/{asset_md.asset_id}"
@@ -295,7 +295,7 @@ class TestAlternateLinksGenerator:
         assert alternate_generator._callbacks["FOO"] is fake_call_back
 
     def test_get_alternate_href_for(self, simple_asset_metadata):
-        alternate_generator = AlternateLinksGenerator()
+        alternate_generator = AlternateHrefGenerator()
 
         def fake_call_back(asset_md: AssetMetadata) -> str:
             return f"foo://bar/{asset_md.asset_id}"
@@ -306,7 +306,7 @@ class TestAlternateLinksGenerator:
         assert alternate_href == "foo://bar/asset123"
 
     def test_get_alternates(self, simple_asset_metadata):
-        alternate_generator = AlternateLinksGenerator()
+        alternate_generator = AlternateHrefGenerator()
 
         def fake_call_back(asset_md: AssetMetadata) -> str:
             return f"foo://bar/{asset_md.asset_id}"
@@ -318,7 +318,7 @@ class TestAlternateLinksGenerator:
         assert alternates == {"alternate": {"FOO": {"href": "foo://bar/asset123"}}}
 
     def test_mep(self, simple_asset_metadata):
-        alternate_generator = AlternateLinksGenerator()
+        alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator.has_alternate_key("MEP") is False
         alternate_generator.add_MEP()
@@ -329,7 +329,7 @@ class TestAlternateLinksGenerator:
         assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}
 
     def test_S3_only_bucket(self, simple_asset_metadata):
-        alternate_generator = AlternateLinksGenerator()
+        alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator.has_alternate_key("S3") is False
         alternate_generator.add_basic_S3("test-bucket")
@@ -339,7 +339,7 @@ class TestAlternateLinksGenerator:
         assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
 
     def test_MEP_and_S3(self, simple_asset_metadata):
-        alternate_generator = AlternateLinksGenerator()
+        alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator.has_alternate_key("MEP") is False
         assert alternate_generator.has_alternate_key("S3") is False
