@@ -24,11 +24,15 @@ from pystac.collection import Collection
 
 from stacbuilder.builder import (
     AlternateHrefGenerator,
-    MEPAlternateLinksGenerator,
-    S3AlternateLinksGenerator,
     GeoTiffPipeline,
 )
-from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
+from stacbuilder.config import (
+    AlternateHrefConfig,
+    CollectionConfig,
+    FileCollectorConfig,
+    InputPathParserConfig,
+)
+from stacbuilder.exceptions import InvalidConfiguration
 from stacbuilder.metadata import AssetMetadata
 
 
@@ -332,11 +336,25 @@ class TestAlternateLinksGenerator:
         alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator.has_alternate_key("S3") is False
-        alternate_generator.add_basic_S3("test-bucket")
+        alternate_generator.add_basic_S3(s3_bucket="test-bucket")
         assert alternate_generator.has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
+
+    def test_S3_with_root_path(self, simple_asset_metadata):
+        alternate_generator = AlternateHrefGenerator()
+
+        assert alternate_generator.has_alternate_key("S3") is False
+        alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
+        assert alternate_generator.has_alternate_key("S3") is True
+
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+        assert alternates == {
+            "alternate": {
+                "S3": {"href": "s3://test-bucket/test/data-root/path/data/collection789/item456/asset123.tif"}
+            }
+        }
 
     def test_MEP_and_S3(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
@@ -357,25 +375,56 @@ class TestAlternateLinksGenerator:
             }
         }
 
+    def test_MEP_and_S3_with_root_path(self, simple_asset_metadata):
+        alternate_generator = AlternateHrefGenerator()
 
-class TestMEPAlternateLinksGenerator:
-    def test_get_alternates(self, simple_asset_metadata):
-        alternate_generator = MEPAlternateLinksGenerator()
-        alternates = alternate_generator.get_alternates(simple_asset_metadata)
-        assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}
+        assert alternate_generator.has_alternate_key("MEP") is False
+        assert alternate_generator.has_alternate_key("S3") is False
 
+        alternate_generator.add_MEP()
+        alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
 
-class TestS3AlternateLinksGenerator:
-    def test_get_alternates_only_s3_bucket(self, simple_asset_metadata):
-        alternate_generator = S3AlternateLinksGenerator(s3_bucket="test-bucket")
-        alternates = alternate_generator.get_alternates(simple_asset_metadata)
-        assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
+        assert alternate_generator.has_alternate_key("MEP") is True
+        assert alternate_generator.has_alternate_key("S3") is True
 
-    def test_get_alternates_with_root_path(self, simple_asset_metadata):
-        alternate_generator = S3AlternateLinksGenerator(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {
             "alternate": {
+                "MEP": {"href": "/data/collection789/item456/asset123.tif"},
                 "S3": {"href": "s3://test-bucket/test/data-root/path/data/collection789/item456/asset123.tif"}
             }
         }
+
+    @pytest.mark.parametrize(
+        "config", 
+        [
+            None,
+            AlternateHrefConfig(add_MEP=False, add_S3=False),
+            AlternateHrefConfig(add_MEP=True, add_S3=False),
+            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="test-bucket"),
+            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
+            AlternateHrefConfig(add_MEP=True, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
+        ]
+    )
+    def test_from_config_adds_correct_callback(self, config):
+        alt_href_gen = AlternateHrefGenerator.from_config(config)
+
+        if config is None:
+            assert alt_href_gen.has_alternate_key("MEP") is False
+            assert alt_href_gen.has_alternate_key("S3") is False
+        else:
+            assert alt_href_gen.has_alternate_key("MEP") == config.add_MEP
+            assert alt_href_gen.has_alternate_key("S3") == config.add_S3
+
+
+    @pytest.mark.parametrize(
+        "config", 
+        [
+            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=None),
+            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="",),
+            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=None, s3_root_path="test/root-path"),
+        ]
+    )
+    def test_from_config_raises_invalidconfiguration_when_s3bucket_missing(self, config):
+        with pytest.raises(InvalidConfiguration):
+            AlternateHrefGenerator.from_config(config)
