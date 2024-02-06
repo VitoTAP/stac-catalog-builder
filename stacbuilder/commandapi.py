@@ -13,9 +13,11 @@ functionality of the CLI, and that is harder to do directly on the CLI.
 
 from pathlib import Path
 import pprint
+from typing import Dict, Hashable, List, Optional
+
 
 from pystac import Collection
-from typing import Dict, Hashable, List, Optional
+import terracatalogueclient as tcc
 
 
 from stacbuilder.builder import (
@@ -38,7 +40,7 @@ def build_collection(
     overwrite: bool,
     max_files: Optional[int] = -1,
     save_dataframe: Optional[bool] = False,
-)-> None:
+) -> None:
     """
     Build a STAC collection from a directory of files.
 
@@ -78,7 +80,7 @@ def build_grouped_collections(
     overwrite: bool,
     max_files: Optional[int] = -1,
     save_dataframe: Optional[bool] = False,
-)-> None:
+) -> None:
     """
     Build a multiple STAC collections from a directory of files,
     where each collection groups related STAC items.
@@ -121,12 +123,12 @@ def list_input_files(
     glob: str,
     input_dir: Path,
     max_files: Optional[int] = -1,
-)-> list[Path]:
+) -> list[Path]:
     """
     Searches the files that are found with the current configuration.
 
     This can be used to test the glob pattern and the input directory.
-    
+
     :param glob: Glob pattern to match the files within the input_dir.
     :param input_dir: Root directory where the files are located.
     :param max_files: Maximum number of files to process.
@@ -147,7 +149,7 @@ def list_asset_metadata(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
-)-> Dict[Hashable, List[AssetMetadata]]:
+) -> Dict[Hashable, List[AssetMetadata]]:
     """
     Return the AssetMetadata objects generated for each file.
 
@@ -184,7 +186,7 @@ def list_stac_items(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
-)-> (List[Collection], List[Path]):
+) -> (List[Collection], List[Path]):
     """
     Return the STAC items that are generated for each file and the files for which no stac item could be generated.
 
@@ -216,13 +218,13 @@ def list_stac_items(
     failed_files = [files[i] for i, item in enumerate(stac_items) if item is None]
 
     return stac_items, failed_files
-    
+
 
 def postprocess_collection(
     collection_file: Path,
     collection_config_path: Path,
     output_dir: Optional[Path] = None,
-)-> None:
+) -> None:
     """
     Run only the post-processing step, on an existing STAC collection.
 
@@ -242,10 +244,10 @@ def postprocess_collection(
 
 def load_collection(
     collection_file: Path,
-)-> Collection:
+) -> Collection:
     """
     Load and return the STAC collection in 'collection_file'.
-    
+
     :param collection_file: Path to the STAC collection file.
     :return: The STAC collection object.
     """
@@ -254,10 +256,10 @@ def load_collection(
 
 def validate_collection(
     collection_file: Path,
-)-> None:
+) -> None:
     """
     Validate a STAC collection.
-    
+
     :param collection_file: Path to the STAC collection file.
     """
     collection = Collection.from_file(collection_file)
@@ -282,6 +284,8 @@ def vpp_list_metadata(
 
 
 def vpp_list_stac_items(
+    collection_id: Optional[str],
+    collection_number: Optional[int],
     max_products: Optional[int] = -1,
 ):
     """Show the STAC items that are generated for each VPP product.
@@ -294,10 +298,11 @@ def vpp_list_stac_items(
     # keep the collection ID as a parameter so we can run it selectively.
     # We would just need a list of all collection IDs we want to process.
     collector = HRLVPPMetadataCollector()
-    COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
-    collector.collection_id = COLLECTION_ID
+    # COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
+
+    collection_id = _get_tcc_collection_id(collection_id, collection_number)
+    collector.collection_id = collection_id
     collector.max_products = max_products
-    collector.collect()
 
     coll_cfg = collector.get_collection_config()
     pipeline = AssetMetadataPipeline.from_config(
@@ -312,22 +317,22 @@ def vpp_list_stac_items(
 
 
 def vpp_build_collection(
-    collection_config_path: Path,
-    output_dir: Path,
-    overwrite: bool,
+    collection_id: Optional[str],
+    collection_number: Optional[int],
+    output_dir: Optional[Path] = None,
+    overwrite: Optional[bool] = False,
     max_products: Optional[int] = -1,
     # save_dataframe: Optional[bool] = False,
 ):
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
     collector = HRLVPPMetadataCollector()
-    COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
-    collector.collection_id = COLLECTION_ID
+    # COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
+    collection_id = _get_tcc_collection_id(collection_id, collection_number)
+    collector.collection_id = collection_id
     collector.max_products = max_products
-    collector.collect()
 
-    collection_config_path = Path(collection_config_path).expanduser().absolute()
-    coll_cfg = CollectionConfig.from_json_file(collection_config_path)
+    coll_cfg = collector.get_collection_config()
     pipeline = AssetMetadataPipeline.from_config(
         metadata_collector=collector,
         collection_config=coll_cfg,
@@ -340,3 +345,64 @@ def vpp_build_collection(
 
     # if save_dataframe:
     #     GeodataframeExporter.export_item_bboxes(pipeline.collection)
+
+
+def vpp_build_all_collections(
+    output_dir: Path,
+    overwrite: bool,
+    max_products: Optional[int] = -1,
+    # save_dataframe: Optional[bool] = False,
+):
+    """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
+
+    collector = HRLVPPMetadataCollector()
+    collector.max_products = max_products
+    tcc_collections = collector.get_tcc_collections()
+
+    coll: tcc.Collection
+    for coll in tcc_collections:
+        collector.collection_id = coll.id
+        collector.collect()
+
+        coll_cfg = collector.get_collection_config()
+        pipeline = AssetMetadataPipeline.from_config(
+            metadata_collector=collector,
+            collection_config=coll_cfg,
+            output_dir=output_dir,
+            overwrite=overwrite,
+        )
+
+        pipeline.from_config()
+        pipeline.build_collection()
+
+
+def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Optional[int]) -> str:
+    if collection_id and collection_number:
+        raise ValueError(
+            "You must specify either a collection_id, or the number of the collection "
+            + "in the list on available collections. You can't have both."
+        )
+    if collection_id and not isinstance(collection_id, str):
+        raise TypeError("Type of collection_id must be str. " + f"{type(collection_id)=}, {collection_id=!r}")
+    if collection_number is not None and not isinstance(collection_number, int):
+        raise TypeError(
+            "Type of collection_number must be int. " + f"{type(collection_number)=}, {collection_number=!r}"
+        )
+
+    collector = HRLVPPMetadataCollector()
+    tcc_collections = collector.get_tcc_collections()
+
+    if collection_id:
+        if collection_id not in [c.id for c in tcc_collections]:
+            raise ValueError('collection_id "{collection_id}" does not exists.')
+        return collection_id
+
+    if collection_number < 1:
+        raise ValueError("An int value for collection_number must be 1 or higher., {}" + f"{collection_number=!r}")
+
+    num_colls = len(tcc_collections)
+    if collection_number > num_colls:
+        raise ValueError(f"{collection_number=} but there are only {num_colls} collections.")
+
+    collection = tcc_collections[collection_number - 1]
+    return collection.id

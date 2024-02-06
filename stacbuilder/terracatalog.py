@@ -137,7 +137,6 @@ class CollectionConfigBuilder:
             raster_cfg = RasterBandConfig(
                 name=title, offset=offset, scale=scale_factor, resolution=resolution, bits_per_sample=bit_per_value
             )
-            eo_band = ([],)
             asset_cfg = AssetConfig(
                 title=title,
                 description=title,
@@ -157,10 +156,18 @@ class CollectionConfigBuilder:
             media_type = pystac.media_type.MediaType.COG
         return media_type
 
+    def get_product_types(self):
+        return self.get_product_info().get("productType")
+
 
 class HRLVPPMetadataCollector(IMetadataCollector):
     def __init__(self):
         super().__init__()
+
+        # components: objects that we delegate work to.
+        self._cfg_builder: CollectionConfigBuilder = None
+
+        # state / collected information
         self._df_products: Optional[gpd.GeoDataFrame] = None
         self._collection_id: Optional[str] = None
         self._max_products = -1
@@ -219,8 +226,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         if not tcc_collection:
             return None
 
-        cfg_builder = CollectionConfigBuilder(self.get_tcc_collection())
-        return cfg_builder.get_collection_config()
+        self._cfg_builder = CollectionConfigBuilder(self.get_tcc_collection())
+        return self._cfg_builder.get_collection_config()
 
     def get_products_as_dataframe(self) -> gpd.GeoDataFrame:
         catalogue = self.get_tcc_catalogue()
@@ -228,49 +235,71 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         num_prods = catalogue.get_product_count(collection.id)
         pprint(f"product count for coll_id {collection.id}: {num_prods}")
 
+        # We retrieve the products in chunks per day, and per product type (see below)
+        # So divide the temporal extent into slots per day:
         dt_start, dt_end = get_coll_temporal_extent(collection)
-        dt_range_months = pd.date_range(dt_start, dt_end, freq="MS")
-
-        pprint(dt_range_months)
+        dt_ranges = pd.date_range(dt_start, dt_end, freq="D")
+        pprint(dt_ranges)
 
         data_frames = []
-        slot_start = dt_range_months[0]
-
+        slot_start = dt_ranges[0]
         num_products_processed = 0
-        for i, slot_start in enumerate(dt_range_months[:-1]):
-            slot_end = dt_range_months[i + 1]
 
-            products = catalogue.get_products(collection.id, start=slot_start, end=slot_end)
-            assets_md = []
-            for product in products:
-                num_products_processed += 1
+        for i, slot_start in enumerate(dt_ranges[:-1]):
+            slot_end = dt_ranges[i + 1]
+            prod_types = self._cfg_builder.get_product_types()
+
+            # Sometimes getting the data per data still hits the limit of how many
+            # products you can retrieve in one go.
+            # Therefore, dividing it up into product types as well.
+            for prod_type in prod_types:
+                products = list(
+                    catalogue.get_products(collection.id, start=slot_start, end=slot_end, productType=prod_type)
+                )
+                assets_md = []
+                if not products:
+                    # There is no data for this time range.
+                    continue
+
+                for product in products:
+                    # Apply our own max_products limit for testing & troubleshooting:
+                    # in the inner-most loop
+                    num_products_processed += 1
+                    if self._max_products > 0 and num_products_processed > self._max_products:
+                        break
+
+                    print("-" * 50)
+                    # print(product.id)
+                    # print(product.title)
+                    # print("product properties:")
+                    # pprint(product.properties)
+                    # print("... end properties ...")
+
+                    asset_metadata = self.create_asset_metadata(product)
+                    assets_md.append(asset_metadata)
+                    pprint(asset_metadata.to_dict())
+
+                    asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
+                    print(f"{asset_bbox.as_polygon()=}")
+                    print(f"{product.geometry}")
+                    print(asset_bbox.as_polygon() == product.geometry)
+                    print("-" * 50)
+
+                # The extra break statements are needed so we don't end up with
+                # an empty dataframe here, which is something we cannot process.
+                data = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
+                geoms = [md.geometry_lat_lon for md in assets_md]
+                gdf = gpd.GeoDataFrame(data=data, crs=4326, geometry=geoms)
+                gdf.index = gdf["asset_id"]
+                data_frames.append(gdf)
+
+                # Apply our own max_products limit for testing & troubleshooting:
+                #   Break out of the second loop.
                 if self._max_products > 0 and num_products_processed > self._max_products:
                     break
 
-                print("-" * 50)
-                # print(product.id)
-                # print(product.title)
-                # print("product properties:")
-                # pprint(product.properties)
-                # print("... end properties ...")
-
-                asset_metadata = self.create_asset_metadata(product)
-                assets_md.append(asset_metadata)
-                pprint(asset_metadata.to_dict())
-
-                asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
-                print(f"{asset_bbox.as_polygon()=}")
-                print(f"{product.geometry}")
-                print(asset_bbox.as_polygon() == product.geometry)
-                print("-" * 50)
-
-            data = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
-
-            geoms = [md.geometry_lat_lon for md in assets_md]
-            gdf = gpd.GeoDataFrame(data=data, crs=4326, geometry=geoms)
-            gdf.index = gdf["asset_id"]
-            data_frames.append(gdf)
-
+            # Apply our own max_products limit for testing & troubleshooting:
+            #   Break out of the outer loop.
             if self._max_products > 0 and num_products_processed > self._max_products:
                 break
 
