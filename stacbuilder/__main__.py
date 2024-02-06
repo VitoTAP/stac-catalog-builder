@@ -278,7 +278,18 @@ def post_process(outputdir, collection_config, collection_file):
     "collection_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
 )
-def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, start_dt, end_dt, dry_run, verbose):
+def test_openeo(
+    backend_url, 
+    out_dir, 
+    collection_file, 
+    bbox, 
+    epsg, 
+    max_extent_size, 
+    start_dt, 
+    end_dt, 
+    dry_run, 
+    verbose
+    ):
     """Test STAC collection via load_stac in openEO.
 
     It guesses a reasonable spatial and temporal extent based on what

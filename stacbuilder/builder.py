@@ -988,7 +988,7 @@ class GeoTiffPipeline:
         pipeline.setup(
             collection_config=collection_config,
             file_coll_cfg=file_coll_cfg,
-            output_dir=output_dir,
+            output_dir=output_dir.absolute() if output_dir else None,
             overwrite=overwrite,
         )
         return pipeline
