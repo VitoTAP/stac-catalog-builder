@@ -391,12 +391,12 @@ class TestAlternateLinksGenerator:
         assert alternates == {
             "alternate": {
                 "MEP": {"href": "/data/collection789/item456/asset123.tif"},
-                "S3": {"href": "s3://test-bucket/test/data-root/path/data/collection789/item456/asset123.tif"}
+                "S3": {"href": "s3://test-bucket/test/data-root/path/data/collection789/item456/asset123.tif"},
             }
         }
 
     @pytest.mark.parametrize(
-        "config", 
+        "config",
         [
             None,
             AlternateHrefConfig(add_MEP=False, add_S3=False),
@@ -404,7 +404,7 @@ class TestAlternateLinksGenerator:
             AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="test-bucket"),
             AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
             AlternateHrefConfig(add_MEP=True, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
-        ]
+        ],
     )
     def test_from_config_adds_correct_callback(self, config):
         alt_href_gen = AlternateHrefGenerator.from_config(config)
@@ -416,14 +416,13 @@ class TestAlternateLinksGenerator:
             assert alt_href_gen.has_alternate_key("MEP") == config.add_MEP
             assert alt_href_gen.has_alternate_key("S3") == config.add_S3
 
-
     @pytest.mark.parametrize(
-        "config", 
+        "config",
         [
             AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=None),
-            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="",),
+            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=""),
             AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=None, s3_root_path="test/root-path"),
-        ]
+        ],
     )
     def test_from_config_raises_invalidconfiguration_when_s3bucket_missing(self, config):
         with pytest.raises(InvalidConfiguration):
