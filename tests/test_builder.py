@@ -12,6 +12,7 @@ TODO: need coverage for PostProcessSTACCollectionFile
 Best to add unit tests in a bottom-up way.
 
 """
+import datetime as dt
 from pathlib import Path
 from typing import List
 
@@ -24,7 +25,9 @@ from pystac.collection import Collection
 
 from stacbuilder.builder import (
     AlternateHrefGenerator,
+    AssetMetadataPipeline,
     GeoTiffPipeline,
+    IMetadataCollector,
 )
 from stacbuilder.config import (
     AlternateHrefConfig,
@@ -104,9 +107,25 @@ def geotif_paths_relative() -> List[str]:
 
 
 @pytest.fixture
+def geotif_paths_relative_small_set() -> List[str]:
+    return sorted(
+        [
+            "2000/observations_2m-temp-monthly_2000-01-01.tif",
+            "2000/observations_tot-precip-monthly_2000-01-01.tif",
+        ]
+    )
+
+
+@pytest.fixture
 def geotiff_paths(data_dir, geotif_paths_relative) -> List[Path]:
     input_dir = data_dir / "geotiff/mock-geotiffs"
     return generate_geotiff_paths(input_dir, geotif_paths_relative)
+
+
+@pytest.fixture
+def geotiff_paths_small_set(data_dir, geotif_paths_relative_small_set) -> List[Path]:
+    input_dir = data_dir / "geotiff/mock-geotiffs"
+    return generate_geotiff_paths(input_dir, geotif_paths_relative_small_set)
 
 
 def generate_geotiff_paths(input_dir, geotif_paths_relative) -> List[Path]:
@@ -239,6 +258,72 @@ def grouped_collection_test_config() -> CollectionConfig:
     return CollectionConfig(**data)
 
 
+class MockMetadataCollector(IMetadataCollector):
+    """Interface/Protocol for collector that gets Metadata objects from a source.
+
+    You need still to implement the method `collect`
+    """
+
+    def __init__(self, asset_metadata_list: List[AssetMetadata]):
+        self._metadata_list = asset_metadata_list
+
+    def add_asset(self, asset_md: AssetMetadata):
+        if self._metadata_list is None:
+            self._metadata_list = []
+        self._metadata_list.append(asset_md)
+
+
+@pytest.fixture
+def basic_asset_metadata(data_dir) -> AssetMetadata:
+    # TODO: maybe better to save a few AssetMetadata and their STAC items to JSON and load them here
+    md = AssetMetadata()
+
+    md.asset_id = "observations_2m-temp-monthly_2000-01-01.tif"
+    md.item_id = "observations"
+    md.asset_path = data_dir / "2000/observations_2m-temp-monthly_2000-01-01.tif"
+    md.href = md.asset_path
+    md.original_href = md.asset_path
+    md.item_href = data_dir / "2000"
+
+    start_datetime = dt.datetime(2000, 1, 1, tzinfo=dt.UTC)
+    end_datetime = dt.datetime(2000, 2, 1, tzinfo=dt.UTC)
+
+    md.collection_id = "observations"
+    md.tile_id = None
+    md.title = "observations 2m temp monthly for 2000-01-01"
+    md.asset_type = "2m-temp-monthly"
+    md.datetime = start_datetime
+    md.start_datetime = start_datetime
+    md.end_datetime = end_datetime
+    md.shape = [123, 456]
+    md.tags = ["tag1", "tag2"]
+    md.file_size = 100
+
+    return md
+
+
+@pytest.fixture
+def basic_asset_metadata_list(basic_asset_metadata) -> List[AssetMetadata]:
+    # TODO: add a second asset, for the same STAC item.
+    return [basic_asset_metadata]
+
+
+@pytest.fixture
+def metadata_collector_basic_assets(basic_asset_metadata_list) -> MockMetadataCollector:
+    return MockMetadataCollector(basic_asset_metadata_list)
+
+
+@pytest.fixture
+def asset_metadata_pipeline(
+    metadata_collector_basic_assets, collection_config_from_file, tmp_path
+) -> AssetMetadataPipeline:
+    return AssetMetadataPipeline.from_config(
+        metadata_collector=metadata_collector_basic_assets,
+        collection_config=collection_config_from_file,
+        output_dir=tmp_path,
+    )
+
+
 class TestGeoTiffPipeline:
     def test_collect_input_files(self, geotiff_pipeline: GeoTiffPipeline, geotiff_paths: List[Path]):
         input_files = list(geotiff_pipeline.get_input_files())
@@ -272,6 +357,29 @@ class TestGeoTiffPipeline:
 
             collection = Collection.from_file(coll_path)
             collection.validate_all()
+
+
+class TestAssetMetadataPipeline:
+    def test_collect_metadata(self, asset_metadata_pipeline: AssetMetadataPipeline, basic_asset_metadata_list):
+        metadata_list = list(asset_metadata_pipeline.get_metadata())
+        assert metadata_list == basic_asset_metadata_list
+
+    def test_collect_stac_items(self, asset_metadata_pipeline: AssetMetadataPipeline):
+        stac_items = list(asset_metadata_pipeline.collect_stac_items())
+        assert len(stac_items) == 1
+
+    def test_build_collection(self, asset_metadata_pipeline: GeoTiffPipeline):
+        assert asset_metadata_pipeline.collection is None
+
+        asset_metadata_pipeline.build_collection()
+
+        assert asset_metadata_pipeline.collection is not None
+        assert asset_metadata_pipeline.collection_file is not None
+        assert asset_metadata_pipeline.collection_file.exists()
+        Collection.validate_all(asset_metadata_pipeline.collection)
+
+        collection = Collection.from_file(asset_metadata_pipeline.collection_file)
+        collection.validate_all()
 
 
 @pytest.fixture

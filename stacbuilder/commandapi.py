@@ -12,11 +12,10 @@ functionality of the CLI, and that is harder to do directly on the CLI.
 """
 
 from pathlib import Path
-import pprint
 from typing import Dict, Hashable, List, Optional
 
 
-from pystac import Collection
+from pystac import Collection, Item
 import terracatalogueclient as tcc
 
 
@@ -267,39 +266,15 @@ def validate_collection(
 
 
 def vpp_list_metadata(
+    collection_id: Optional[str] = None,
+    collection_number: Optional[int] = None,
     max_products: Optional[int] = -1,
-):
+) -> List[AssetMetadata]:
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
     collector = HRLVPPMetadataCollector()
-    COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
-    collector.collection_id = COLLECTION_ID
-    collector.max_products = max_products
-    collector.collect()
-
-    for md in collector.metadata_list:
-        pprint.pprint(md.to_dict())
-
-
-def vpp_list_stac_items(
-    collection_id: Optional[str],
-    collection_number: Optional[int],
-    max_products: Optional[int] = -1,
-):
-    """Show the STAC items that are generated for each VPP product.
-
-    This is used to test the conversion and check the configuration files.
-    """
-
-    # In the end the HRLVPPMetadataCollector would not really need configuration
-    # We do need to process all collections, but perhaps we we want to
-    # keep the collection ID as a parameter so we can run it selectively.
-    # We would just need a list of all collection IDs we want to process.
-    collector = HRLVPPMetadataCollector()
-    # COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
-
     collection_id = _get_tcc_collection_id(collection_id, collection_number)
     collector.collection_id = collection_id
     collector.max_products = max_products
@@ -311,26 +286,51 @@ def vpp_list_stac_items(
         output_dir=None,
         overwrite=False,
     )
+    return list(pipeline.get_metadata())
 
-    for item in list(pipeline.collect_stac_items()):
-        pprint.pprint(item.to_dict())
+
+def vpp_list_stac_items(
+    collection_id: Optional[str] = None,
+    collection_number: Optional[int] = None,
+    max_products: Optional[int] = -1,
+) -> List[Item]:
+    """Show the STAC items that are generated for each VPP product.
+
+    This is used to test the conversion and check the configuration files.
+    """
+    collector = HRLVPPMetadataCollector()
+    collection_id = _get_tcc_collection_id(collection_id, collection_number)
+    collector.collection_id = collection_id
+    collector.max_products = max_products
+
+    coll_cfg = collector.get_collection_config()
+    pipeline = AssetMetadataPipeline.from_config(
+        metadata_collector=collector,
+        collection_config=coll_cfg,
+        output_dir=None,
+        overwrite=False,
+    )
+    return list(pipeline.collect_stac_items())
 
 
 def vpp_build_collection(
-    collection_id: Optional[str],
-    collection_number: Optional[int],
+    collection_id: Optional[str] = None,
+    collection_number: Optional[int] = None,
     output_dir: Optional[Path] = None,
     overwrite: Optional[bool] = False,
     max_products: Optional[int] = -1,
     # save_dataframe: Optional[bool] = False,
-):
+) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
     collector = HRLVPPMetadataCollector()
-    # COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
     collection_id = _get_tcc_collection_id(collection_id, collection_number)
     collector.collection_id = collection_id
     collector.max_products = max_products
+
+    if output_dir and not isinstance(output_dir, Path):
+        output_dir = Path(output_dir).expanduser().absolute()
+        output_dir = output_dir / collection_id
 
     coll_cfg = collector.get_collection_config()
     pipeline = AssetMetadataPipeline.from_config(
@@ -340,7 +340,6 @@ def vpp_build_collection(
         overwrite=overwrite,
     )
 
-    pipeline.from_config()
     pipeline.build_collection()
 
     # if save_dataframe:
@@ -352,7 +351,7 @@ def vpp_build_all_collections(
     overwrite: bool,
     max_products: Optional[int] = -1,
     # save_dataframe: Optional[bool] = False,
-):
+) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
     collector = HRLVPPMetadataCollector()
@@ -372,7 +371,6 @@ def vpp_build_all_collections(
             overwrite=overwrite,
         )
 
-        pipeline.from_config()
         pipeline.build_collection()
 
 
