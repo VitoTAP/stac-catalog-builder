@@ -317,6 +317,46 @@ class TestAlternateLinksGenerator:
 
         assert alternates == {"alternate": {"FOO": {"href": "foo://bar/asset123"}}}
 
+    def test_mep(self, simple_asset_metadata):
+        alternate_generator = AlternateLinksGenerator()
+
+        assert alternate_generator.has_alternate_key("MEP") is False
+        alternate_generator.add_mep()
+        assert alternate_generator.has_alternate_key("MEP") is True
+
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+
+        assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}
+
+    def test_S3_only_bucket(self, simple_asset_metadata):
+        alternate_generator = AlternateLinksGenerator()
+
+        assert alternate_generator.has_alternate_key("S3") is False
+        alternate_generator.add_basic_s3("test-bucket")
+        assert alternate_generator.has_alternate_key("S3") is True
+
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+        assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
+
+    def test_MEP_and_S3(self, simple_asset_metadata):
+        alternate_generator = AlternateLinksGenerator()
+
+        assert alternate_generator.has_alternate_key("MEP") is False
+        assert alternate_generator.has_alternate_key("S3") is False
+
+        alternate_generator.add_mep()
+        alternate_generator.add_basic_s3("test-bucket")
+        assert alternate_generator.has_alternate_key("MEP") is True
+        assert alternate_generator.has_alternate_key("S3") is True
+
+        alternates = alternate_generator.get_alternates(simple_asset_metadata)
+        assert alternates == {
+            "alternate": {
+                "MEP": {"href": "/data/collection789/item456/asset123.tif"},
+                "S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"},
+            }
+        }
+
 
 class TestMEPAlternateLinksGenerator:
     def test_get_alternates(self, simple_asset_metadata):
@@ -331,7 +371,7 @@ class TestS3AlternateLinksGenerator:
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
 
-    def test_get_alternates_only_with_root_path(self, simple_asset_metadata):
+    def test_get_alternates_with_root_path(self, simple_asset_metadata):
         alternate_generator = S3AlternateLinksGenerator(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {

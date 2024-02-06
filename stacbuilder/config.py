@@ -232,6 +232,12 @@ class AssetHrefModifierConfig(BaseModel):
     data_root: str
 
 
+# TODO add config class for AlternateLinksGenerator and its descendants.
+#   Problem is that the AlternateLinksGenerator system could be simpler I think.
+# class AlternateHrefConfig(BaseModel):
+#     pass
+
+
 class CollectionConfig(BaseModel):
     """Model, store configuration of a STAC collection"""
 
