@@ -83,12 +83,6 @@ AssetMetadataToURL = Callable[[AssetMetadata], str]
 class AlternateHrefGenerator:
     """Generates the alternate links for assets."""
 
-    # TODO: Make it configurable so we can have MEP, S3, etc.
-    # TODO: Would like AlternateLinksGenerator system to be simpler, maybe without subclasses.
-    #   - Do we have only a few types of alternates and can we do that with one class?
-    #   - Maybe we can have one class that generate all of them but looks at the config to
-    #       select which ones need to be added.
-
     def __init__(self):
         self._callbacks: Dict[str, AssetMetadataToURL] = {}
 
@@ -159,6 +153,9 @@ class AlternateHrefGenerator:
     @classmethod
     def from_config(cls, config: AlternateHrefConfig) -> "AlternateHrefGenerator":
         alt_link_gen = AlternateHrefGenerator()
+        if not config:
+            return alt_link_gen
+        
         if config.add_MEP:
             alt_link_gen.add_MEP()
 
@@ -169,64 +166,7 @@ class AlternateHrefGenerator:
                 )
             alt_link_gen.add_basic_S3(s3_bucket=config.s3_bucket, s3_root_path=config.s3_root_path)
 
-
-class MEPAlternateLinksGenerator(AlternateHrefGenerator):
-    """A simple CreateAlternateLinks that only generates the MEP link, which is a POSIX path"""
-
-    def __init__(self):
-        super().__init__()
-        self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
-
-
-class S3AlternateLinksGenerator(AlternateHrefGenerator):
-    """A simple CreateAlternateLinks that generates the S3 links.
-
-    This implementation simply concatenates the S3 bucket and the asset's file path,
-    and removes any leading or trailing slashes that would lead to a double slash `//`.
-
-    For example:
-        /my/data/folder/some-collection/some-asset.tif
-    becomes:
-        s3://my-bucket/my/data/folder/some-collection/some-asset.tif
-
-    If you need to translate the file path in a more sophisticated wat you have to write your
-    own handler.
-
-    For example when the root of the path needs to be replaced by something else
-    for the S3 urls. You need write a callback for that:
-
-        /my/data/folder/some-collection/some-asset.tif -> s3://my-bucket/different-data-root/some-asset.tif
-    """
-
-    def __init__(self, s3_bucket: str, s3_root_path: Optional[str] = None):
-        super().__init__()
-
-        self._s3_bucket = self.remove_leading_trailing_slash(s3_bucket)
-        self._s3_root_path = self.remove_leading_trailing_slash(s3_root_path) if s3_root_path else None
-
-        convert = partial(self.to_s3_url, s3_bucket=s3_bucket, s3_root_path=s3_root_path)
-        self.register_callback("S3", convert)
-
-    @staticmethod
-    def remove_leading_trailing_slash(path: str):
-        if path.startswith("/"):
-            result = path[1:]
-        else:
-            result = path
-
-        if result.endswith("/"):
-            result = result[:-1]
-
-        return result
-
-    @classmethod
-    def to_s3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
-        path = cls.remove_leading_trailing_slash(str(asset_md.asset_path))
-        if s3_root_path:
-            s3_url = f"s3://{s3_bucket}/{s3_root_path}/{path}"
-        else:
-            s3_url = f"s3://{s3_bucket}/{path}"
-        return s3_url
+        return alt_link_gen
 
 
 def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file: Path):
