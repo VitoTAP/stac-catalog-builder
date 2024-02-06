@@ -15,7 +15,7 @@ from pathlib import Path
 import pprint
 
 from pystac import Collection
-from typing import Optional
+from typing import Dict, Hashable, List, Optional
 
 
 from stacbuilder.builder import (
@@ -26,6 +26,7 @@ from stacbuilder.builder import (
     PostProcessSTACCollectionFile,
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
+from stacbuilder.metadata import AssetMetadata
 from stacbuilder.terracatalog import HRLVPPMetadataCollector
 
 
@@ -37,8 +38,18 @@ def build_collection(
     overwrite: bool,
     max_files: Optional[int] = -1,
     save_dataframe: Optional[bool] = False,
-):
-    """Build a STAC collection from a directory of geotiff files."""
+)-> None:
+    """
+    Build a STAC collection from a directory of files.
+
+    :param collection_config_path: Path to the collection configuration file.
+    :param glob: Glob pattern to match the files within the input_dir.
+    :param input_dir: Root directory where the files are located.
+    :param output_dir: Directory where the STAC collection will be saved.
+    :param overwrite: Overwrite the output directory if it exists.
+    :param max_files: Maximum number of files to process.
+    :param save_dataframe: Save the geodataframe of the STAC items.
+    """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
@@ -63,11 +74,20 @@ def build_grouped_collections(
     overwrite: bool,
     max_files: Optional[int] = -1,
     save_dataframe: Optional[bool] = False,
-):
-    """Build a multiple STAC collections from a directory of geotiff files,
+)-> None:
+    """
+    Build a multiple STAC collections from a directory of files,
     where each collection groups related STAC items.
 
     The default grouping is per year.
+
+    :param collection_config_path: Path to the collection configuration file.
+    :param glob: Glob pattern to match the files within the input_dir.
+    :param input_dir: Root directory where the files are located.
+    :param output_dir: Directory where the STAC collection will be saved.
+    :param overwrite: Overwrite the output directory if it exists.
+    :param max_files: Maximum number of files to process.
+    :param save_dataframe: Save the geodataframe of the STAC items.
     """
 
     collection_config_path = Path(collection_config_path).expanduser().absolute()
@@ -97,17 +117,24 @@ def list_input_files(
     glob: str,
     input_dir: Path,
     max_files: Optional[int] = -1,
-):
-    """List the geotiff files that are found with the current configuration."""
+)-> list[Path]:
+    """
+    Searches the files that are found with the current configuration.
+
+    This can be used to test the glob pattern and the input directory.
+    
+    :param glob: Glob pattern to match the files within the input_dir.
+    :param input_dir: Root directory where the files are located.
+    :param max_files: Maximum number of files to process.
+    :return: List containing paths of all the found files.
+    """
 
     collector = FileCollector()
     collector.input_dir = Path(input_dir)
     collector.glob = glob
     collector.max_files = max_files
     collector.collect()
-    print(f"Found {len(collector.input_files)} files:")
-    for file in collector.input_files:
-        print(file)
+    return collector.input_files
 
 
 def list_asset_metadata(
@@ -116,10 +143,18 @@ def list_asset_metadata(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
-):
-    """Show the AssetMetadata objects generated for each geotiff file.
+)-> Dict[Hashable, List[AssetMetadata]]:
+    """
+    Return the AssetMetadata objects generated for each file.
 
-    This is used to test the conversion and check the configuration files.
+    This is used to test the digestion of input files and check the configuration files.
+
+    :param collection_config_path: Path to the collection configuration file.
+    :param glob: Glob pattern to match the files within the input_dir.
+    :param input_dir: Root directory where the files are located.
+    :param max_files: Maximum number of files to process.
+    :param save_dataframe: Save the geodataframe of the metadata.
+    :return: Dictionary containing the groups as keys and the AssetMetadata objects for each file. If the collection is not grouped, the key is an empty string.
     """
 
     collection_config_path = Path(collection_config_path).expanduser().absolute()
@@ -127,26 +162,16 @@ def list_asset_metadata(
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
     pipeline = GeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
-    if pipeline.has_grouping:
-        for group, metadata_list in sorted(pipeline.get_metadata_groups().items()):
-            print(f"=== group={group} ===")
-            print(f"   number of assets: {len(metadata_list)}")
-
-            for meta in metadata_list:
-                report = {"group": group, "metadata": meta.to_dict(include_internal=True)}
-                pprint.pprint(report)
-                print()
-            print()
-    else:
-        for meta in pipeline.get_metadata():
-            pprint.pprint(meta.to_dict(include_internal=True))
-            print()
-
     if save_dataframe:
         df = pipeline.get_metadata_as_geodataframe()
         # TODO: Want better directory to save geodata, maybe use save_dataframe as path instead of flag.
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-assetmetadata"
         GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
+
+    if not pipeline.has_grouping:
+        return {"": list(pipeline.get_metadata())}
+    else:
+        return pipeline.get_metadata_groups()
 
 
 def list_stac_items(
@@ -155,33 +180,26 @@ def list_stac_items(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
-):
-    """Show the STAC items that are generated for each geotiff file.
+)-> (List[Collection], List[Path]):
+    """
+    Return the STAC items that are generated for each file and the files for which no stac item could be generated.
 
-    This is used to test the conversion and check the configuration files.
+    This is used to test the creation of individual stac items from files.
+
+    :param collection_config_path: Path to the collection configuration file.
+    :param glob: Glob pattern to match the files within the input_dir.
+    :param input_dir: Root directory where the files are located.
+    :param max_files: Maximum number of files to process.
+    :param save_dataframe: Save the geodataframe of the STAC items.
+    :return: Tuple containing a List of STAC items and a list of files for which no item could be generated.
     """
 
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
-
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-
     pipeline = GeoTiffPipeline.from_config(
         collection_config=coll_cfg, file_coll_cfg=file_coll_cfg, output_dir=None, overwrite=False
     )
-
-    stac_items = list(pipeline.collect_stac_items())
-    files = list(pipeline.get_input_files())
-    num_itemst = len(stac_items)
-    for i, item in enumerate(stac_items):
-        if item:
-            pprint.pprint(item.to_dict())
-        else:
-            file = files[i]
-            print(
-                f"Received None for a STAC Item {i+1} of {num_itemst}. "
-                + f"Item could not be generated for file: {file}"
-            )
 
     if save_dataframe:
         df = pipeline.get_stac_items_as_geodataframe()
@@ -189,16 +207,27 @@ def list_stac_items(
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-stac-items"
         GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
 
+    stac_items = list(pipeline.collect_stac_items())
+    files = list(pipeline.get_input_files())
+    failed_files = [files[i] for i, item in enumerate(stac_items) if item is None]
+
+    return stac_items, failed_files
+    
 
 def postprocess_collection(
     collection_file: Path,
     collection_config_path: Path,
     output_dir: Optional[Path] = None,
-):
-    """Run only the post-processing step, on an existing STAC collection.
+)-> None:
+    """
+    Run only the post-processing step, on an existing STAC collection.
 
     Mainly intended to troubleshoot the postprocessing so you don't have to
     regenerate the entire set every time.
+
+    :param collection_file: Path to the STAC collection file.
+    :param collection_config_path: Path to the collection configuration file.
+    :param output_dir: Directory where the STAC collection will be saved.
     """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -209,16 +238,24 @@ def postprocess_collection(
 
 def load_collection(
     collection_file: Path,
-):
-    """Show the STAC collection in 'collection_file'."""
-    collection = Collection.from_file(collection_file)
-    pprint.pprint(collection.to_dict(), indent=2)
+)-> Collection:
+    """
+    Load and return the STAC collection in 'collection_file'.
+    
+    :param collection_file: Path to the STAC collection file.
+    :return: The STAC collection object.
+    """
+    return Collection.from_file(collection_file)
 
 
 def validate_collection(
     collection_file: Path,
-):
-    """Validate a STAC collection."""
+)-> None:
+    """
+    Validate a STAC collection.
+    
+    :param collection_file: Path to the STAC collection file.
+    """
     collection = Collection.from_file(collection_file)
     collection.validate_all()
 

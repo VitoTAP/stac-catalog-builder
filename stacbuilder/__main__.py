@@ -1,4 +1,5 @@
-"""The main module, which is run as the program.
+"""
+The main module, which is run as the program.
 
 This defines the Commane Line Interface of the application.
 We want to keep this layer thin so we can write unit/integration tests for the
@@ -140,7 +141,10 @@ def build_grouped_collections(glob, collection_config, overwrite, max_files, sav
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 def list_tiffs(glob, inputdir, max_files):
     """List which GeoTIFF files will be selected with this input dir and glob pattern."""
-    commandapi.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
+    result = commandapi.list_input_files(glob=glob, input_dir=inputdir, max_files=max_files)
+    print(f"Found {len(result)} files:")
+    for file in result:
+        print(file)
 
 
 @cli.command
@@ -165,13 +169,27 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    commandapi.list_asset_metadata(
+    result = commandapi.list_asset_metadata(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
         max_files=max_files,
         save_dataframe=save_dataframe,
     )
+    if len(result.keys()) == 1:
+        for meta in result[result.keys()[0]]:
+            pprint.pprint(meta.to_dict(include_internal=True))
+            print()
+    else:
+        for group, metadata_list in sorted(result.items()):
+            print(f"=== group={group} ===")
+            print(f"   number of assets: {len(metadata_list)}")
+
+            for meta in metadata_list:
+                report = {"group": group, "metadata": meta.to_dict(include_internal=True)}
+                pprint.pprint(report)
+                print()
+            print()
 
 
 @cli.command
@@ -196,13 +214,19 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    commandapi.list_stac_items(
+    stac_items, failed_files = commandapi.list_stac_items(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
         max_files=max_files,
         save_dataframe=save_dataframe,
     )
+    for item in enumerate(stac_items):
+        pprint.pprint(item.to_dict())
+    for file in failed_files:
+        print(
+            f"Item could not be generated for file: {file}"
+        )
 
 
 @cli.command
@@ -212,7 +236,8 @@ def show_collection(collection_file):
 
     You can use this to see if it can be loaded.
     """
-    commandapi.load_collection(collection_file)
+    collection = commandapi.load_collection(collection_file)
+    pprint.pprint(collection.to_dict(), indent=2)
 
 
 @cli.command
