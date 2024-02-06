@@ -331,12 +331,16 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
     TODO: find better name for item_assets_configs, maybe asset_definition_configs.
     """
 
-    def __init__(self, item_assets_configs: Dict[str, AssetConfig]) -> None:
+    def __init__(
+        self,
+        item_assets_configs: Dict[str, AssetConfig],
+        alternate_href_generator: Optional[AlternateHrefGenerator] = None,
+    ) -> None:
         super().__init__()
 
         # Settings: these are just data, not components we delegate work to.
         self._item_assets_configs: item_assets_configs = item_assets_configs
-        self._alternate_href_generator: Optional[AlternateHrefGenerator] = None
+        self._alternate_href_generator: Optional[AlternateHrefGenerator] = alternate_href_generator
 
     @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
@@ -1158,7 +1162,16 @@ class GeoTiffPipeline:
         self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
             path_parser=self._path_parser, href_modifier=href_modifier
         )
-        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
+
+        if not self._collection_config.alternate_links:
+            alternate_href_generator = AlternateHrefGenerator()
+            alternate_href_generator.add_MEP()
+        else:
+            alternate_href_generator = AlternateHrefGenerator.from_config(self._collection_config.alternate_links)
+        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(
+            item_assets_configs=self.item_assets_configs,
+            alternate_href_generator=alternate_href_generator,
+        )
         self._metadata_group_creator = GroupMetadataByYear()
 
         if group and not self.has_grouping:
