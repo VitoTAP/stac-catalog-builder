@@ -236,8 +236,29 @@ class AssetHrefModifierConfig(BaseModel):
 #   Problem is that the AlternateLinksGenerator system could be simpler I think.
 #   However, having subclasses would make it easier to load the right
 #   implementation from a configuration.
-# class AlternateHrefConfig(BaseModel):
-#     pass
+
+
+class AlternateHrefConfig(BaseModel):
+    """Configuration for what alternate links we need to add.
+
+    This implementation is simple but only makes it possible to add pre-defined
+    alternates that we know how to set up. But that is enough for now.
+    We could make it possible to register new subclasses of AlternateLinksGenerator
+    but that is a bit more complex and we don't need it now.
+
+    So taking the simple and direct approach until we need more.
+
+    See also: stacbuilder.builder.AlternateLinksGenerator
+    In particular these methods:
+    - AlternateLinksGenerator.from_config
+    - AlternateLinksGenerator.add_MEP
+    - AlternateLinksGenerator.add_basic_S3
+    """
+
+    add_MEP: bool = True
+    add_S3: bool = False
+    s3_bucket: Optional[str] = None
+    s3_root_path: Optional[str] = None
 
 
 class CollectionConfig(BaseModel):
@@ -270,6 +291,7 @@ class CollectionConfig(BaseModel):
     item_assets: Optional[Dict[str, AssetConfig]] = {}
 
     asset_href_modifier: Optional[AssetHrefModifierConfig] = None
+    alternate_links: Optional[AlternateHrefConfig] = None
 
     # TODO: links (urls)
 
