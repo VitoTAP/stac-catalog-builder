@@ -224,9 +224,7 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
     for item in enumerate(stac_items):
         pprint.pprint(item.to_dict())
     for file in failed_files:
-        print(
-            f"Item could not be generated for file: {file}"
-        )
+        print(f"Item could not be generated for file: {file}")
 
 
 @cli.command
@@ -303,18 +301,7 @@ def post_process(outputdir, collection_config, collection_file):
     "collection_file",
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
 )
-def test_openeo(
-    backend_url, 
-    out_dir, 
-    collection_file, 
-    bbox, 
-    epsg, 
-    max_extent_size, 
-    start_dt, 
-    end_dt, 
-    dry_run, 
-    verbose
-    ):
+def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, start_dt, end_dt, dry_run, verbose):
     """Test STAC collection via load_stac in openEO.
 
     It guesses a reasonable spatial and temporal extent based on what
@@ -365,17 +352,11 @@ def test_openeo(
 
 
 #
-# Subcommands for working with the HRL VPP pipeline"""
+# Commands for working with the HRL VPP pipeline"""
 #
 
 
-@cli.group
-def hrlvpp():
-    """Subcommands for the HRL VPP pipeline"""
-    pass
-
-
-@hrlvpp.command
+@cli.command
 @click.option(
     "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
 )
@@ -387,22 +368,29 @@ def vpp_list_metadata(max_products: int):
     commandapi.vpp_list_metadata(max_products=max_products)
 
 
-@hrlvpp.command
+@cli.command
+@click.option("-c", "--collection", type=str, help="ID in OpenSearch of the collection to build")
+@click.option("-n", "--number", type=int, help="Build the N-th collection available (counting from 1).")
 @click.option(
     "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
 )
-def vpp_list_items(max_products: int):
+def vpp_list_items(collection: str, number: int, max_products: int):
     """Show the STAC items that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
-    commandapi.vpp_list_stac_items(max_products=max_products)
+    commandapi.vpp_list_stac_items(collection_id=collection, collection_number=number, max_products=max_products)
 
 
-@hrlvpp.command
-def vpp_build():
+@cli.command
+@click.option("-c", "--collection", type=str, help="ID in OpenSearch of the collection to build")
+@click.option("-n", "--number", type=int, help="Build the N-th collection available (counting from 1).")
+@click.option(
+    "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
+)
+def vpp_build(collection: str, number: int, max_products: int):
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
-    commandapi.vpp_build_collection()
+    commandapi.vpp_build_collection(collection_id=collection, collection_number=number, max_products=max_products)
 
 
 #
