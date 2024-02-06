@@ -132,10 +132,16 @@ class CollectionConfigBuilder:
             offset = band.get("offset")
             scale_factor = band.get("scaleFactor")
             bit_per_value = band.get("bitPerValue")
-            resolution = band.get("resolution")
+            spatial_resolution = band.get("resolution")
+            data_type = self.guess_datatype(bit_per_value)
 
             raster_cfg = RasterBandConfig(
-                name=title, offset=offset, scale=scale_factor, resolution=resolution, bits_per_sample=bit_per_value
+                name=title,
+                offset=offset,
+                scale=scale_factor,
+                spatial_resolution=spatial_resolution,
+                bits_per_sample=bit_per_value,
+                data_type=data_type,
             )
             asset_cfg = AssetConfig(
                 title=title,
@@ -146,6 +152,9 @@ class CollectionConfigBuilder:
             asset_configs[title] = asset_cfg
 
         return asset_configs
+
+    def guess_datatype(self, bit_per_value: int) -> str:
+        return f"uint{bit_per_value}"
 
     def get_media_type(self) -> pystac.media_type.MediaType:
         format = self.get_format()
@@ -269,11 +278,11 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                         break
 
                     print("-" * 50)
-                    # print(product.id)
-                    # print(product.title)
-                    # print("product properties:")
-                    # pprint(product.properties)
-                    # print("... end properties ...")
+                    print(product.id)
+                    print(product.title)
+                    print("product properties:")
+                    pprint(product.properties)
+                    print("... end properties ...")
 
                     asset_metadata = self.create_asset_metadata(product)
                     assets_md.append(asset_metadata)
@@ -282,7 +291,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
                     print(f"{asset_bbox.as_polygon()=}")
                     print(f"{product.geometry}")
-                    print(asset_bbox.as_polygon() == product.geometry)
+                    # print(asset_bbox.as_polygon() == product.geometry)
                     print("-" * 50)
 
                 # The extra break statements are needed so we don't end up with

@@ -208,20 +208,29 @@ class AssetConfig(BaseModel):
     def to_asset_definition(self) -> AssetDefinition:
         """Create an AssetDefinition object from this configuration."""
         if self.eo_bands:
-            bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
+            eo_bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
         else:
-            bands = []
-        return AssetDefinition(
-            properties={
-                "type": self.media_type,
-                "title": self.title,
-                "description": self.description,
-                # TODO: Switch to EOExtension to add eo:bands in the correct way.
-                #   Our content for eo:bands is no 10% standard: data_type belongs in raster:bands.
-                "eo:bands": bands,
-                "roles": self.roles,
-            }
-        )
+            eo_bands = None
+
+        if self.raster_bands:
+            raster_bands = [dict_no_none(b.model_dump()) for b in self.raster_bands]
+        else:
+            raster_bands = None
+        properties = {
+            "type": self.media_type,
+            "title": self.title,
+            "description": self.description,
+            "roles": self.roles,
+        }
+        if eo_bands:
+            # TODO: Switch to EOExtension to add eo:bands in the correct way.
+            #   Our content for eo:bands is not 100% standard: data_type belongs in raster:bands.
+            properties["eo:bands"] = eo_bands
+
+        if raster_bands:
+            properties["raster:bands"] = raster_bands
+
+        return AssetDefinition(properties=properties)
 
 
 class FileCollectorConfig(BaseModel):

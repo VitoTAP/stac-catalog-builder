@@ -11,6 +11,7 @@ import tempfile
 from functools import partial
 from itertools import islice
 from pathlib import Path
+from pprint import pformat
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
 
 
@@ -320,6 +321,10 @@ class IMapMetadataToSTACItem(Protocol):
         """Converts a Metadata objects to a STAC Items."""
         ...
 
+    def bundle_assets(self, assets: List[AssetMetadata]) -> Item:
+        """Create a STAC item that contains multiple assets, from a list of Metadata objects."""
+        ...
+
     def map_all(self, metadata_source: Iterable[AssetMetadata]) -> Iterable[Item]:
         """Return generator the converts all metadata objects to STAC Items"""
         return (self.map(metadata) for metadata in metadata_source)
@@ -403,6 +408,95 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         item_proj.geometry = metadata.proj_geometry_as_dict
         item_proj.transform = metadata.transform
         item_proj.shape = metadata.shape
+
+        # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
+        #    that is not always the case.
+        #
+        # The tile ID is not always the format that GridExtension expects.
+        # TODO: investigate when/when not to include the GridExtension.
+        #
+        # if metadata.tile_id:
+        #     grid = GridExtension.ext(item, add_if_missing=True)
+        #     grid.code = metadata.tile_id
+
+        # TODO: Adding the eo:bands to the item this way below breaks the validation. Find out why.
+        from pystac.extensions.eo import EOExtension, Band
+
+        EOExtension.add_to(item)
+        item_eo = EOExtension.ext(item, add_if_missing=True)
+        item_eo.bands = []
+        asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
+        eo_bands = []
+        for band_cfg in asset_config.eo_bands:
+            new_band: Band = Band.create(
+                name=band_cfg.name,
+                description=band_cfg.description,
+            )
+            eo_bands.append(new_band)
+        item_eo.apply(eo_bands)
+
+        item.stac_extensions.append(CLASSIFICATION_SCHEMA)
+        item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
+
+        return item
+
+    def bundle_assets(self, assets: List[AssetMetadata]) -> Item:
+        def is_known_asset_type(metadata: AssetMetadata) -> bool:
+            return metadata.asset_type in self.item_assets_configs
+
+        known_assets = [a for a in assets if is_known_asset_type(a)]
+        if not known_assets:
+            error_msg = (
+                "None of the assets in 'assets' is a known item type, not defined in collection configuration: "
+                + f"{assets}, returning item=None"
+            )
+            _logger.warning(error_msg)
+            return None
+
+        first_asset = known_assets[0]
+        first_asset.href
+
+        # from urllib.parse import ParseResult, urlparse, urljoin
+        # url_parsed: ParseResult = urlparse(first_asset.href)
+        # item_path = Path(url_parsed.netloc).parent
+        # url_parsed.netloc = item_path
+        # item_href = url_parsed.geturl()
+
+        item = Item(
+            href=first_asset.item_href,
+            id=first_asset.item_id,
+            geometry=first_asset.geometry_as_dict,
+            bbox=first_asset.bbox_as_list,
+            datetime=first_asset.datetime,
+            start_datetime=first_asset.start_datetime,
+            end_datetime=first_asset.end_datetime,
+            properties={
+                "product_version": first_asset.version,
+                # "product_tile": metadata.tile,
+            },
+        )
+        # TODO: support optional parts: store the tile ID if dataset uses that.
+        #   We would need a way to customize extracting that tile ID for the specific dataset.
+
+        # TODO: looks like we should get description from a sourse/config at the item level.
+        description = self.item_assets_configs[first_asset.asset_type].description
+        item.common_metadata.description = description
+
+        item.common_metadata.created = dt.datetime.utcnow()
+
+        # TODO: support optional parts: these fields are recommended but they are also not always relevant or present.
+        # item.common_metadata.mission = constants.MISSION
+        # item.common_metadata.platform = constants.PLATFORM
+        # item.common_metadata.instruments = constants.INSTRUMENTS
+
+        for metadata in assets:
+            item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
+            item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
+            item_proj.epsg = metadata.proj_epsg
+            item_proj.bbox = metadata.proj_bbox_as_list
+            item_proj.geometry = metadata.proj_geometry_as_dict
+            item_proj.transform = metadata.transform
+            item_proj.shape = metadata.shape
 
         # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
         #    that is not always the case.
@@ -1256,7 +1350,17 @@ class GeoTiffPipeline:
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
-                stac_item.validate()
+                try:
+                    stac_item.validate()
+                except STACValidationError:
+                    _logger.error(
+                        (
+                            "Validation failed for STAC item with following contents: "
+                            + pformat(stac_item.to_dict(), indent=2)
+                        ),
+                        exc_info=True,
+                    )
+                    raise
                 yield stac_item
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
@@ -1315,13 +1419,13 @@ class AssetMetadataPipeline:
         output_dir: Path,
         overwrite: Optional[bool] = False,
     ) -> None:
-        # Components / dependencies that must be provided
-        self._metadata_collector: IMetadataCollector = metadata_collector
-
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
         self._collection_dir: Path = None
         self._overwrite: bool = overwrite
+
+        # Components / dependencies that must be provided
+        self._metadata_collector: IMetadataCollector = metadata_collector
 
         # Components / dependencies that we set up internally
         self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
@@ -1376,23 +1480,10 @@ class AssetMetadataPipeline:
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
     ) -> "AssetMetadataPipeline":
-        """Creates a GeoTiffPipeline from configurations.
-
-        We want the two configuration objects to remain separate, because one is the
-        general collection configuration which is typically read from a JSON file
-        and the other defines what paths to read from and write too.
-        Especially the options about output path can change a lot so these are
-        specified via CLI options.
-
-        For example they can be different for testing versus for final output,
-        and each user would typically work in their own home or user data folders
-        for test output.
-
-        Also we do not want to mix these (volatile) path settings with the
-        stable/fixed settings in the general config file.
-        """
-        pipeline = AssetMetadataPipeline(metadata_collector=metadata_collector, output_dir=None, overwrite=False)
+        """Creates a AssetMetadataPipeline from configurations."""
+        pipeline = AssetMetadataPipeline(metadata_collector=None, output_dir=None, overwrite=False)
         pipeline.setup(
+            metadata_collector=metadata_collector,
             collection_config=collection_config,
             output_dir=output_dir,
             overwrite=overwrite,
@@ -1401,10 +1492,15 @@ class AssetMetadataPipeline:
 
     def setup(
         self,
+        metadata_collector: IMetadataCollector,
         collection_config: CollectionConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
     ) -> None:
+        """Set up an existing instance using the specified dependencies and configuration settings."""
+        # Dependencies or components that we delegate work to.
+        self._metadata_collector = metadata_collector
+
         # Settings: these are just data, not components we delegate work to.
         if collection_config is None:
             raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
@@ -1451,8 +1547,8 @@ class AssetMetadataPipeline:
 
     def get_metadata(self) -> Iterable[AssetMetadata]:
         """Generate the intermediate metadata objects, from the input files."""
-        for file in self.get_input_files():
-            yield self._geotiff_to_metadata_mapper.to_metadata(file)
+        self._metadata_collector.collect()
+        return self._metadata_collector.metadata_list
 
     # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
     # @property
@@ -1477,8 +1573,22 @@ class AssetMetadataPipeline:
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
-        self._metadata_collector.collect()
-        for metadata in self._metadata_collector.metadata_list:
+
+        group_per_item_id = GroupMetadataByAttribute("item_id")
+        for item_id, assets in group_per_item_id.group_by(self.get_metadata()).items():
+            # TODO: implement grouping of several assets that belong to one item, here.
+
+            print(f"Bundling assets for STAC item {item_id=}, asset: {assets}")
+            stac_item = self._meta_to_stac_item_mapper.bundle_assets(assets)
+            # Ignore the asset when the file was not a known asset type, for example it is
+            # not a GeoTIFF or it is not one of the assets or bands we want to include.
+            if stac_item:
+                stac_item.validate()
+                yield stac_item
+
+    def old_collect_stac_items(self):
+        """Generate the intermediate STAC Item objects."""
+        for metadata in self.get_metadata():
             # TODO: implement grouping of several assets that belong to one item, here.
 
             stac_item = self._meta_to_stac_item_mapper.map(metadata)
@@ -1511,9 +1621,9 @@ class AssetMetadataPipeline:
         self._collection_builder.build_collection(self.collect_stac_items())
         self._collection = self._collection_builder.collection
 
-        coll_file = self._collection_builder.collection_file
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
-        post_processor.process_collection(coll_file)
+        # coll_file = self._collection_builder.collection_file
+        # post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        # post_processor.process_collection(coll_file)
 
     # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
     # def get_collection_file_for_group(self, group: str | int):

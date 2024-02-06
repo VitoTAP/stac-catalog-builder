@@ -357,15 +357,45 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
 
 
 @cli.command
+@click.option("-c", "--collection", type=str, help="ID in OpenSearch of the collection to build")
+@click.option("-n", "--number", type=int, help="Build the N-th collection available (counting from 1).")
 @click.option(
     "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
 )
-def vpp_list_metadata(max_products: int):
+@click.option(
+    "-o",
+    "--outputdir",
+    required=False,
+    type=click.Path(dir_okay=True, file_okay=False),
+)
+@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
+def vpp_build(collection: str, number: int, max_products: int, outputdir: Path, overwrite: bool):
+    """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
+    commandapi.vpp_build_collection(
+        collection_id=collection,
+        collection_number=number,
+        max_products=max_products,
+        output_dir=outputdir,
+        overwrite=overwrite,
+    )
+
+
+@cli.command
+@click.option("-c", "--collection", type=str, help="ID in OpenSearch of the collection to build")
+@click.option("-n", "--number", type=int, help="Build the N-th collection available (counting from 1).")
+@click.option(
+    "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
+)
+def vpp_list_metadata(collection: str, number: int, max_products: int):
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
-    commandapi.vpp_list_metadata(max_products=max_products)
+    md_list = commandapi.vpp_list_metadata(
+        collection_id=collection, collection_number=number, max_products=max_products
+    )
+    for asset_md in md_list:
+        pprint.pprint(asset_md.to_dict())
 
 
 @cli.command
@@ -379,18 +409,12 @@ def vpp_list_items(collection: str, number: int, max_products: int):
 
     This is used to test the conversion and check the configuration files.
     """
-    commandapi.vpp_list_stac_items(collection_id=collection, collection_number=number, max_products=max_products)
 
-
-@cli.command
-@click.option("-c", "--collection", type=str, help="ID in OpenSearch of the collection to build")
-@click.option("-n", "--number", type=int, help="Build the N-th collection available (counting from 1).")
-@click.option(
-    "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
-)
-def vpp_build(collection: str, number: int, max_products: int):
-    """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
-    commandapi.vpp_build_collection(collection_id=collection, collection_number=number, max_products=max_products)
+    stac_items = commandapi.vpp_list_stac_items(
+        collection_id=collection, collection_number=number, max_products=max_products
+    )
+    for item in stac_items:
+        pprint.pprint(item.to_dict())
 
 
 #

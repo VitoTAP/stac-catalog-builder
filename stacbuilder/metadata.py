@@ -195,6 +195,7 @@ class AssetMetadata:
         self.title: Optional[str] = None
         self.collection_id: Optional[str] = None
         self.tile_id: Optional[str] = None
+        self.item_href: Optional[str] = None
 
         # TODO: add some properties that need to trickle up to the collection level, or not?
         # These properties are really at the collection level, but in HRL VPP
@@ -441,6 +442,7 @@ class AssetMetadata:
             "title": self.title,
             "href": self.href,
             "original_href": self.original_href,
+            "item_href": self.item_href,
             "asset_path": self.asset_path,
             "asset_type": self.asset_type,
             "datetime": self.datetime,
@@ -470,8 +472,10 @@ class AssetMetadata:
         metadata.title = cls.__get_str_from_dict("title", data)
         metadata.href = cls.__get_str_from_dict("href", data)
         metadata.original_href = cls.__get_str_from_dict("original_href", data)
+        metadata.item_href = cls.__get_str_from_dict("item_href", data)
         metadata.asset_path = cls.__as_type_from_dict("asset_path", Path, data)
         metadata.asset_type = cls.__get_str_from_dict("asset_type", data)
+        metadata.file_size = cls.__as_type_from_dict("file_size", int, data)
 
         import pandas as pd
 

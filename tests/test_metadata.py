@@ -19,6 +19,7 @@ class TestAssetMetadata:
 
         assert meta.href is None
         assert meta.original_href is None
+        assert meta.item_href is None
 
         assert meta.shape is None
         assert meta.tags == []
@@ -55,6 +56,7 @@ class TestAssetMetadata:
             "title": None,
             "href": None,
             "original_href": None,
+            "item_href": None,
             "asset_path": None,
             "asset_type": None,
             "datetime": None,
