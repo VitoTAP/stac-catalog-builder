@@ -2,10 +2,11 @@
 
 Classes we really need to add coverage for:
 
-TODO: need coverage for GeoTiffPipeline
-TODO: need coverage for STACCollectionBuilder
+TODO: need more coverage for AssetMetadataPipeline
+TODO: need more coverage for GeoTiffPipeline
 TODO: need coverage for MapMetadataToSTACItem
 TODO: need coverage for MapGeoTiffToSTACItem
+TODO: need coverage for STACCollectionBuilder
 TODO: need coverage for GroupMetadataByYear and GroupMetadataByAttribute
 TODO: need coverage for PostProcessSTACCollectionFile
 
@@ -19,6 +20,7 @@ from typing import List
 
 import pytest
 import rasterio
+from rasterio.io import DatasetWriter
 import numpy as np
 from pystac.collection import Collection
 
@@ -139,7 +141,12 @@ def create_geotiff_files(paths):
         create_mock_geotiff(file)
 
 
+# TODO: move create_mock_geotiff and test_create_tiffs to a non-test module that generates test data.
 def create_mock_geotiff(tif_path: Path):
+    """Create GeoTIFF raster files for testing.
+
+    The pixels form a simple gradient just to have some data.
+    """
     # Based on the example in rasterio docs:
     # https://rasterio.readthedocs.io/en/stable/quickstart.html#opening-a-dataset-in-writing-mode
     x = np.linspace(-4.0, 4.0, 240)
@@ -149,7 +156,7 @@ def create_mock_geotiff(tif_path: Path):
     Z2 = np.exp(-3 * np.log(2) * ((X + 0.5) ** 2 + (Y + 0.5) ** 2) / 2.5**2)
     Z = 10.0 * (Z2 - Z1)
 
-    new_dataset = rasterio.open(
+    dataset: DatasetWriter = rasterio.open(
         tif_path,
         "w",
         driver="GTiff",
@@ -158,10 +165,9 @@ def create_mock_geotiff(tif_path: Path):
         count=1,
         dtype=Z.dtype,
         crs=4326,
-        # transform=transform,
     )
-    new_dataset.write(Z, 1)
-    new_dataset.close()
+    dataset.write(Z, 1)
+    dataset.close()
 
 
 @pytest.mark.skip
@@ -174,6 +180,8 @@ def test_create_tiffs(geotiff_paths):
 
 @pytest.fixture
 def collection_test_config() -> CollectionConfig:
+    """Collection configuration for use in pipeline fixtures."""
+
     data = {
         "collection_id": "foo-2023-v01",
         "title": "Foo collection",
@@ -259,9 +267,10 @@ def grouped_collection_test_config() -> CollectionConfig:
 
 
 class MockMetadataCollector(IMetadataCollector):
-    """Interface/Protocol for collector that gets Metadata objects from a source.
+    """A mock implementation of IMetadataCollector.
 
-    You need still to implement the method `collect`
+    You give it some fixed AssetMetadata you want it to return.
+    The `collect` method is a no-op in this case
     """
 
     def __init__(self, asset_metadata_list: List[AssetMetadata]):
@@ -272,40 +281,68 @@ class MockMetadataCollector(IMetadataCollector):
             self._metadata_list = []
         self._metadata_list.append(asset_md)
 
+    def collect(self) -> None:
+        pass
+
 
 @pytest.fixture
 def basic_asset_metadata(data_dir) -> AssetMetadata:
     # TODO: maybe better to save a few AssetMetadata and their STAC items to JSON and load them here
+    return create_basic_asset_metadata(data_dir / "observations_2m-temp-monthly_2000-01-01.tif")
+
+
+def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
+    """Create a AssetMetadata with basic (fake) information.
+
+    The relative_asset_path are expected to come from the fixture geotif_paths_relative or alike
+    So they should look similar to the one below:
+
+        2000/observations_2m-temp-monthly_2000-01-01.tif
+
+    """
     md = AssetMetadata()
 
-    md.asset_id = "observations_2m-temp-monthly_2000-01-01.tif"
-    md.item_id = "observations"
-    md.asset_path = data_dir / "2000/observations_2m-temp-monthly_2000-01-01.tif"
+    md.asset_id = asset_path.name
+
+    prefix_length = len("observations_")
+    end_length = len("_2000-01-01.tif")
+    md.asset_type = asset_path.name[prefix_length:-end_length]
+
+    year = asset_path.parent.name
+    md.item_id = f"weather_observations:{md.asset_type}:{year}"
+    md.asset_path = asset_path
     md.href = md.asset_path
     md.original_href = md.asset_path
-    md.item_href = data_dir / "2000"
+    md.item_href = asset_path.parent
+
+    md.asset_type = "2m-temp-monthly"
+
+    md.collection_id = "weather_observations"
+    md.tile_id = None
+    md.title = " ".join(asset_path.name.split("_"))
 
     start_datetime = dt.datetime(2000, 1, 1, tzinfo=dt.UTC)
     end_datetime = dt.datetime(2000, 2, 1, tzinfo=dt.UTC)
 
-    md.collection_id = "observations"
-    md.tile_id = None
-    md.title = "observations 2m temp monthly for 2000-01-01"
-    md.asset_type = "2m-temp-monthly"
     md.datetime = start_datetime
     md.start_datetime = start_datetime
     md.end_datetime = end_datetime
-    md.shape = [123, 456]
+
+    md.shape = [180, 240]
     md.tags = ["tag1", "tag2"]
-    md.file_size = 100
+    md.file_size = 340
 
     return md
 
 
 @pytest.fixture
-def basic_asset_metadata_list(basic_asset_metadata) -> List[AssetMetadata]:
-    # TODO: add a second asset, for the same STAC item.
-    return [basic_asset_metadata]
+def basic_asset_metadata_list(geotiff_paths) -> List[AssetMetadata]:
+    return [create_basic_asset_metadata(f) for f in geotiff_paths]
+
+
+@pytest.fixture
+def basic_asset_metadata_list_small_set(geotiff_paths_small_set) -> List[AssetMetadata]:
+    return [create_basic_asset_metadata(f) for f in geotiff_paths_small_set]
 
 
 @pytest.fixture
@@ -366,7 +403,14 @@ class TestAssetMetadataPipeline:
 
     def test_collect_stac_items(self, asset_metadata_pipeline: AssetMetadataPipeline):
         stac_items = list(asset_metadata_pipeline.collect_stac_items())
-        assert len(stac_items) == 1
+        assert len(stac_items) == 4
+
+        for item in stac_items:
+            len(item.assets) == 3
+
+        # Validation should not raise a pystac.errors.STACValidationError
+        for item in stac_items:
+            item.validate()
 
     def test_build_collection(self, asset_metadata_pipeline: GeoTiffPipeline):
         assert asset_metadata_pipeline.collection is None

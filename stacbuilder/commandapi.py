@@ -98,6 +98,10 @@ def build_grouped_collections(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
+
+    if output_dir and not isinstance(output_dir, Path):
+        output_dir = Path(output_dir).expanduser().absolute()
+
     pipeline = GeoTiffPipeline.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
@@ -174,7 +178,7 @@ def list_asset_metadata(
         GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
 
     if not pipeline.has_grouping:
-        return {"": list(pipeline.get_metadata())}
+        return {None: list(pipeline.get_metadata())}
     else:
         return pipeline.get_metadata_groups()
 

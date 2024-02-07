@@ -3,6 +3,7 @@
 This contains the classes that generate the STAC catalogs, collections and items.
 """
 
+# Standard libraries
 import datetime as dt
 import json
 import logging
@@ -15,28 +16,32 @@ from pprint import pformat
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
 
 
+# Third party libraries
 import geopandas as gpd
 import pandas as pd
 import rasterio
 import rio_stac.stac as rst
-from openeo.util import normalize_crs
 from shapely.geometry import shape
 from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
 from pystac.errors import STACValidationError
 from pystac.layout import TemplateLayoutStrategy
 
-
 # TODO: add the GridExtension support again
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.file import FileExtension
-
-
-# TODO: add the GridExtension support again
+from pystac.extensions.eo import EOExtension, Band
 from pystac.extensions.raster import RasterExtension, RasterBand
+
+# TODO: add datacube extension
+
 from stactools.core.io import ReadHrefModifier
 
+# our own libraries outside of this project
+from openeo.util import normalize_crs
 
+
+# Modules from this project
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.exceptions import InvalidOperation, InvalidConfiguration
 from stacbuilder.pathparsers import (
@@ -54,11 +59,11 @@ from stacbuilder.projections import reproject_bounding_box
 from stacbuilder.timezoneformat import TimezoneFormatConverter
 
 
-_logger = logging.getLogger(__name__)
-
-
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
 ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
+
+
+_logger = logging.getLogger(__name__)
 
 
 class CreateAssetUrlFromPath:
@@ -79,6 +84,7 @@ class CreateAssetUrlFromPath:
         return self.url_template.format(str(rel_path))
 
 
+# Type alias for the specific callable that AlternateHrefGenerator needs.
 AssetMetadataToURL = Callable[[AssetMetadata], str]
 
 
@@ -207,7 +213,11 @@ class IDataCollector(Protocol):
 
 
 class FileCollector(IDataCollector):
-    """Collects geotiff files that match a glob, in a directory."""
+    """Collects geotiff files that match a glob, in a directory.
+
+    Note that the values None and [] have a different meaning for self.input_files:
+    See :meth: FileCollector.has_collected
+    """
 
     def __init__(
         self, input_dir: Optional[Path] = None, glob: Optional[str] = "*", max_files: Optional[int] = -1
@@ -258,10 +268,20 @@ class FileCollector(IDataCollector):
         self._input_files = list(input_files)
 
     def has_collected(self) -> bool:
+        """Whether or not the data has been collected.
+
+        Note that the values None and [] have a different meaning here:
+        Namely:
+            `self.input_files == []`
+            means no files were found during collection,
+        but in contrast:
+            `self.input_files is None`
+            means the collection was never run in the first place.
+        """
         return self._input_files is not None
 
     def reset(self):
-        # print(f"resetting {self.__class__.__name__} instance: {self}")
+        """Reset the collector: clear the collected files."""
         self._input_files = None
 
     @property
@@ -273,40 +293,37 @@ class FileCollector(IDataCollector):
 class IMetadataCollector(IDataCollector):
     """Interface/Protocol for collector that gets Metadata objects from a source.
 
-    You need still to implement the method `collect`
+    You need still to implement the method `collect`.
+
+    Note that the values None and [] have a different meaning for self.metadata_list,
+    See :meth: IMetadataCollector.has_collected
     """
 
     def __init__(self):
         self._metadata_list: List[AssetMetadata] = None
 
     def has_collected(self) -> bool:
+        """Whether or not the data has been collected.
+
+        Note that the values None and [] have a different meaning here:
+        Namely:
+            `self.metadata_list == []`
+            means no asset metadata were found during collection,
+        but in contrast:
+            `self.metadata_list is None`
+            means the collection was never run in the first place.
+        """
         return self._metadata_list is not None
 
     def reset(self):
+        """Reset the collector: clear the collected asset metadata,
+
+        Value must be `None`, as if it was never run.
+        """
         self._metadata_list = None
 
     @property
     def metadata_list(self) -> List[AssetMetadata]:
-        return self._metadata_list or []
-
-
-class ISTACItemCollector(IDataCollector):
-    """Interface/Protocol for collector that gets STAC Items from a source.
-
-    You need still to implement the method `collect`
-    """
-
-    def __init__(self):
-        self._metadata_list: List[AssetMetadata] = None
-
-    def has_collected(self) -> bool:
-        return self._metadata_list is not None
-
-    def reset(self):
-        self._metadata_list = None
-
-    @property
-    def stac_items(self) -> List[Item]:
         return self._metadata_list or []
 
 
@@ -317,17 +334,15 @@ class IMapMetadataToSTACItem(Protocol):
     TODO: Will we really have multiple implementations or not? If probability low, remove IMapMetadataToSTACItem
     """
 
-    def map(self, metadata: AssetMetadata) -> Item:
+    def map_one(self, metadata: AssetMetadata) -> Item:
         """Converts a Metadata objects to a STAC Items."""
         ...
 
-    def bundle_assets(self, assets: List[AssetMetadata]) -> Item:
+    # TODO: consider replacing "map" entirely with "bundle_assets"
+    #   Map would do the same if each asset goes into a separate STAC item. So avoid duplicate code.
+    def create_item(self, assets: List[AssetMetadata]) -> Item:
         """Create a STAC item that contains multiple assets, from a list of Metadata objects."""
         ...
-
-    def map_all(self, metadata_source: Iterable[AssetMetadata]) -> Iterable[Item]:
-        """Return generator the converts all metadata objects to STAC Items"""
-        return (self.map(metadata) for metadata in metadata_source)
 
 
 class MapMetadataToSTACItem(IMapMetadataToSTACItem):
@@ -365,7 +380,9 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return self._alternate_href_generator.get_alternates(metadata)
 
-    def map(self, metadata: AssetMetadata) -> Item:
+    # TODO: consider replacing "map" entirely with "bundle"
+    #   Map would do the same if each asset goes into a separate STAC item. So avoid duplicate code.
+    def map_one(self, metadata: AssetMetadata) -> Item:
         if metadata.asset_type not in self.item_assets_configs:
             error_msg = (
                 "Found an unknown item type, not defined in collection configuration: "
@@ -419,12 +436,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         #     grid = GridExtension.ext(item, add_if_missing=True)
         #     grid.code = metadata.tile_id
 
-        # TODO: Adding the eo:bands to the item this way below breaks the validation. Find out why.
-        from pystac.extensions.eo import EOExtension, Band
-
         EOExtension.add_to(item)
         item_eo = EOExtension.ext(item, add_if_missing=True)
-        item_eo.bands = []
         asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
         eo_bands = []
         for band_cfg in asset_config.eo_bands:
@@ -440,7 +453,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return item
 
-    def bundle_assets(self, assets: List[AssetMetadata]) -> Item:
+    def create_item(self, assets: List[AssetMetadata]) -> Item:
         def is_known_asset_type(metadata: AssetMetadata) -> bool:
             return metadata.asset_type in self.item_assets_configs
 
@@ -453,15 +466,11 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
             _logger.warning(error_msg)
             return None
 
+        # Ensure that the asset are all for the same STAC item
+        assert len(set(a.item_id for a in assets)) == 1
+        assert len(set(a.item_href for a in assets)) == 1
+
         first_asset = known_assets[0]
-        first_asset.href
-
-        # from urllib.parse import ParseResult, urlparse, urljoin
-        # url_parsed: ParseResult = urlparse(first_asset.href)
-        # item_path = Path(url_parsed.netloc).parent
-        # url_parsed.netloc = item_path
-        # item_href = url_parsed.geturl()
-
         item = Item(
             href=first_asset.item_href,
             id=first_asset.item_id,
@@ -472,6 +481,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
             end_datetime=first_asset.end_datetime,
             properties={
                 "product_version": first_asset.version,
+                # TODO: what was product_tile in the original script and do we still need it. Else remove.
                 # "product_tile": metadata.tile,
             },
         )
@@ -485,18 +495,31 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         item.common_metadata.created = dt.datetime.utcnow()
 
         # TODO: support optional parts: these fields are recommended but they are also not always relevant or present.
+        #   Originally defined in a module with only constants. Need to add this to the config classes.
         # item.common_metadata.mission = constants.MISSION
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
+        def to_tuple_or_none(value) -> Union[Tuple, None]:
+            if value is None:
+                return None
+            return tuple(value)
+
+        assert len(set(a.proj_epsg for a in assets)) == 1
+        assert len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1
+        assert len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1
+        assert len(set(to_tuple_or_none(a.transform) for a in assets)) == 1
+        assert len(set(to_tuple_or_none(a.shape) for a in assets)) == 1
+
         for metadata in assets:
             item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
-            item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-            item_proj.epsg = metadata.proj_epsg
-            item_proj.bbox = metadata.proj_bbox_as_list
-            item_proj.geometry = metadata.proj_geometry_as_dict
-            item_proj.transform = metadata.transform
-            item_proj.shape = metadata.shape
+
+        item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
+        item_proj.epsg = first_asset.proj_epsg
+        item_proj.bbox = first_asset.proj_bbox_as_list
+        item_proj.geometry = first_asset.proj_geometry_as_dict
+        item_proj.transform = first_asset.transform
+        item_proj.shape = first_asset.shape
 
         # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
         #    that is not always the case.
@@ -508,19 +531,17 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         #     grid = GridExtension.ext(item, add_if_missing=True)
         #     grid.code = metadata.tile_id
 
-        # TODO: Adding the eo:bands to the item this way below breaks the validation. Find out why.
-        # EOExtension.add_to(item)
-        # item_eo = EOExtension.ext(item, add_if_missing=True)
-        # item_eo.bands = []
-        # asset_config: AssetConfig = self._assets_config_for(metadata.asset_type)
-        # eo_bands = []
-        # for band_cfg in asset_config.eo_bands:
-        #     new_band: Band = Band.create(
-        #         name = band_cfg.name,
-        #         description=band_cfg.description,
-        #     )
-        #     eo_bands.append(new_band)
-        # item_eo.apply(eo_bands)
+        EOExtension.add_to(item)
+        item_eo = EOExtension.ext(item, add_if_missing=True)
+        asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
+        eo_bands = []
+        for band_cfg in asset_config.eo_bands:
+            new_band: Band = Band.create(
+                name=band_cfg.name,
+                description=band_cfg.description,
+            )
+            eo_bands.append(new_band)
+        item_eo.apply(eo_bands)
 
         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
         item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
@@ -590,6 +611,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
 
         return asset
 
+        # TODO: Did original script do anything in code below that we still need to re-implement? And remove it after.
         # asset = Asset(href=make_absolute_href(metadata.href))
         # asset.title = asset_def.title
         # asset.description = asset_def.description
@@ -764,12 +786,22 @@ class MapGeoTiffToAssetMetadata:
     #     return meta
 
 
+# TODO: [simplify] Check if we can easily use functools groupby directly to eliminate all IGroupMetadataBy stuff.
 class IGroupMetadataBy(Protocol):
+    """Interface/Protocol for grouping AssetMetadata by a specified attribute.
+
+    This is used to group assets that belong to the same STAC item into that item.
+    Also used to divide large collections into a group of collections,
+    for example collections by year.
+    """
+
     def group_by(self, iter_metadata) -> Dict[Hashable, List[AssetMetadata]]:
         ...
 
 
 class GroupMetadataByYear(IGroupMetadataBy):
+    """Groups AssetMetadata objects by year"""
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -786,6 +818,11 @@ class GroupMetadataByYear(IGroupMetadataBy):
 
 
 class GroupMetadataByAttribute(IGroupMetadataBy):
+    """Groups AssetMetadata objects by an attribute you specify.
+
+    The attribute must exist on AssetMetadata.
+    """
+
     def __init__(self, attribute_name: str) -> None:
         super().__init__()
         self._attribute_name = attribute_name
@@ -827,7 +864,6 @@ class STACCollectionBuilder:
         self._collection: Collection = None
 
     def reset(self):
-        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._stac_items = None
 
@@ -1301,7 +1337,6 @@ class GeoTiffPipeline:
         )
 
     def reset(self) -> None:
-        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._collection_groups = {}
         self._file_collector.reset()
@@ -1315,7 +1350,7 @@ class GeoTiffPipeline:
             yield file
 
     def get_metadata(self) -> Iterable[AssetMetadata]:
-        """Generate the intermediate metadata objects, from the input files."""
+        """Generate the intermediate asset metadata objects, from the input files."""
         for file in self.get_input_files():
             yield self._geotiff_to_metadata_mapper.to_metadata(file)
 
@@ -1334,7 +1369,8 @@ class GeoTiffPipeline:
 
         group_to_stac_items = {}
         for group, list_metadata in self.get_metadata_groups().items():
-            list_items = list(self._meta_to_stac_item_mapper.map_all(list_metadata))
+            mapper = self._meta_to_stac_item_mapper
+            list_items = [mapper.map_one(metadata) for metadata in list_metadata]
             group_to_stac_items[group] = list_items
 
         return group_to_stac_items
@@ -1344,9 +1380,7 @@ class GeoTiffPipeline:
         for file in self.get_input_files():
             metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
 
-            # TODO: implement grouping of several assets that belong to one item, here.
-
-            stac_item = self._meta_to_stac_item_mapper.map(metadata)
+            stac_item = self._meta_to_stac_item_mapper.map_one(metadata)
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
@@ -1430,7 +1464,7 @@ class AssetMetadataPipeline:
         # Components / dependencies that we set up internally
         self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
         self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
-        self._metadata_group_creator: IGroupMetadataBy = None
+        # self._metadata_group_creator: IGroupMetadataBy = None
 
         self._collection_builder: STACCollectionBuilder = None
 
@@ -1481,6 +1515,7 @@ class AssetMetadataPipeline:
         overwrite: Optional[bool] = False,
     ) -> "AssetMetadataPipeline":
         """Creates a AssetMetadataPipeline from configurations."""
+
         pipeline = AssetMetadataPipeline(metadata_collector=None, output_dir=None, overwrite=False)
         pipeline.setup(
             metadata_collector=metadata_collector,
@@ -1498,6 +1533,7 @@ class AssetMetadataPipeline:
         overwrite: Optional[bool] = False,
     ) -> None:
         """Set up an existing instance using the specified dependencies and configuration settings."""
+
         # Dependencies or components that we delegate work to.
         self._metadata_collector = metadata_collector
 
@@ -1522,7 +1558,7 @@ class AssetMetadataPipeline:
         """Setup the internal components based on the components that we receive via dependency injection."""
 
         self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
-        self._metadata_group_creator = GroupMetadataByYear()
+        # self._metadata_group_creator = GroupMetadataByYear()
 
         # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
         # if group and not self.has_grouping:
@@ -1541,7 +1577,6 @@ class AssetMetadataPipeline:
         )
 
     def reset(self) -> None:
-        # print(f"resetting {self.__class__.__name__} instance: {self}")
         self._collection = None
         self._collection_groups = {}
 
@@ -1579,19 +1614,7 @@ class AssetMetadataPipeline:
             # TODO: implement grouping of several assets that belong to one item, here.
 
             print(f"Bundling assets for STAC item {item_id=}, asset: {assets}")
-            stac_item = self._meta_to_stac_item_mapper.bundle_assets(assets)
-            # Ignore the asset when the file was not a known asset type, for example it is
-            # not a GeoTIFF or it is not one of the assets or bands we want to include.
-            if stac_item:
-                stac_item.validate()
-                yield stac_item
-
-    def old_collect_stac_items(self):
-        """Generate the intermediate STAC Item objects."""
-        for metadata in self.get_metadata():
-            # TODO: implement grouping of several assets that belong to one item, here.
-
-            stac_item = self._meta_to_stac_item_mapper.map(metadata)
+            stac_item = self._meta_to_stac_item_mapper.create_item(assets)
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
