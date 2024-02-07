@@ -160,7 +160,7 @@ class CollectionConfigBuilder:
     def get_media_type(self) -> MediaType:
         format = self.get_format()
         media_type = None
-        if format.lower() in ["geotif", "geotif", "tiff"]:
+        if format.lower() in ["geotif", "geotiff", "tiff"]:
             media_type = MediaType.GEOTIFF
         elif format.lower() == "COG":
             media_type = MediaType.COG
@@ -330,23 +330,18 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         #   Is each link a separate asset in STAC terms?
         #   And does our data even use this or does the list only ever contain one element?
         first_link = data_links[0]
-        href = first_link.get("href") if data_links else None
+        first_prod_data = product.data[0] if product.data else None
 
-        # TODO: Is this below a better way to get the href?
-        # href2 = product.data[0].href
-        # assert href2 == href
-
-        # In this case we should get the title and description from the source in
-        # OpenSearch rather than our own collection config file
-        # TODO: Add title + description to AssetMetadata, or some other intermediate for STAC items.
-        acquisitionInformation = props.get("acquisitionInformation")
-        tile_id = None
-        if acquisitionInformation:
-            acquisitionInformation = acquisitionInformation[0]
-            tile_id = acquisitionInformation.get("acquisitionParameters", {}).get("tileId")
+        href = first_prod_data.href
+        # TODO: remove temporary assert for development. The above method to get href seems better but want to verify that they are indeed identical.
+        href2 = first_link.get("href") if data_links else None
+        assert href2 == href
 
         asset_metadata = AssetMetadata()
+        asset_metadata.href = href
+        asset_metadata.original_href = href
         asset_metadata.asset_id = product.id
+        asset_metadata.collection_id = props.get("parentIdentifier")
         asset_metadata.title = product.title
 
         # product type is a shorter code than what corresponds to asset_metadata.asset_type
@@ -357,18 +352,42 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         num_chars_to_remove = 1 + len(product_type)
         asset_metadata.item_id = asset_metadata.asset_id[:-num_chars_to_remove]
 
+        # In this case we should get the title and description from the source in
+        # OpenSearch rather than our own collection config file
+        # TODO: Add title + description to AssetMetadata, or some other intermediate for STAC items.
+        acquisitionInformation = props.get("acquisitionInformation")
+        tile_id = None
+        if acquisitionInformation:
+            acquisitionInformation = acquisitionInformation[0]
+            tile_id = acquisitionInformation.get("acquisitionParameters", {}).get("tileId")
+            asset_metadata.tile_id = tile_id
+
+        if product.data:
+            first_prod_data = product.data[0]
+            asset_metadata.asset_type = first_prod_data.title
+            asset_metadata.media_type = AssetMetadata.mime_to_media_type(first_prod_data.type)
+            asset_metadata.file_size = first_prod_data.length
+
+        epsg_code = None
         if data_links:
-            asset_metadata.asset_type = first_link.get("title")
+            # conformsTo': 'http://www.opengis.net/def/crs/EPSG/0/3035'
+            epsg_url = first_link.get("conformsTo")
+            parts_epsg_code = epsg_url.split("/")
+            if "EPSG" in parts_epsg_code:
+                try:
+                    epsg_code = int(parts_epsg_code[-1])
+                except Exception:
+                    _logger.error(
+                        f"Could not get EPSG code for product with ID={product.id}, {epsg_url=}", exc_info=True
+                    )
+                    raise
+        asset_metadata.proj_epsg = epsg_code
 
-            file_type = first_link.get("type")
-            asset_metadata.media_type = AssetMetadata.mime_to_media_type(file_type)
-            asset_metadata.file_size = first_link.get("length")
-
-        asset_metadata.collection_id = props.get("parentIdentifier")
-        asset_metadata.tile_id = tile_id
-
-        asset_metadata.href = href
-        asset_metadata.original_href = href
+        # if data_links:
+        #     asset_metadata.asset_type = first_link.get("title")
+        #     file_type = first_link.get("type")
+        #     asset_metadata.media_type = AssetMetadata.mime_to_media_type(file_type)
+        #     asset_metadata.file_size = first_link.get("length")
 
         asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=4326)
         asset_metadata.geometry_lat_lon = product.geometry
@@ -426,8 +445,6 @@ def parse_tile_id(tile_id: str) -> Tuple[str, str]:
 
 def main():
     collector = HRLVPPMetadataCollector()
-    COLLECTION_ID = "copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01"
-    collector.collection_id = COLLECTION_ID
 
     for coll in collector.get_tcc_collections():
         print(coll.id)
@@ -435,7 +452,7 @@ def main():
         print("-" * 50)
 
         conf_builder = CollectionConfigBuilder(coll)
-        print(conf_builder.get_collection_config().model_dump())
+        pprint(conf_builder.get_collection_config().model_dump())
 
 
 if __name__ == "__main__":

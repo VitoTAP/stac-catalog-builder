@@ -28,7 +28,7 @@ from pystac.layout import TemplateLayoutStrategy
 
 # TODO: add the GridExtension support again
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
-from pystac.extensions.projection import ItemProjectionExtension
+from pystac.extensions.projection import ItemProjectionExtension, ProjectionExtension
 from pystac.extensions.file import FileExtension
 from pystac.extensions.eo import EOExtension, Band as EOBand
 from pystac.extensions.raster import RasterExtension, RasterBand
@@ -335,10 +335,11 @@ class IMapMetadataToSTACItem(Protocol):
     """
 
     def map_one(self, metadata: AssetMetadata) -> Item:
-        """Converts a Metadata objects to a STAC Items."""
+        """DEPRECATED. Use create_item instead.
+        Converts a Metadata objects to a STAC Items."""
         ...
 
-    # TODO: consider replacing "map" entirely with "bundle_assets"
+    # TODO: replacing "map_one" entirely with "create_item" => refactor GeoTiffPipeline to use AssetMetadataPipeline
     #   Map would do the same if each asset goes into a separate STAC item. So avoid duplicate code.
     def create_item(self, assets: List[AssetMetadata]) -> Item:
         """Create a STAC item that contains multiple assets, from a list of Metadata objects."""
@@ -419,8 +420,10 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         # item.common_metadata.instruments = constants.INSTRUMENTS
 
         item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
-        item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-        item_proj.epsg = metadata.proj_epsg
+        item_proj: ProjectionExtension = ItemProjectionExtension.ext(item, add_if_missing=True)
+
+        if metadata.proj_epsg:
+            item_proj.epsg = metadata.proj_epsg
         item_proj.bbox = metadata.proj_bbox_as_list
         item_proj.geometry = metadata.proj_geometry_as_dict
         item_proj.transform = metadata.transform
@@ -530,7 +533,8 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
             item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
 
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-        item_proj.epsg = first_asset.proj_epsg
+        if metadata.proj_epsg:
+            item_proj.epsg = first_asset.proj_epsg
         item_proj.bbox = first_asset.proj_bbox_as_list
         item_proj.geometry = first_asset.proj_geometry_as_dict
         item_proj.transform = first_asset.transform
@@ -1483,6 +1487,7 @@ class AssetMetadataPipeline:
         self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
         self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
         # self._metadata_group_creator: IGroupMetadataBy = None
+        self._func_find_item_group: Optional[Callable[[Item], str]] = None
 
         self._collection_builder: STACCollectionBuilder = None
 
@@ -1571,21 +1576,22 @@ class AssetMetadataPipeline:
 
     def _setup_internals(
         self,
-        # group: str | int | None = None,
+        group: str | int | None = None,
     ) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
 
         self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
         # self._metadata_group_creator = GroupMetadataByYear()
+        self._func_find_item_group = lambda item: item.datetime.year
 
         # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
-        # if group and not self.has_grouping:
-        #     raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
-        #
-        # if group:
-        #     self._collection_dir = self.get_collection_file_for_group(group)
-        # else:
-        #     self._collection_dir = self._output_base_dir
+        if group and not self.uses_collection_groups:
+            raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
+
+        if group:
+            self._collection_dir = self.get_collection_file_for_group(group)
+        else:
+            self._collection_dir = self._output_base_dir
 
         self._collection_dir = self._output_base_dir
         self._collection_builder = STACCollectionBuilder(
@@ -1603,38 +1609,50 @@ class AssetMetadataPipeline:
         self._metadata_collector.collect()
         return self._metadata_collector.metadata_list
 
-    # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
-    # @property
-    # def has_grouping(self):
-    #     return self._metadata_group_creator is not None
-    #
-    # def get_metadata_groups(self) -> Dict[Hashable, List[AssetMetadata]]:
-    #     if not self.has_grouping:
-    #         return None
-    #     return self._metadata_group_creator.group_by(self.get_metadata())
-    #
-    # def get_item_groups(self) -> Dict[Hashable, List[Item]]:
-    #     if not self.has_grouping:
-    #         return None
-    #
-    #     group_to_stac_items = {}
-    #     for group, list_metadata in self.get_metadata_groups().items():
-    #         list_items = list(self._meta_to_stac_item_mapper.map_all(list_metadata))
-    #         group_to_stac_items[group] = list_items
-    #
-    #     return group_to_stac_items
+    @property
+    def uses_collection_groups(self):
+        return self._func_find_item_group is not None
+
+    def group_stac_items_by(self) -> Dict[int, List[Item]]:
+        groups: Dict[int, AssetMetadata] = {}
+        iter_items = self.collect_stac_items()
+
+        for item in iter_items:
+            group = self._func_find_item_group(item)
+
+            if group not in groups:
+                groups[group] = []
+
+            groups[group].append(item)
+
+        return groups
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
-        group_per_item_id = GroupMetadataByAttribute("item_id")
 
-        for assets in group_per_item_id.group_by(self.get_metadata()).values():
+        groups = self.group_metadata_by_item_id(self.get_metadata())
+        for assets in groups.values():
             stac_item = self._meta_to_stac_item_mapper.create_item(assets)
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
                 stac_item.validate()
                 yield stac_item
+
+    # TODO: [simplify] [refactor] Merge this into collect_stac_items once it works well and it has tests.
+    @staticmethod
+    def group_metadata_by_item_id(iter_metadata) -> Dict[int, List[Item]]:
+        groups: Dict[int, AssetMetadata] = {}
+
+        for metadata in iter_metadata:
+            item_id = metadata.item_id
+
+            if item_id not in groups:
+                groups[item_id] = []
+
+            groups[item_id].append(metadata)
+
+        return groups
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame representing the intermediate metadata."""
@@ -1659,57 +1677,29 @@ class AssetMetadataPipeline:
         self._collection_builder.build_collection(self.collect_stac_items())
         self._collection = self._collection_builder.collection
 
-        # coll_file = self._collection_builder.collection_file
-        # post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
-        # post_processor.process_collection(coll_file)
+        coll_file = self._collection_builder.collection_file
+        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        post_processor.process_collection(coll_file)
 
     # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
-    # def get_collection_file_for_group(self, group: str | int):
-    #     return self._output_base_dir / str(group)
-    #
-    # def build_grouped_collections(self):
-    #     self.reset()
-    #
-    #     if not self.has_grouping:
-    #         raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
-    #
-    #     for group, metadata_list in sorted(self.get_item_groups().items()):
-    #         self._setup_internals(group=group)
-    #
-    #         self._collection_builder.build_collection(metadata_list)
-    #         self._collection_groups[group] = self._collection_builder.collection
-    #
-    #         coll_file = self._collection_builder.collection_file
-    #         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
-    #         post_processor.process_collection(coll_file)
+    def get_collection_file_for_group(self, group: str | int):
+        return self._output_base_dir / str(group)
 
-    @staticmethod
-    def group_metadata_by_item_id(iter_metadata) -> Dict[int, List[Item]]:
-        groups: Dict[int, AssetMetadata] = {}
+    def build_grouped_collections(self):
+        self.reset()
 
-        for metadata in iter_metadata:
-            item_id = metadata.item_id
+        if not self.uses_collection_groups:
+            raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
 
-            if item_id not in groups:
-                groups[item_id] = []
+        for group, metadata_list in sorted(self.group_stac_items_by().items()):
+            self._setup_internals(group=group)
 
-            groups[item_id].append(metadata)
+            self._collection_builder.build_collection(metadata_list)
+            self._collection_groups[group] = self._collection_builder.collection
 
-        return groups
-
-    @staticmethod
-    def group_stac_items_by(iter_items, group_func: Callable[[Item], str]) -> Dict[int, List[Item]]:
-        groups: Dict[int, AssetMetadata] = {}
-
-        for item in iter_items:
-            group = group_func(item)
-
-            if group not in groups:
-                groups[group] = []
-
-            groups[group].append(item)
-
-        return groups
+            coll_file = self._collection_builder.collection_file
+            post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+            post_processor.process_collection(coll_file)
 
 
 class GeodataframeExporter:

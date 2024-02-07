@@ -425,6 +425,21 @@ class TestAssetMetadataPipeline:
         collection = Collection.from_file(asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
+    def test_build_grouped_collection(self, asset_metadata_pipeline: GeoTiffPipeline):
+        assert asset_metadata_pipeline.collection is None
+
+        asset_metadata_pipeline.build_grouped_collections()
+
+        assert asset_metadata_pipeline.collection_groups is not None
+        assert asset_metadata_pipeline.collection is None
+
+        for coll in asset_metadata_pipeline.collection_groups.values():
+            coll_path = Path(coll.self_href)
+            coll_path.exists()
+
+            collection = Collection.from_file(coll_path)
+            collection.validate_all()
+
 
 @pytest.fixture
 def simple_asset_metadata() -> AssetMetadata:
