@@ -214,8 +214,6 @@ class AssetMetadata:
             # Ignore keys that do not match any attribute that should come from the href.
             if key in self.PROPS_FROM_HREFS:
                 setattr(self, key, value)
-            # if hasattr(self, key):
-            #     setattr(self, key, value)
 
     @property
     def version(self) -> str:
@@ -264,10 +262,6 @@ class AssetMetadata:
 
     @property
     def asset_type(self) -> Optional[str]:
-        # Default to the band name if it is not set
-        # TODO: remove this fallback, and going to remove band as a property as well.
-        # if not self._asset_type:
-        #     return self.band
         return self._asset_type
 
     @asset_type.setter
@@ -509,11 +503,7 @@ class AssetMetadata:
         else:
             metadata.bbox_lat_lon = None
 
-        # geom_dict = data.get("geometry")
-        # from shapely import from_geojson
-        # import json
-        # metadata.geometry_lat_lon = from_geojson(json.dumps(geom_dict))
-        metadata.geometry_lat_lon = data.get("geometry_lat_lon")
+        metadata.geometry_lat_lon = data.get("geometry_lat_lon") or data.get("geometry")
 
         proj_bbox_dict = data.get("bbox_projected")
         if proj_bbox_dict:
@@ -528,62 +518,13 @@ class AssetMetadata:
 
     @classmethod
     def from_geoseries(cls, series: gpd.GeoSeries) -> "AssetMetadata":
+        # Delegate the conversion to `from_dict` for consistency.
         return cls.from_dict(series.to_dict())
-
-        # metadata = AssetMetadata()
-        # metadata.asset_id = series["asset_id"]
-        # metadata.item_id = series["item_id"]
-        # metadata.collection_id = series["collection_id"]
-        # metadata.tile_id = series["tile_id"]
-        # metadata.title = series["title"]
-
-        # metadata.href = series["href"]
-        # metadata.original_href = series["original_href"]
-
-        # asset_path = series["asset_path"]
-        # metadata.asset_path = Path(asset_path) if asset_path else None
-
-        # metadata.asset_type = series["asset_type"]
-        # metadata.file_size = series["file_size"]
-
-        # media_type = series["media_type"]
-        # metadata.media_type = cls.mime_to_media_type(media_type)
-
-        # metadata.datetime = series["datetime"].to_pydatetime()
-        # metadata.start_datetime = series["start_datetime"].to_pydatetime()
-        # metadata.end_datetime = series["end_datetime"].to_pydatetime()
-
-        # metadata.shape = series["shape"]
-        # metadata.tags = series["tags"]
-
-        # bbox_dict = series["bbox_lat_lon"]
-        # if bbox_dict:
-        #     bbox = BoundingBox.from_dict(bbox_dict)
-        #     assert bbox.epsg in (4326, None)
-        #     metadata.bbox_lat_lon = bbox
-        # else:
-        #     metadata.bbox_lat_lon = None
-
-        # # This is the essential difference between from_dict and from_geoseries
-        # # TODO: reduce duplication between from_dict and from_geoseries, but geometry is an issue.
-        # metadata.geometry_lat_lon = series["geometry"]
-
-        # proj_bbox_dict = series["bbox_projected"]
-        # if proj_bbox_dict:
-        #     proj_bbox = BoundingBox.from_dict(proj_bbox_dict, 4326)
-        #     metadata.bbox_projected = proj_bbox
-        # else:
-        #     metadata.bbox_projected = None
-
-        # metadata.raster_metadata = series["raster_metadata"]
-
-        # return metadata
 
     @staticmethod
     def __get_str_from_dict(key: str, data: Dict[str, Any]) -> Optional[str]:
         value = data.get(key)
-        # preserve None, convert everything else to string.
-        # return str(value) if value is not None else None
+        # Preserve None, convert everything else to string.
         if value is None:
             return None
         return str(value)
@@ -592,7 +533,6 @@ class AssetMetadata:
     def __as_type_from_dict(key: str, to_type: callable, data: Dict[str, Any]) -> Any:
         value = data.get(key)
         # preserve None, convert everything else to string.
-        # return to_type(value) if value is not None else None
         if value is None:
             return None
         return to_type(value)
