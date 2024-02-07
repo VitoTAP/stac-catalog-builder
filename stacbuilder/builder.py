@@ -1702,6 +1702,305 @@ class AssetMetadataPipeline:
             post_processor.process_collection(coll_file)
 
 
+class GeoTiffMetadataCollector(IMetadataCollector):
+    def __init__(
+        self,
+        collection_config: CollectionConfig,
+        file_collector: FileCollector,
+    ):
+        super().__init__()
+
+        if collection_config is None:
+            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
+
+        if file_collector is None:
+            raise ValueError('Argument "file_collector" can not be None, must be a FileCollector instance.')
+
+        # Components / dependencies that must be provided
+        self._file_collector = file_collector
+
+        # Settings: these are just data, not components we delegate work to.
+        self._collection_config = collection_config
+
+        # Components / dependencies that we set up internally
+        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
+        self._path_parser: InputPathParser = None
+
+        self._setup_internals()
+
+    def _setup_internals(self):
+        # TODO: implement href modified that translates file path to a URL with a configurable base URL
+        href_modifier = None
+        collection_conf = self._collection_config
+
+        cfg_href_modifier = collection_conf.asset_href_modifier
+        if cfg_href_modifier:
+            href_modifier = CreateAssetUrlFromPath(
+                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
+            )
+
+        path_parser = None
+        if collection_conf.input_path_parser:
+            path_parser = InputPathParserFactory.from_config(collection_conf.input_path_parser)
+
+        self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
+            path_parser=path_parser, href_modifier=href_modifier
+        )
+
+    @staticmethod
+    def from_config(
+        collection_config: CollectionConfig,
+        file_coll_cfg: FileCollectorConfig,
+    ) -> "GeoTiffPipeline":
+        if collection_config is None:
+            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
+
+        if file_coll_cfg is None:
+            raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
+
+        file_collector = FileCollector.from_config(file_coll_cfg)
+
+        return GeoTiffMetadataCollector(
+            collection_config=collection_config,
+            file_collector=file_collector,
+        )
+
+    @property
+    def collection_config(self) -> CollectionConfig:
+        return self._collection_config
+
+    @property
+    def file_collector(self) -> FileCollector:
+        return self._file_collector
+
+    @property
+    def path_parser(self) -> InputPathParser:
+        return self._path_parser
+
+    @property
+    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
+        return self._geotiff_to_metadata_mapper
+
+    def reset(self) -> None:
+        super().reset()
+        self._file_collector.reset()
+
+    def _get_input_files(self) -> Iterable[Path]:
+        """Collect the input files for processing."""
+        if not self._file_collector.has_collected():
+            self._file_collector.collect()
+
+        for file in self._file_collector.input_files:
+            yield file
+
+    def collect(self) -> None:
+        self._metadata_list = []
+
+        for file in self._get_input_files():
+            metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
+            self._metadata_list.append(metadata)
+
+
+class NewGeoTiffPipeline:
+    """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
+
+    def __init__(
+        self,
+        collection_config: CollectionConfig,
+        file_collector: FileCollector,
+        # path_parser: InputPathParser,
+        output_dir: Path,
+        overwrite: Optional[bool] = False,
+    ) -> None:
+        # Settings: these are just data, not components we delegate work to.
+        self._collection_config = collection_config
+        self._output_base_dir = GeoTiffPipeline._get_output_dir_or_default(output_dir)
+        self._overwrite = overwrite
+
+        # Store dependencies: components that have to be provided to constructor
+        self._file_collector = file_collector
+
+        # Components / dependencies that we set up internally
+        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
+        self._path_parser: InputPathParser = None
+        self._metadata_collector: IMetadataCollector = None
+
+        self._asset_metadata_pipeline: AssetMetadataPipeline = None
+
+        # results
+        self._collection: Optional[Collection] = None
+        self._collection_groups: Dict[Hashable, Collection] = {}
+
+    @property
+    def collection(self) -> Collection | None:
+        return self._collection
+
+    @property
+    def collection_file(self) -> Path | None:
+        if not self.collection:
+            return None
+
+        return Path(self.collection.self_href)
+
+    @property
+    def collection_groups(self) -> Dict[Hashable, Collection] | None:
+        return self._collection_groups
+
+    @property
+    def collection_config(self) -> CollectionConfig:
+        return self._collection_config
+
+    @property
+    def file_collector(self) -> FileCollector:
+        return self._file_collector
+
+    @property
+    def path_parser(self) -> InputPathParser:
+        return self._path_parser
+
+    @property
+    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
+        return self._geotiff_to_metadata_mapper
+
+    @property
+    def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
+        return self._meta_to_stac_item_mapper
+
+    @staticmethod
+    def from_config(
+        collection_config: CollectionConfig,
+        file_coll_cfg: FileCollectorConfig,
+        output_dir: Optional[Path] = None,
+        overwrite: Optional[bool] = False,
+    ) -> "GeoTiffPipeline":
+        """Creates a GeoTiffPipeline from configurations.
+
+        We want the two configuration objects to remain separate, because one is the
+        general collection configuration which is typically read from a JSON file
+        and the other defines what paths to read from and write too.
+        Especially the options about output path can change a lot so these are
+        specified via CLI options.
+
+        For example they can be different for testing versus for final output,
+        and each user would typically work in their own home or user data folders
+        for test output.
+
+        Also we do not want to mix these (volatile) path settings with the
+        stable/fixed settings in the general config file.
+        """
+        if output_dir and not isinstance(output_dir, Path):
+            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
+
+        pipeline = NewGeoTiffPipeline(None, None, None, None)
+        pipeline.setup(
+            collection_config=collection_config,
+            file_coll_cfg=file_coll_cfg,
+            output_dir=output_dir.expanduser().absolute() if output_dir else None,
+            overwrite=overwrite,
+        )
+        return pipeline
+
+    def setup(
+        self,
+        collection_config: CollectionConfig,
+        file_coll_cfg: FileCollectorConfig,
+        output_dir: Optional[Path] = None,
+        overwrite: Optional[bool] = False,
+    ) -> None:
+        # Settings: these are just data, not components we delegate work to.
+        if collection_config is None:
+            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
+
+        if file_coll_cfg is None:
+            raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
+
+        self._collection_config = collection_config
+        self._output_base_dir = GeoTiffPipeline._get_output_dir_or_default(output_dir)
+        self._overwrite = overwrite
+
+        # Store dependencies: components that have to be provided to constructor
+        self._file_collector = FileCollector.from_config(file_coll_cfg)
+
+        if collection_config.input_path_parser:
+            self._path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
+        else:
+            self._path_parser = None
+
+        href_modifier = None
+        cfg_href_modifier = self._collection_config.asset_href_modifier
+        if cfg_href_modifier:
+            href_modifier = CreateAssetUrlFromPath(
+                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
+            )
+
+        self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
+            path_parser=self._path_parser, href_modifier=href_modifier
+        )
+
+        metadata_collector = None
+        self._asset_metadata_pipeline = AssetMetadataPipeline.from_config(
+            metadata_collector=metadata_collector,
+            collection_config=self._collection_config,
+            output_dir=self._output_base_dir,
+            overwrite=self._overwrite,
+        )
+
+    def reset(self) -> None:
+        self._collection = None
+        self._collection_groups = {}
+        self._file_collector.reset()
+        self._asset_metadata_pipeline.reset()
+
+    def get_input_files(self) -> Iterable[Path]:
+        """Collect the input files for processing."""
+        if not self._file_collector.has_collected():
+            self._file_collector.collect()
+
+        for file in self._file_collector.input_files:
+            yield file
+
+    def get_metadata(self) -> Iterable[AssetMetadata]:
+        """Generate the intermediate asset metadata objects, from the input files."""
+        for file in self.get_input_files():
+            yield self._geotiff_to_metadata_mapper.to_metadata(file)
+
+    @property
+    def uses_collection_groups(self):
+        return self._asset_metadata_pipeline.uses_collection_groups is not None
+
+    def collect_stac_items(self):
+        """Generate the intermediate STAC Item objects."""
+        return self._asset_metadata_pipeline.collect_stac_items()
+
+    def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
+        """Return a GeoDataFrame representing the intermediate metadata."""
+        return self._asset_metadata_pipeline.get_metadata_as_geodataframe()
+
+    def get_metadata_as_dataframe(self) -> pd.DataFrame:
+        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
+        return self._asset_metadata_pipeline.get_metadata_as_dataframe()
+
+    def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
+        """Return a GeoDataFrame representing the STAC Items."""
+        return self._asset_metadata_pipeline.get_stac_items_as_geodataframe()
+
+    def get_stac_items_as_dataframe(self) -> pd.DataFrame:
+        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
+        return self._asset_metadata_pipeline.get_stac_items_as_dataframe()
+
+    def build_collection(self):
+        """Build the entire STAC collection."""
+        self.reset()
+        self._asset_metadata_pipeline.build_collection()
+
+    def get_collection_file_for_group(self, group: str | int):
+        return self._asset_metadata_pipeline.get_collection_file_for_group(group)
+
+    def build_grouped_collections(self):
+        self.reset()
+        self._asset_metadata_pipeline.build_grouped_collections()
+
+
 class GeodataframeExporter:
     """Utility class to export metadata and STAC items as geopandas GeoDataframes.
 
