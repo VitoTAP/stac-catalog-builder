@@ -73,6 +73,7 @@ class CollectionConfigBuilder:
 
         platforms = self.get_platforms()
         instrument = [self.get_instruments()]
+        # TODO: Do we have a field for mission in OpenSearch / terracatalogueclient?
         # mission = Optional[List[str]] = []
 
         layout_strategy_item_template = "${collection}/${year}/${month}/${day}"
@@ -325,16 +326,19 @@ class HRLVPPMetadataCollector(IMetadataCollector):
     def create_asset_metadata(self, product: tcc.Product) -> AssetMetadata:
         props = product.properties
         data_links = props.get("links", {}).get("data", [])
-        href = data_links[0].get("href") if data_links else None
+        # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
+        #   Is each link a separate asset in STAC terms?
+        #   And does our data even use this or does the list only ever contain one element?
+        first_link = data_links[0]
+        href = first_link.get("href") if data_links else None
 
-        # Is this a better way to get the href?
-        href2 = product.data[0].href
-        assert href2 == href
+        # TODO: Is this below a better way to get the href?
+        # href2 = product.data[0].href
+        # assert href2 == href
 
         # In this case we should get the title and description from the source in
         # OpenSearch rather than our own collection config file
         # TODO: Add title + description to AssetMetadata, or some other intermediate for STAC items.
-
         acquisitionInformation = props.get("acquisitionInformation")
         tile_id = None
         if acquisitionInformation:
@@ -353,10 +357,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         num_chars_to_remove = 1 + len(product_type)
         asset_metadata.item_id = asset_metadata.asset_id[:-num_chars_to_remove]
 
-        # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
-        #   Is each link a separate asset in STAC terms?
         if data_links:
-            first_link = data_links[0]
             asset_metadata.asset_type = first_link.get("title")
 
             file_type = first_link.get("type")
