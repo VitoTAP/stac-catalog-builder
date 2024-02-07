@@ -348,7 +348,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         asset_metadata.title = product.title
 
         # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
-        #   Is each line a separate asset in STAC terms?
+        #   Is each link a separate asset in STAC terms?
         links_data: List[Dict] = product.properties.get("links", {}).get("data", [])
         if links_data:
             asset_metadata.asset_type = links_data[0].get("title")

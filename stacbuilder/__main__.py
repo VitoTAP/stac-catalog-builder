@@ -176,20 +176,24 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
         max_files=max_files,
         save_dataframe=save_dataframe,
     )
-    if len(result.keys()) == 1:
-        for meta in result[result.keys()[0]]:
-            pprint.pprint(meta.to_dict(include_internal=True))
-            print()
-    else:
-        for group, metadata_list in sorted(result.items()):
-            print(f"=== group={group} ===")
+    if not result:
+        print("No asset metadata found")
+        return
+
+    for group, metadata_list in sorted(result.items()):
+        # If there are no groups then group is None.
+        # Note that a group == 0 or group == "" could occur and does not mean the same as None.
+        # It literally means the value for the group-by attribute == 0 or == "".
+        if group is None:
+            # group = "not grouped (the group with no name)"
+            print(f"=== group={group!r} ===")
             print(f"   number of assets: {len(metadata_list)}")
 
-            for meta in metadata_list:
-                report = {"group": group, "metadata": meta.to_dict(include_internal=True)}
-                pprint.pprint(report)
-                print()
+        for meta in metadata_list:
+            report = {"group": group, "metadata": meta.to_dict(include_internal=True)}
+            pprint.pprint(report)
             print()
+        print()
 
 
 @cli.command
@@ -221,7 +225,7 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
         max_files=max_files,
         save_dataframe=save_dataframe,
     )
-    for item in enumerate(stac_items):
+    for item in stac_items:
         pprint.pprint(item.to_dict())
     for file in failed_files:
         print(f"Item could not be generated for file: {file}")
