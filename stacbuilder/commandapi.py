@@ -317,6 +317,8 @@ def vpp_list_stac_items(
     return list(pipeline.collect_stac_items())
 
 
+# TODO: Decide what to do with saving the geodateframe used to visualize the bounding boxes.
+#   Do we also need it for VPP? Idem for vpp_build_all_collections
 def vpp_build_collection(
     collection_id: Optional[str] = None,
     collection_number: Optional[int] = None,
@@ -385,22 +387,20 @@ def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Opti
             + "in the list on available collections. You can't have both."
         )
     if collection_id and not isinstance(collection_id, str):
-        raise TypeError("Type of collection_id must be str. " + f"{type(collection_id)=}, {collection_id=!r}")
+        raise TypeError(f"Type of collection_id must be str. {type(collection_id)=}, {collection_id=!r}")
     if collection_number is not None and not isinstance(collection_number, int):
-        raise TypeError(
-            "Type of collection_number must be int. " + f"{type(collection_number)=}, {collection_number=!r}"
-        )
+        raise TypeError(f"Type of collection_number must be int. {type(collection_number)=}, {collection_number=!r}")
 
     collector = HRLVPPMetadataCollector()
     tcc_collections = collector.get_tcc_collections()
 
     if collection_id:
         if collection_id not in [c.id for c in tcc_collections]:
-            raise ValueError('collection_id "{collection_id}" does not exists.')
+            raise ValueError(f'collection_id "{collection_id}" does not exists.')
         return collection_id
 
     if collection_number < 1:
-        raise ValueError("An int value for collection_number must be 1 or higher., {}" + f"{collection_number=!r}")
+        raise ValueError(f"An int value for collection_number must be 1 or higher. {collection_number=!r}")
 
     num_colls = len(tcc_collections)
     if collection_number > num_colls:

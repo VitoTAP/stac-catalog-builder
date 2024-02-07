@@ -15,6 +15,7 @@ class TestAssetMetadata:
         assert meta.asset_id is None
         assert meta.item_id is None
         assert meta.asset_type is None
+        assert meta.media_type is None
         assert meta.title is None
 
         assert meta.href is None
@@ -59,6 +60,7 @@ class TestAssetMetadata:
             "item_href": None,
             "asset_path": None,
             "asset_type": None,
+            "media_type": None,
             "datetime": None,
             "start_datetime": None,
             "end_datetime": None,

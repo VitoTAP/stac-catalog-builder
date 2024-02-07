@@ -185,7 +185,6 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
         # Note that a group == 0 or group == "" could occur and does not mean the same as None.
         # It literally means the value for the group-by attribute == 0 or == "".
         if group is None:
-            # group = "not grouped (the group with no name)"
             print(f"=== group={group!r} ===")
             print(f"   number of assets: {len(metadata_list)}")
 

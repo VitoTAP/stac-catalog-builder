@@ -30,7 +30,7 @@ from pystac.layout import TemplateLayoutStrategy
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.file import FileExtension
-from pystac.extensions.eo import EOExtension, Band
+from pystac.extensions.eo import EOExtension, Band as EOBand
 from pystac.extensions.raster import RasterExtension, RasterBand
 
 # TODO: add datacube extension
@@ -436,17 +436,32 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         #     grid = GridExtension.ext(item, add_if_missing=True)
         #     grid.code = metadata.tile_id
 
-        EOExtension.add_to(item)
-        item_eo = EOExtension.ext(item, add_if_missing=True)
+        # Causes validation to fail on the eo extension.
+        # EOExtension.add_to(item)
+        # item_eo = EOExtension.ext(item, add_if_missing=True)
+        # asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
+        # eo_bands = []
+        # for band_cfg in asset_config.eo_bands:
+        #     new_band: EOBand = EOBand.create(
+        #         name=band_cfg.name,
+        #         description=band_cfg.description,
+        #     )
+        #     eo_bands.append(new_band)
+        # item_eo.apply(eo_bands)
+
         asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
-        eo_bands = []
-        for band_cfg in asset_config.eo_bands:
-            new_band: Band = Band.create(
-                name=band_cfg.name,
-                description=band_cfg.description,
-            )
-            eo_bands.append(new_band)
-        item_eo.apply(eo_bands)
+        if asset_config.eo_bands:
+            EOExtension.add_to(item)
+            item_eo = EOExtension.ext(item, add_if_missing=True)
+            eo_bands = []
+
+            for band_cfg in asset_config.eo_bands:
+                new_band: EOBand = EOBand.create(
+                    name=band_cfg.name,
+                    description=band_cfg.description,
+                )
+                eo_bands.append(new_band)
+            item_eo.apply(eo_bands)
 
         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
         item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
@@ -531,17 +546,19 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         #     grid = GridExtension.ext(item, add_if_missing=True)
         #     grid.code = metadata.tile_id
 
-        EOExtension.add_to(item)
-        item_eo = EOExtension.ext(item, add_if_missing=True)
         asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
-        eo_bands = []
-        for band_cfg in asset_config.eo_bands:
-            new_band: Band = Band.create(
-                name=band_cfg.name,
-                description=band_cfg.description,
-            )
-            eo_bands.append(new_band)
-        item_eo.apply(eo_bands)
+        if asset_config.eo_bands:
+            EOExtension.add_to(item)
+            item_eo = EOExtension.ext(item, add_if_missing=True)
+            eo_bands = []
+
+            for band_cfg in asset_config.eo_bands:
+                new_band: EOBand = EOBand.create(
+                    name=band_cfg.name,
+                    description=band_cfg.description,
+                )
+                eo_bands.append(new_band)
+            item_eo.apply(eo_bands)
 
         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
         item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
@@ -554,6 +571,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         asset_config = self._get_assets_config_for(metadata.asset_type)
         asset: Asset = asset_def.create_asset(metadata.href)
         asset.set_owner(item)
+        asset.media_type = metadata.media_type
 
         if metadata.file_size:
             file_info = FileExtension.ext(asset, add_if_missing=True)
@@ -1608,12 +1626,9 @@ class AssetMetadataPipeline:
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
-
         group_per_item_id = GroupMetadataByAttribute("item_id")
-        for item_id, assets in group_per_item_id.group_by(self.get_metadata()).items():
-            # TODO: implement grouping of several assets that belong to one item, here.
 
-            print(f"Bundling assets for STAC item {item_id=}, asset: {assets}")
+        for assets in group_per_item_id.group_by(self.get_metadata()).values():
             stac_item = self._meta_to_stac_item_mapper.create_item(assets)
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
@@ -1667,6 +1682,34 @@ class AssetMetadataPipeline:
     #         coll_file = self._collection_builder.collection_file
     #         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
     #         post_processor.process_collection(coll_file)
+
+    @staticmethod
+    def group_metadata_by_item_id(iter_metadata) -> Dict[int, List[Item]]:
+        groups: Dict[int, AssetMetadata] = {}
+
+        for metadata in iter_metadata:
+            item_id = metadata.item_id
+
+            if item_id not in groups:
+                groups[item_id] = []
+
+            groups[item_id].append(metadata)
+
+        return groups
+
+    @staticmethod
+    def group_stac_items_by(iter_items, group_func: Callable[[Item], str]) -> Dict[int, List[Item]]:
+        groups: Dict[int, AssetMetadata] = {}
+
+        for item in iter_items:
+            group = group_func(item)
+
+            if group not in groups:
+                groups[group] = []
+
+            groups[group].append(item)
+
+        return groups
 
 
 class GeodataframeExporter:

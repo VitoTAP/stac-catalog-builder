@@ -22,8 +22,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import dateutil.parser
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 from shapely.geometry import Polygon
-
+from pystac.media_type import MediaType
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.pathparsers import InputPathParser
@@ -196,6 +197,7 @@ class AssetMetadata:
         self.collection_id: Optional[str] = None
         self.tile_id: Optional[str] = None
         self.item_href: Optional[str] = None
+        self.media_type: Optional[MediaType] = None
 
         # TODO: add some properties that need to trickle up to the collection level, or not?
         # These properties are really at the collection level, but in HRL VPP
@@ -445,6 +447,7 @@ class AssetMetadata:
             "item_href": self.item_href,
             "asset_path": self.asset_path,
             "asset_type": self.asset_type,
+            "media_type": self.media_type,
             "datetime": self.datetime,
             "start_datetime": self.start_datetime,
             "end_datetime": self.end_datetime,
@@ -462,6 +465,15 @@ class AssetMetadata:
 
         return data
 
+    @staticmethod
+    def mime_to_media_type(mime_string: str) -> Optional[MediaType]:
+        """Get the pystac.mediatype.MediaType that is equivalent to the MIME string, if known.
+
+        Returns None if the string does is not one of the enum members in MediaType.
+        """
+        media_type_map = {mt.value: mt for mt in MediaType}
+        return media_type_map.get(mime_string)
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AssetMetadata":
         metadata = AssetMetadata()
@@ -470,16 +482,18 @@ class AssetMetadata:
         metadata.collection_id = cls.__get_str_from_dict("collection_id", data)
         metadata.tile_id = cls.__get_str_from_dict("tile_id", data)
         metadata.title = cls.__get_str_from_dict("title", data)
+
         metadata.href = cls.__get_str_from_dict("href", data)
         metadata.original_href = cls.__get_str_from_dict("original_href", data)
         metadata.item_href = cls.__get_str_from_dict("item_href", data)
         metadata.asset_path = cls.__as_type_from_dict("asset_path", Path, data)
+
         metadata.asset_type = cls.__get_str_from_dict("asset_type", data)
         metadata.file_size = cls.__as_type_from_dict("file_size", int, data)
 
-        import pandas as pd
+        media_type = data.get("media_type")
+        metadata.media_type = cls.mime_to_media_type(media_type)
 
-        pd.Timestamp
         metadata.datetime = cls.__as_type_from_dict("datetime", pd.Timestamp.to_pydatetime, data)
         metadata.start_datetime = cls.__as_type_from_dict("start_datetime", pd.Timestamp.to_pydatetime, data)
         metadata.end_datetime = cls.__as_type_from_dict("end_datetime", pd.Timestamp.to_pydatetime, data)
@@ -514,49 +528,56 @@ class AssetMetadata:
 
     @classmethod
     def from_geoseries(cls, series: gpd.GeoSeries) -> "AssetMetadata":
-        # return cls.from_dict(series.to_dict())
+        return cls.from_dict(series.to_dict())
 
-        metadata = AssetMetadata()
-        metadata.asset_id = series["asset_id"]
-        metadata.item_id = series["item_id"]
-        metadata.collection_id = series["collection_id"]
-        metadata.tile_id = series["tile_id"]
-        metadata.title = series["title"]
-        metadata.href = series["href"]
-        metadata.original_href = series["original_href"]
+        # metadata = AssetMetadata()
+        # metadata.asset_id = series["asset_id"]
+        # metadata.item_id = series["item_id"]
+        # metadata.collection_id = series["collection_id"]
+        # metadata.tile_id = series["tile_id"]
+        # metadata.title = series["title"]
 
-        asset_path = series["asset_path"]
-        metadata.asset_path = Path(asset_path) if asset_path else None
+        # metadata.href = series["href"]
+        # metadata.original_href = series["original_href"]
 
-        metadata.asset_type = series["asset_type"]
+        # asset_path = series["asset_path"]
+        # metadata.asset_path = Path(asset_path) if asset_path else None
 
-        metadata.datetime = series["datetime"].to_pydatetime()
-        metadata.start_datetime = series["start_datetime"].to_pydatetime()
-        metadata.end_datetime = series["end_datetime"].to_pydatetime()
+        # metadata.asset_type = series["asset_type"]
+        # metadata.file_size = series["file_size"]
 
-        metadata.shape = series["shape"]
-        metadata.tags = series["tags"]
+        # media_type = series["media_type"]
+        # metadata.media_type = cls.mime_to_media_type(media_type)
 
-        bbox_dict = series["bbox_lat_lon"]
-        if bbox_dict:
-            bbox = BoundingBox.from_dict(bbox_dict)
-            assert bbox.epsg in (4326, None)
-            metadata.bbox_lat_lon = bbox
-        else:
-            metadata.bbox_lat_lon = None
+        # metadata.datetime = series["datetime"].to_pydatetime()
+        # metadata.start_datetime = series["start_datetime"].to_pydatetime()
+        # metadata.end_datetime = series["end_datetime"].to_pydatetime()
 
-        metadata.geometry_lat_lon = series["geometry"]
+        # metadata.shape = series["shape"]
+        # metadata.tags = series["tags"]
 
-        proj_bbox_dict = series["bbox_projected"]
-        if proj_bbox_dict:
-            proj_bbox = BoundingBox.from_dict(proj_bbox_dict, 4326)
-            metadata.bbox_projected = proj_bbox
-        else:
-            metadata.bbox_projected = None
+        # bbox_dict = series["bbox_lat_lon"]
+        # if bbox_dict:
+        #     bbox = BoundingBox.from_dict(bbox_dict)
+        #     assert bbox.epsg in (4326, None)
+        #     metadata.bbox_lat_lon = bbox
+        # else:
+        #     metadata.bbox_lat_lon = None
 
-        metadata.raster_metadata = series["raster_metadata"]
+        # # This is the essential difference between from_dict and from_geoseries
+        # # TODO: reduce duplication between from_dict and from_geoseries, but geometry is an issue.
+        # metadata.geometry_lat_lon = series["geometry"]
 
-        return metadata
+        # proj_bbox_dict = series["bbox_projected"]
+        # if proj_bbox_dict:
+        #     proj_bbox = BoundingBox.from_dict(proj_bbox_dict, 4326)
+        #     metadata.bbox_projected = proj_bbox
+        # else:
+        #     metadata.bbox_projected = None
+
+        # metadata.raster_metadata = series["raster_metadata"]
+
+        # return metadata
 
     @staticmethod
     def __get_str_from_dict(key: str, data: Dict[str, Any]) -> Optional[str]:
