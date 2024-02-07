@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import geopandas as gpd
 import pandas as pd
-import pystac.media_type
+from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
 
 import terracatalogueclient as tcc
@@ -156,13 +156,13 @@ class CollectionConfigBuilder:
     def guess_datatype(self, bit_per_value: int) -> str:
         return f"uint{bit_per_value}"
 
-    def get_media_type(self) -> pystac.media_type.MediaType:
+    def get_media_type(self) -> MediaType:
         format = self.get_format()
         media_type = None
         if format.lower() in ["geotif", "geotif", "tiff"]:
-            media_type = pystac.media_type.MediaType.GEOTIFF
+            media_type = MediaType.GEOTIFF
         elif format.lower() == "COG":
-            media_type = pystac.media_type.MediaType.COG
+            media_type = MediaType.COG
         return media_type
 
     def get_product_types(self):
@@ -277,22 +277,21 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     if self._max_products > 0 and num_products_processed > self._max_products:
                         break
 
-                    print("-" * 50)
-                    print(product.id)
-                    print(product.title)
-                    print("product properties:")
-                    pprint(product.properties)
-                    print("... end properties ...")
+                    # print("-" * 50)
+                    # print(product.id)
+                    # print(product.title)
+                    # print("product properties:")
+                    # pprint(product.properties)
+                    # print("... end properties ...")
 
                     asset_metadata = self.create_asset_metadata(product)
                     assets_md.append(asset_metadata)
-                    pprint(asset_metadata.to_dict())
+                    # pprint(asset_metadata.to_dict())
 
-                    asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
-                    print(f"{asset_bbox.as_polygon()=}")
-                    print(f"{product.geometry}")
-                    # print(asset_bbox.as_polygon() == product.geometry)
-                    print("-" * 50)
+                    # asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
+                    # print(f"{asset_bbox.as_polygon()=}")
+                    # print(f"{product.geometry}")
+                    # print("-" * 50)
 
                 # The extra break statements are needed so we don't end up with
                 # an empty dataframe here, which is something we cannot process.
@@ -333,9 +332,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         assert href2 == href
 
         # In this case we should get the title and description from the source in
-        # opensearch rather than our own collection config file
+        # OpenSearch rather than our own collection config file
         # TODO: Add title + description to AssetMetadata, or some other intermediate for STAC items.
-        product_type = props.get("productInformation", {}).get("productType")
 
         acquisitionInformation = props.get("acquisitionInformation")
         tile_id = None
@@ -347,23 +345,30 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         asset_metadata.asset_id = product.id
         asset_metadata.title = product.title
 
-        # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
-        #   Is each link a separate asset in STAC terms?
-        links_data: List[Dict] = product.properties.get("links", {}).get("data", [])
-        if links_data:
-            asset_metadata.asset_type = links_data[0].get("title")
-        # asset_metadata.asset_type = product_type
-        asset_metadata.file_size = links_data[0].get("length")
-
+        # product type is a shorter code than what corresponds to asset_metadata.asset_type
+        # The product type is more general. But the OpenSearch title (asset_type for is) appends the spatial resolution.
+        # For example: product_type="PPI", title="PPI_10M"
+        product_type = props.get("productInformation", {}).get("productType")
         # item_id is the asset_id without the product_type/band name at the end
         num_chars_to_remove = 1 + len(product_type)
         asset_metadata.item_id = asset_metadata.asset_id[:-num_chars_to_remove]
+
+        # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
+        #   Is each link a separate asset in STAC terms?
+        if data_links:
+            first_link = data_links[0]
+            asset_metadata.asset_type = first_link.get("title")
+
+            file_type = first_link.get("type")
+            asset_metadata.media_type = AssetMetadata.mime_to_media_type(file_type)
+            asset_metadata.file_size = first_link.get("length")
 
         asset_metadata.collection_id = props.get("parentIdentifier")
         asset_metadata.tile_id = tile_id
 
         asset_metadata.href = href
         asset_metadata.original_href = href
+
         asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=4326)
         asset_metadata.geometry_lat_lon = product.geometry
 
@@ -401,6 +406,21 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         # 'title': 'Seasonal Trajectories 2017-now (raster 010m) - version 1 revision 01 : PPI E09N27 20170401T000000',
         # 'updated': '2021-08-23T15:07:52.759Z'}
         return asset_metadata
+
+
+def parse_tile_id(tile_id: str) -> Tuple[str, str]:
+    pos_N = tile_id.find("N")
+    pos_S = tile_id.find("S")
+    start_northing = None
+    easting = None
+    northing = None
+    start_northing = max(pos_S, pos_N)
+
+    if start_northing:
+        easting = tile_id[:start_northing]
+        northing = tile_id[start_northing:]
+
+    return (northing, easting)
 
 
 def main():
