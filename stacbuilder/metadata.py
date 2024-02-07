@@ -173,6 +173,7 @@ class AssetMetadata:
         # The bounding boxes, in latitude-longitude and also the projected version.
         self._bbox_lat_lon: Optional[BoundingBox] = None
         self._bbox_projected: Optional[BoundingBox] = None
+        self._proj_epsg: Optional[int] = None
 
         # The geometry is sometimes provided by the source data, and its coordinates
         # might have more decimals than we get in the bounding box.
@@ -289,6 +290,8 @@ class AssetMetadata:
     @bbox_projected.setter
     def bbox_projected(self, bbox: BoundingBox) -> None:
         self._bbox_projected = bbox
+        if bbox and bbox.epsg:
+            self._proj_epsg = bbox.epsg
 
     @property
     def proj_bbox_as_list(self) -> Optional[List[float]]:
@@ -299,13 +302,10 @@ class AssetMetadata:
 
     @property
     def proj_epsg(self) -> Optional[int]:
-        if not self._bbox_projected:
-            return None
-        return self._bbox_projected.epsg
+        return self._proj_epsg
 
     @proj_epsg.setter
     def proj_epsg(self, value: Optional[int]) -> None:
-        # TODO: remove setter for epsg, should become a readonly property that returns self._bbox_projected.epsg.
         if not isinstance(value, (int, NoneType)):
             raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
         self._proj_epsg = value

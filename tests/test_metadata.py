@@ -1,3 +1,7 @@
+# TODO: test coverage for AssetMetadata.to_dict
+# TODO: test coverage for AssetMetadata.from_dict
+# TODO: test coverage for AssetMetadata.from_geoseries
+
 import datetime as dt
 from dateutil.tz import tzoffset
 
