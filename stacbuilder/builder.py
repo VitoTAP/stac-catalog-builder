@@ -1169,7 +1169,7 @@ class PostProcessSTACCollectionFile:
             json.dump(data, f_out, indent=2)
 
 
-class GeoTiffPipeline:
+class OldGeoTiffPipeline:
     """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
 
     # TODO: split up for reuse: want 2 pipelines, 1 for geotiffs and 1 that converts OSCARS metadata
@@ -1184,7 +1184,7 @@ class GeoTiffPipeline:
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
-        self._output_base_dir: Path = GeoTiffPipeline._get_output_dir_or_default(output_dir)
+        self._output_base_dir: Path = OldGeoTiffPipeline._get_output_dir_or_default(output_dir)
         self._collection_dir: Path = None
         self._overwrite: bool = overwrite
 
@@ -1252,7 +1252,7 @@ class GeoTiffPipeline:
         file_coll_cfg: FileCollectorConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
-    ) -> "GeoTiffPipeline":
+    ) -> "OldGeoTiffPipeline":
         """Creates a GeoTiffPipeline from configurations.
 
         We want the two configuration objects to remain separate, because one is the
@@ -1271,7 +1271,7 @@ class GeoTiffPipeline:
         if output_dir and not isinstance(output_dir, Path):
             raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
 
-        pipeline = GeoTiffPipeline(None, None, None, None)
+        pipeline = OldGeoTiffPipeline(None, None, None, None)
         pipeline.setup(
             collection_config=collection_config,
             file_coll_cfg=file_coll_cfg,
@@ -1295,7 +1295,7 @@ class GeoTiffPipeline:
             raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
 
         self._collection_config = collection_config
-        self._output_base_dir = GeoTiffPipeline._get_output_dir_or_default(output_dir)
+        self._output_base_dir = OldGeoTiffPipeline._get_output_dir_or_default(output_dir)
         self._overwrite = overwrite
 
         # Store dependencies: components that have to be provided to constructor
@@ -1753,7 +1753,7 @@ class GeoTiffMetadataCollector(IMetadataCollector):
     def from_config(
         collection_config: CollectionConfig,
         file_coll_cfg: FileCollectorConfig,
-    ) -> "GeoTiffPipeline":
+    ) -> "OldGeoTiffPipeline":
         if collection_config is None:
             raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
 

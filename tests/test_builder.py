@@ -30,7 +30,7 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
-    GeoTiffPipeline,
+    OldGeoTiffPipeline,
     NewGeoTiffPipeline,
     GeoTiffMetadataCollector,
     IMetadataCollector,
@@ -73,8 +73,8 @@ def grouped_collection_output_dir(tmp_path) -> Path:
 
 
 @pytest.fixture
-def geotiff_pipeline(collection_config_from_file, file_collector_config, collection_output_dir) -> GeoTiffPipeline:
-    return GeoTiffPipeline.from_config(
+def geotiff_pipeline(collection_config_from_file, file_collector_config, collection_output_dir) -> OldGeoTiffPipeline:
+    return OldGeoTiffPipeline.from_config(
         collection_config=collection_config_from_file,
         file_coll_cfg=file_collector_config,
         output_dir=collection_output_dir,
@@ -85,8 +85,8 @@ def geotiff_pipeline(collection_config_from_file, file_collector_config, collect
 @pytest.fixture
 def geotiff_pipeline_grouped(
     grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
-) -> GeoTiffPipeline:
-    return GeoTiffPipeline.from_config(
+) -> OldGeoTiffPipeline:
+    return OldGeoTiffPipeline.from_config(
         collection_config=grouped_collection_test_config,
         file_coll_cfg=file_collector_config,
         output_dir=grouped_collection_output_dir,
@@ -314,9 +314,6 @@ class MockPathParser(RegexInputPathParser):
         self._data["end_datetime"] = self._derive_end_datetime()
 
         year = self._data["year"]
-        month = self._data["month"]
-        day = self._data["day"]
-        # self._data["item_id"] = f"observations_{year:04}-{month:02}-{day:02}"
         self._data["item_id"] = f"observations_{self._data['asset_type']}_{year:04}"
 
     def _derive_start_datetime(self):
@@ -419,12 +416,12 @@ def asset_metadata_pipeline(
 
 
 class TestGeoTiffPipeline:
-    def test_collect_input_files(self, geotiff_pipeline: GeoTiffPipeline, geotiff_paths: List[Path]):
+    def test_collect_input_files(self, geotiff_pipeline: OldGeoTiffPipeline, geotiff_paths: List[Path]):
         input_files = list(geotiff_pipeline.get_input_files())
 
         assert sorted(input_files) == sorted(geotiff_paths)
 
-    def test_build_collection(self, geotiff_pipeline: GeoTiffPipeline):
+    def test_build_collection(self, geotiff_pipeline: OldGeoTiffPipeline):
         assert geotiff_pipeline.collection is None
 
         geotiff_pipeline.build_collection()
@@ -437,7 +434,7 @@ class TestGeoTiffPipeline:
         collection = Collection.from_file(geotiff_pipeline.collection_file)
         collection.validate_all()
 
-    def test_build_grouped_collection(self, geotiff_pipeline_grouped: GeoTiffPipeline):
+    def test_build_grouped_collection(self, geotiff_pipeline_grouped: OldGeoTiffPipeline):
         assert geotiff_pipeline_grouped.collection is None
 
         geotiff_pipeline_grouped.build_grouped_collections()
@@ -545,7 +542,7 @@ class TestAssetMetadataPipeline:
         for item in stac_items:
             item.validate()
 
-    def test_build_collection(self, asset_metadata_pipeline: GeoTiffPipeline):
+    def test_build_collection(self, asset_metadata_pipeline: OldGeoTiffPipeline):
         assert asset_metadata_pipeline.collection is None
 
         asset_metadata_pipeline.build_collection()
@@ -559,7 +556,7 @@ class TestAssetMetadataPipeline:
         collection = Collection.from_file(asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
-    def test_build_grouped_collection(self, asset_metadata_pipeline: GeoTiffPipeline):
+    def test_build_grouped_collection(self, asset_metadata_pipeline: OldGeoTiffPipeline):
         assert asset_metadata_pipeline.collection is None
 
         asset_metadata_pipeline.build_grouped_collections()
