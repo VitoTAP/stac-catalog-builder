@@ -32,7 +32,7 @@ class ProviderModel(BaseModel):
     """Model for Providers in STAC."""
 
     name: str
-    # TODO: [decide]: us a set or just a list at the risk of having duplicates.
+    # TODO: [decide]: use a set or just a list at the risk of having duplicates.
     roles: Set[ProviderRole] = DEFAULT_PROVIDER_ROLES
     url: Optional[HttpUrl] = None
 
@@ -73,28 +73,11 @@ class EOBandConfig(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    # TODO: the EO extension calls this commmon_name, maybe we should use that instead of 'name'
+    # TODO: the EO extension calls this common_name, maybe we should use that instead of 'name'
     #   https://github.com/stac-extensions/eo#band-object
     name: str = Field(description="common_name of the band.")
 
     description: str = Field(description="Description of the band.")
-
-    # # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
-    # # TODO: maybe use a numpy type or make an Enum for data_type
-    # data_type:92str = Field(description="which data type this raster band has, use the same names as numpy.")
-
-    # # TODO: it looks like this belongs in the raster:band extension insteadof eo:band
-    # # TODO: how do we store NaN in JSON?
-    # nodata: Optional[Union[int, float, str]] = Field(
-    #     default=None, description='What value is used to represent "NO DATA" in the raster'
-    # )
-
-    # # TODO: check what were the other allowed values for `sampling`.
-    # sampling: Optional[str] = Field(default=None, description="Whether sampling is `area` or ???")
-
-    # spatial_resolution: Optional[int] = Field(
-    #     default=None, description="Spatial resolution, usually in meter, but possibly in degrees, depending on the CRS."
-    # )
 
 
 class SamplingType(enum.StrEnum):
@@ -149,7 +132,6 @@ class RasterBandConfig(BaseModel):
         type=SamplingType,
     )
 
-    # TODO: bits_per_sample
     bits_per_sample: Optional[int] = Field(
         default=None,
         description=(
@@ -201,9 +183,6 @@ class AssetConfig(BaseModel):
     eo_bands: Optional[List[EOBandConfig]] = None
 
     raster_bands: Optional[List[RasterBandConfig]] = None
-
-    # TODO: [decide] Do we still need extra_fields?
-    # extra_fields = Dict[str, Any]
 
     def to_asset_definition(self) -> AssetDefinition:
         """Create an AssetDefinition object from this configuration."""

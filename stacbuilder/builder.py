@@ -369,10 +369,7 @@ class MapMetadataToSTACItem(IMapMetadataToSTACItem):
         return self._item_assets_configs
 
     def create_alternate_links(self, metadata: AssetMetadata) -> Dict[str, Any]:
-        """Create the alternate links.
-
-        TODO: make this configurable so we can handle both MEP, S3 and anything else.
-        """
+        """Create the alternate links."""
         if not self._alternate_href_generator:
             return None
 
@@ -1495,41 +1492,6 @@ class AssetMetadataPipeline:
         self._collection: Optional[Collection] = None
         self._collection_groups: Dict[Hashable, Collection] = {}
 
-    @property
-    def collection(self) -> Collection | None:
-        return self._collection
-
-    @property
-    def collection_file(self) -> Path | None:
-        if not self.collection:
-            return None
-
-        return Path(self.collection.self_href)
-
-    @property
-    def collection_groups(self) -> Dict[Hashable, Collection] | None:
-        return self._collection_groups
-
-    @property
-    def collection_config(self) -> CollectionConfig:
-        return self._collection_config
-
-    @property
-    def item_assets_configs(self) -> Dict[str, AssetConfig]:
-        return self._collection_config.item_assets or {}
-
-    @property
-    def collection_builder(self) -> STACCollectionBuilder:
-        return self._collection_builder
-
-    @property
-    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
-        return self._geotiff_to_metadata_mapper
-
-    @property
-    def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
-        return self._meta_to_stac_item_mapper
-
     @staticmethod
     def from_config(
         metadata_collector: IMetadataCollector,
@@ -1540,7 +1502,7 @@ class AssetMetadataPipeline:
         """Creates a AssetMetadataPipeline from configurations."""
 
         pipeline = AssetMetadataPipeline(metadata_collector=None, output_dir=None, overwrite=False)
-        pipeline.setup(
+        pipeline._setup(
             metadata_collector=metadata_collector,
             collection_config=collection_config,
             output_dir=output_dir,
@@ -1548,7 +1510,7 @@ class AssetMetadataPipeline:
         )
         return pipeline
 
-    def setup(
+    def _setup(
         self,
         metadata_collector: IMetadataCollector,
         collection_config: CollectionConfig,
@@ -1557,13 +1519,18 @@ class AssetMetadataPipeline:
     ) -> None:
         """Set up an existing instance using the specified dependencies and configuration settings."""
 
+        if metadata_collector is None:
+            raise ValueError(
+                'Argument "metadata_collector" can not be None, must be a IMetadataCollector implementation.'
+            )
+
+        if collection_config is None:
+            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
+
         # Dependencies or components that we delegate work to.
         self._metadata_collector = metadata_collector
 
         # Settings: these are just data, not components we delegate work to.
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
         self._collection_config = collection_config
         self._output_base_dir = self._get_output_dir_or_default(output_dir)
         self._overwrite = overwrite
@@ -1599,6 +1566,41 @@ class AssetMetadataPipeline:
             overwrite=self._overwrite,
             output_dir=self._collection_dir,
         )
+
+    @property
+    def collection(self) -> Collection | None:
+        return self._collection
+
+    @property
+    def collection_file(self) -> Path | None:
+        if not self.collection:
+            return None
+
+        return Path(self.collection.self_href)
+
+    @property
+    def collection_groups(self) -> Dict[Hashable, Collection] | None:
+        return self._collection_groups
+
+    @property
+    def collection_config(self) -> CollectionConfig:
+        return self._collection_config
+
+    @property
+    def item_assets_configs(self) -> Dict[str, AssetConfig]:
+        return self._collection_config.item_assets or {}
+
+    @property
+    def collection_builder(self) -> STACCollectionBuilder:
+        return self._collection_builder
+
+    @property
+    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
+        return self._geotiff_to_metadata_mapper
+
+    @property
+    def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
+        return self._meta_to_stac_item_mapper
 
     def reset(self) -> None:
         self._collection = None
@@ -1801,6 +1803,8 @@ class GeoTiffMetadataCollector(IMetadataCollector):
             self._metadata_list.append(metadata)
 
 
+# TODO: NewGeoTiffPipeline will replace GeoTiffPipeline (temp code for refactoring but in the end will keep it with the old name GeoTiffPipeline )
+# TODO: use GeoTiffMetadataCollector in NewGeoTiffPipeline, replacing the old way and slimming down the class.
 class NewGeoTiffPipeline:
     """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
 
