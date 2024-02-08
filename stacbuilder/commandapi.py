@@ -22,7 +22,7 @@ import terracatalogueclient as tcc
 from stacbuilder.builder import (
     AssetMetadataPipeline,
     FileCollector,
-    OldGeoTiffPipeline,
+    NewGeoTiffPipeline,
     GeodataframeExporter,
     PostProcessSTACCollectionFile,
 )
@@ -58,7 +58,7 @@ def build_collection(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    pipeline = OldGeoTiffPipeline.from_config(
+    pipeline = NewGeoTiffPipeline.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
         output_dir=output_dir,
@@ -102,7 +102,7 @@ def build_grouped_collections(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    pipeline = OldGeoTiffPipeline.from_config(
+    pipeline = NewGeoTiffPipeline.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
         output_dir=output_dir,
@@ -169,7 +169,7 @@ def list_asset_metadata(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-    pipeline = OldGeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    pipeline = NewGeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
     if save_dataframe:
         df = pipeline.get_metadata_as_geodataframe()
@@ -177,10 +177,7 @@ def list_asset_metadata(
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-assetmetadata"
         GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
 
-    if not pipeline.has_grouping:
-        return {None: list(pipeline.get_metadata())}
-    else:
-        return pipeline.get_metadata_groups()
+    return pipeline.get_asset_metadata()
 
 
 def list_stac_items(
@@ -206,7 +203,7 @@ def list_stac_items(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-    pipeline = OldGeoTiffPipeline.from_config(
+    pipeline = NewGeoTiffPipeline.from_config(
         collection_config=coll_cfg, file_coll_cfg=file_coll_cfg, output_dir=None, overwrite=False
     )
 
@@ -216,6 +213,8 @@ def list_stac_items(
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-stac-items"
         GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
 
+    # TODO: how to deal with item grouping for the grouped collections in this command?
+    #   Maybe just don't show the groups here and add a separate command to show them with grouping.
     stac_items = list(pipeline.collect_stac_items())
     files = list(pipeline.get_input_files())
     failed_files = [files[i] for i, item in enumerate(stac_items) if item is None]
