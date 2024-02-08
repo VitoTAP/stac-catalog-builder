@@ -169,30 +169,21 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     You can optionally save the metadata as a shapefile and geoparquet so you
     can inspect the bounding boxes as well as the data.
     """
-    result = commandapi.list_asset_metadata(
+    metadata_list = commandapi.list_asset_metadata(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
         max_files=max_files,
         save_dataframe=save_dataframe,
     )
-    if not result:
+    if not metadata_list:
         print("No asset metadata found")
         return
 
-    for group, metadata_list in sorted(result.items()):
-        # If there are no groups then group is None.
-        # Note that a group == 0 or group == "" could occur and does not mean the same as None.
-        # It literally means the value for the group-by attribute == 0 or == "".
-        if group is None:
-            print(f"=== group={group!r} ===")
-            print(f"   number of assets: {len(metadata_list)}")
-
-        for meta in metadata_list:
-            report = {"group": group, "metadata": meta.to_dict(include_internal=True)}
-            pprint.pprint(report)
-            print()
+    for meta in metadata_list:
+        pprint.pprint(meta.to_dict(include_internal=True))
         print()
+    print()
 
 
 @cli.command
@@ -224,6 +215,9 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
         max_files=max_files,
         save_dataframe=save_dataframe,
     )
+    if not stac_items:
+        print("No STAC items were generated")
+
     for item in stac_items:
         pprint.pprint(item.to_dict())
     for file in failed_files:
@@ -475,7 +469,6 @@ def show_config(config_file):
         click.echo(click.style("ERROR: NOT VALID: \n" + str(exc), fg="red"))
     else:
         pprint.pprint(configuration.model_dump(), indent=2, width=160)
-        # print(json.dumps(configuration.model_dump(), indent=2))
 
 
 @config.command
