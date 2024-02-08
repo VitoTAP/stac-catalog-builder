@@ -30,7 +30,6 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
-    OldGeoTiffPipeline,
     NewGeoTiffPipeline,
     GeoTiffMetadataCollector,
     IMetadataCollector,
@@ -73,8 +72,10 @@ def grouped_collection_output_dir(tmp_path) -> Path:
 
 
 @pytest.fixture
-def geotiff_pipeline(collection_config_from_file, file_collector_config, collection_output_dir) -> OldGeoTiffPipeline:
-    return OldGeoTiffPipeline.from_config(
+def new_geotiff_pipeline(
+    collection_config_from_file, file_collector_config, collection_output_dir
+) -> NewGeoTiffPipeline:
+    return NewGeoTiffPipeline.from_config(
         collection_config=collection_config_from_file,
         file_coll_cfg=file_collector_config,
         output_dir=collection_output_dir,
@@ -83,10 +84,10 @@ def geotiff_pipeline(collection_config_from_file, file_collector_config, collect
 
 
 @pytest.fixture
-def geotiff_pipeline_grouped(
+def new_geotiff_pipeline_grouped(
     grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
-) -> OldGeoTiffPipeline:
-    return OldGeoTiffPipeline.from_config(
+) -> NewGeoTiffPipeline:
+    return NewGeoTiffPipeline.from_config(
         collection_config=grouped_collection_test_config,
         file_coll_cfg=file_collector_config,
         output_dir=grouped_collection_output_dir,
@@ -288,12 +289,6 @@ class MockMetadataCollector(IMetadataCollector):
         pass
 
 
-@pytest.fixture
-def basic_asset_metadata(data_dir) -> AssetMetadata:
-    # TODO: maybe better to save a few AssetMetadata and their STAC items to JSON and load them here
-    return create_basic_asset_metadata(data_dir / "observations_2m-temp-monthly_2000-01-01.tif")
-
-
 class MockPathParser(RegexInputPathParser):
     def __init__(self, *args, **kwargs) -> None:
         type_converters = {
@@ -390,6 +385,12 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
 
 
 @pytest.fixture
+def basic_asset_metadata(data_dir) -> AssetMetadata:
+    # TODO: maybe better to save a few AssetMetadata and their STAC items to JSON and load them here
+    return create_basic_asset_metadata(data_dir / "observations_2m-temp-monthly_2000-01-01.tif")
+
+
+@pytest.fixture
 def basic_asset_metadata_list(geotiff_paths) -> List[AssetMetadata]:
     return [create_basic_asset_metadata(f) for f in geotiff_paths]
 
@@ -412,65 +413,6 @@ def asset_metadata_pipeline(
         metadata_collector=metadata_collector_basic_assets,
         collection_config=collection_config_from_file,
         output_dir=tmp_path,
-    )
-
-
-class TestGeoTiffPipeline:
-    def test_collect_input_files(self, geotiff_pipeline: OldGeoTiffPipeline, geotiff_paths: List[Path]):
-        input_files = list(geotiff_pipeline.get_input_files())
-
-        assert sorted(input_files) == sorted(geotiff_paths)
-
-    def test_build_collection(self, geotiff_pipeline: OldGeoTiffPipeline):
-        assert geotiff_pipeline.collection is None
-
-        geotiff_pipeline.build_collection()
-
-        assert geotiff_pipeline.collection is not None
-        assert geotiff_pipeline.collection_file is not None
-        assert geotiff_pipeline.collection_file.exists()
-        Collection.validate_all(geotiff_pipeline.collection)
-
-        collection = Collection.from_file(geotiff_pipeline.collection_file)
-        collection.validate_all()
-
-    def test_build_grouped_collection(self, geotiff_pipeline_grouped: OldGeoTiffPipeline):
-        assert geotiff_pipeline_grouped.collection is None
-
-        geotiff_pipeline_grouped.build_grouped_collections()
-
-        assert geotiff_pipeline_grouped.collection_groups is not None
-        assert geotiff_pipeline_grouped.collection is None
-
-        for coll in geotiff_pipeline_grouped.collection_groups.values():
-            coll_path = Path(coll.self_href)
-            coll_path.exists()
-
-            collection = Collection.from_file(coll_path)
-            collection.validate_all()
-
-
-@pytest.fixture
-def new_geotiff_pipeline(
-    collection_config_from_file, file_collector_config, collection_output_dir
-) -> NewGeoTiffPipeline:
-    return NewGeoTiffPipeline.from_config(
-        collection_config=collection_config_from_file,
-        file_coll_cfg=file_collector_config,
-        output_dir=collection_output_dir,
-        overwrite=False,
-    )
-
-
-@pytest.fixture
-def new_geotiff_pipeline_grouped(
-    grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
-) -> NewGeoTiffPipeline:
-    return NewGeoTiffPipeline.from_config(
-        collection_config=grouped_collection_test_config,
-        file_coll_cfg=file_collector_config,
-        output_dir=grouped_collection_output_dir,
-        overwrite=False,
     )
 
 
@@ -542,7 +484,7 @@ class TestAssetMetadataPipeline:
         for item in stac_items:
             item.validate()
 
-    def test_build_collection(self, asset_metadata_pipeline: OldGeoTiffPipeline):
+    def test_build_collection(self, asset_metadata_pipeline: NewGeoTiffPipeline):
         assert asset_metadata_pipeline.collection is None
 
         asset_metadata_pipeline.build_collection()
@@ -556,7 +498,7 @@ class TestAssetMetadataPipeline:
         collection = Collection.from_file(asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
-    def test_build_grouped_collection(self, asset_metadata_pipeline: OldGeoTiffPipeline):
+    def test_build_grouped_collection(self, asset_metadata_pipeline: NewGeoTiffPipeline):
         assert asset_metadata_pipeline.collection is None
 
         asset_metadata_pipeline.build_grouped_collections()
