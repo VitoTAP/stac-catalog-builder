@@ -1331,9 +1331,7 @@ class GeoTiffMetadataCollector(IMetadataCollector):
             self._metadata_list.append(metadata)
 
 
-# TODO: NewGeoTiffPipeline will replace GeoTiffPipeline (temp code for refactoring but in the end will keep it with the old name GeoTiffPipeline )
-# TODO: use GeoTiffMetadataCollector in NewGeoTiffPipeline, replacing the old way and slimming down the class.
-class NewGeoTiffPipeline:
+class GeoTiffPipeline:
     """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
 
     def __init__(
@@ -1381,7 +1379,7 @@ class NewGeoTiffPipeline:
         file_coll_cfg: FileCollectorConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
-    ) -> "NewGeoTiffPipeline":
+    ) -> "GeoTiffPipeline":
         """Creates a GeoTiffPipeline from configurations.
 
         We want the two configuration objects to remain separate, because one is the
@@ -1417,7 +1415,7 @@ class NewGeoTiffPipeline:
             output_dir=output_dir,
             overwrite=overwrite,
         )
-        return NewGeoTiffPipeline(
+        return GeoTiffPipeline(
             metadata_collector=metadata_collector,
             asset_metadata_pipeline=asset_metadata_pipeline,
         )

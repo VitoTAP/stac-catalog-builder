@@ -30,7 +30,7 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
-    NewGeoTiffPipeline,
+    GeoTiffPipeline,
     GeoTiffMetadataCollector,
     IMetadataCollector,
     FileCollector,
@@ -72,10 +72,8 @@ def grouped_collection_output_dir(tmp_path) -> Path:
 
 
 @pytest.fixture
-def new_geotiff_pipeline(
-    collection_config_from_file, file_collector_config, collection_output_dir
-) -> NewGeoTiffPipeline:
-    return NewGeoTiffPipeline.from_config(
+def geotiff_pipeline(collection_config_from_file, file_collector_config, collection_output_dir) -> GeoTiffPipeline:
+    return GeoTiffPipeline.from_config(
         collection_config=collection_config_from_file,
         file_coll_cfg=file_collector_config,
         output_dir=collection_output_dir,
@@ -84,10 +82,10 @@ def new_geotiff_pipeline(
 
 
 @pytest.fixture
-def new_geotiff_pipeline_grouped(
+def geotiff_pipeline_grouped(
     grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
-) -> NewGeoTiffPipeline:
-    return NewGeoTiffPipeline.from_config(
+) -> GeoTiffPipeline:
+    return GeoTiffPipeline.from_config(
         collection_config=grouped_collection_test_config,
         file_coll_cfg=file_collector_config,
         output_dir=grouped_collection_output_dir,
@@ -416,14 +414,14 @@ def asset_metadata_pipeline(
     )
 
 
-class TestNewGeoTiffPipeline:
-    def test_get_input_files(self, new_geotiff_pipeline: NewGeoTiffPipeline, geotiff_paths: List[Path]):
-        input_files = list(new_geotiff_pipeline.get_input_files())
+class TestGeoTiffPipeline:
+    def test_get_input_files(self, geotiff_pipeline: GeoTiffPipeline, geotiff_paths: List[Path]):
+        input_files = list(geotiff_pipeline.get_input_files())
 
         assert sorted(input_files) == sorted(geotiff_paths)
 
-    def test_get_asset_metadata(self, new_geotiff_pipeline: NewGeoTiffPipeline, basic_asset_metadata_list: List[Path]):
-        metadata_list = list(new_geotiff_pipeline.get_asset_metadata())
+    def test_get_asset_metadata(self, geotiff_pipeline: GeoTiffPipeline, basic_asset_metadata_list: List[Path]):
+        metadata_list = list(geotiff_pipeline.get_asset_metadata())
 
         sorted_actual_metadata_list = sorted(metadata_list)
         sorted_expected_metadata_list = sorted(basic_asset_metadata_list)
@@ -437,8 +435,8 @@ class TestNewGeoTiffPipeline:
         assert expected_dicts == actual_dicts
         assert sorted_actual_metadata_list == sorted_expected_metadata_list
 
-    def test_build_collection(self, new_geotiff_pipeline: NewGeoTiffPipeline):
-        pipeline = new_geotiff_pipeline
+    def test_build_collection(self, geotiff_pipeline: GeoTiffPipeline):
+        pipeline = geotiff_pipeline
         assert pipeline.collection is None
 
         pipeline.build_collection()
@@ -451,8 +449,8 @@ class TestNewGeoTiffPipeline:
         collection = Collection.from_file(pipeline.collection_file)
         collection.validate_all()
 
-    def test_build_grouped_collection(self, new_geotiff_pipeline_grouped: NewGeoTiffPipeline):
-        pipeline = new_geotiff_pipeline_grouped
+    def test_build_grouped_collection(self, geotiff_pipeline_grouped: GeoTiffPipeline):
+        pipeline = geotiff_pipeline_grouped
         assert pipeline.collection is None
 
         pipeline.build_grouped_collections()
@@ -484,7 +482,7 @@ class TestAssetMetadataPipeline:
         for item in stac_items:
             item.validate()
 
-    def test_build_collection(self, asset_metadata_pipeline: NewGeoTiffPipeline):
+    def test_build_collection(self, asset_metadata_pipeline: AssetMetadataPipeline):
         assert asset_metadata_pipeline.collection is None
 
         asset_metadata_pipeline.build_collection()
@@ -498,7 +496,7 @@ class TestAssetMetadataPipeline:
         collection = Collection.from_file(asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
-    def test_build_grouped_collection(self, asset_metadata_pipeline: NewGeoTiffPipeline):
+    def test_build_grouped_collection(self, asset_metadata_pipeline: AssetMetadataPipeline):
         assert asset_metadata_pipeline.collection is None
 
         asset_metadata_pipeline.build_grouped_collections()
