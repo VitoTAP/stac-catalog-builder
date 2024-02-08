@@ -23,10 +23,7 @@
     ],
     "layout_strategy_item_template": "${collection}/${year}",
     "input_path_parser": {
-        "classname": "RegexInputPathParser",
-        "parameters": {
-            "regex_pattern": ".*_(?P<asset_type>[a-zA-Z0-9\\-]+)_(?P<datetime>\\d{4}-\\d{2}-\\d{2})\\.tif$"
-        }
+        "classname": "MockPathParser"
     },
     "item_assets": {
         "2m-temp-monthly": {

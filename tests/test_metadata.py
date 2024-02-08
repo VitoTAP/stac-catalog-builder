@@ -32,6 +32,7 @@ class TestAssetMetadata:
         assert meta.transform is None
         assert meta.bbox_lat_lon is None
         assert meta.bbox_projected is None
+        assert meta.transform is None
 
         assert meta.bbox_as_list is None
         assert meta.proj_bbox_as_list is None
@@ -73,6 +74,7 @@ class TestAssetMetadata:
             "bbox_lat_lon": None,
             "bbox_projected": None,
             "geometry_lat_lon": None,
+            "transform": None,
             "raster_metadata": None,
             "file_size": None,
         }

@@ -15,6 +15,7 @@ Best to add unit tests in a bottom-up way.
 """
 import datetime as dt
 from pathlib import Path
+import pprint
 from typing import List
 
 
@@ -25,10 +26,12 @@ import numpy as np
 from pystac.collection import Collection
 
 
+from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
     GeoTiffPipeline,
+    NewGeoTiffPipeline,
     GeoTiffMetadataCollector,
     IMetadataCollector,
     FileCollector,
@@ -40,7 +43,8 @@ from stacbuilder.config import (
     InputPathParserConfig,
 )
 from stacbuilder.exceptions import InvalidConfiguration
-from stacbuilder.metadata import AssetMetadata
+from stacbuilder.metadata import AssetMetadata, RasterMetadata, BandMetadata
+from stacbuilder.pathparsers import RegexInputPathParser
 
 
 @pytest.fixture
@@ -202,7 +206,7 @@ def collection_test_config() -> CollectionConfig:
         "input_path_parser": InputPathParserConfig(
             classname="RegexInputPathParser",
             parameters={
-                "regex_pattern": r".*_(?P<asset_type>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
+                "regex_pattern": "observations_(?P<asset_type>[a-zA-Z0-9\\-]+)_(?P<datetime>\\d{4}-\\d{2}-\\d{2})\\.tif$"
             },
         ),
         "item_assets": {
@@ -243,10 +247,7 @@ def grouped_collection_test_config() -> CollectionConfig:
             }
         ],
         "input_path_parser": InputPathParserConfig(
-            classname="RegexInputPathParser",
-            parameters={
-                "regex_pattern": r".*_(?P<asset_type>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2})\.tif$",
-            },
+            classname="MockPathParser",
         ),
         "item_assets": {
             "2m-temp-monthly": {
@@ -293,6 +294,59 @@ def basic_asset_metadata(data_dir) -> AssetMetadata:
     return create_basic_asset_metadata(data_dir / "observations_2m-temp-monthly_2000-01-01.tif")
 
 
+class MockPathParser(RegexInputPathParser):
+    def __init__(self, *args, **kwargs) -> None:
+        type_converters = {
+            "year": int,
+            "month": int,
+            "day": int,
+        }
+        fixed_values = {"collection_id": "observations"}
+        regex_pattern = ".*observations_(?P<asset_type>.*)_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}).*\\.tif$"
+        super().__init__(
+            regex_pattern=regex_pattern, type_converters=type_converters, fixed_values=fixed_values, *args, **kwargs
+        )
+
+    def _post_process_data(self):
+        start_dt = self._derive_start_datetime()
+        self._data["datetime"] = start_dt
+        self._data["start_datetime"] = start_dt
+        self._data["end_datetime"] = self._derive_end_datetime()
+
+        year = self._data["year"]
+        month = self._data["month"]
+        day = self._data["day"]
+        # self._data["item_id"] = f"observations_{year:04}-{month:02}-{day:02}"
+        self._data["item_id"] = f"observations_{self._data['asset_type']}_{year:04}"
+
+    def _derive_start_datetime(self):
+        """Derive the start datetime from other properties that were extracted."""
+        year = self._data.get("year")
+        month = self._data.get("month")
+        day = self._data.get("day")
+
+        if not (year and month and day):
+            print(
+                "WARNING: Could not find all date fields: "
+                + f"{year=}, {month=}, {day=}, {self._data=},\n{self._path=}\n{self._regex.pattern=}"
+            )
+            return None
+
+        return dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
+
+    def _derive_end_datetime(self):
+        """Derive the end datetime from other properties that were extracted."""
+        start_dt = self._derive_start_datetime()
+        if not start_dt:
+            print(
+                "WARNING: Could not determine start_datetime: " + f"{self._data=}, {self._path=}, {self._regex.pattern}"
+            )
+            return None
+
+        year = start_dt.year
+        return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
+
+
 def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
     """Create a AssetMetadata with basic (fake) information.
 
@@ -302,38 +356,39 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         2000/observations_2m-temp-monthly_2000-01-01.tif
 
     """
-    md = AssetMetadata()
 
-    md.asset_id = asset_path.name
+    md = AssetMetadata()
+    path_parser = MockPathParser()
+
+    md.asset_id = asset_path.stem
+    asset_path_data = path_parser.parse(asset_path)
 
     prefix_length = len("observations_")
     end_length = len("_2000-01-01.tif")
     md.asset_type = asset_path.name[prefix_length:-end_length]
 
-    year = asset_path.parent.name
-    md.item_id = f"weather_observations:{md.asset_type}:{year}"
+    md.item_id = asset_path_data["item_id"]
+
     md.asset_path = asset_path
-    md.href = md.asset_path
-    md.original_href = md.asset_path
-    md.item_href = asset_path.parent
+    md.href = asset_path
+    md.original_href = asset_path
+    md.collection_id = asset_path_data["collection_id"]
 
-    md.asset_type = "2m-temp-monthly"
+    md.datetime = asset_path_data["datetime"]
+    md.start_datetime = asset_path_data["start_datetime"]
+    md.end_datetime = asset_path_data["end_datetime"]
+    md.shape = (180, 240)
+    md.tags = {"AREA_OR_POINT": "Area"}
 
-    md.collection_id = "weather_observations"
-    md.tile_id = None
-    md.title = " ".join(asset_path.name.split("_"))
+    md.file_size = asset_path.stat().st_size
 
-    start_datetime = dt.datetime(2000, 1, 1, tzinfo=dt.UTC)
-    end_datetime = dt.datetime(2000, 2, 1, tzinfo=dt.UTC)
+    bbox_dict = {"east": 240.0, "epsg": 4326, "north": 0.0, "south": 180.0, "west": 0.0}
+    md.bbox_lat_lon = BoundingBox.from_dict(bbox_dict)
+    md.bbox_projected = BoundingBox.from_dict(bbox_dict)
+    md.transform = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
 
-    md.datetime = start_datetime
-    md.start_datetime = start_datetime
-    md.end_datetime = end_datetime
-
-    md.shape = [180, 240]
-    md.tags = ["tag1", "tag2"]
-    md.file_size = 340
-
+    band = BandMetadata(data_type="float64", index=0, nodata=None)
+    md.raster_metadata = RasterMetadata(shape=md.shape, bands=[band])
     return md
 
 
@@ -398,6 +453,82 @@ class TestGeoTiffPipeline:
             collection.validate_all()
 
 
+@pytest.fixture
+def new_geotiff_pipeline(
+    collection_config_from_file, file_collector_config, collection_output_dir
+) -> NewGeoTiffPipeline:
+    return NewGeoTiffPipeline.from_config(
+        collection_config=collection_config_from_file,
+        file_coll_cfg=file_collector_config,
+        output_dir=collection_output_dir,
+        overwrite=False,
+    )
+
+
+@pytest.fixture
+def new_geotiff_pipeline_grouped(
+    grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
+) -> NewGeoTiffPipeline:
+    return NewGeoTiffPipeline.from_config(
+        collection_config=grouped_collection_test_config,
+        file_coll_cfg=file_collector_config,
+        output_dir=grouped_collection_output_dir,
+        overwrite=False,
+    )
+
+
+class TestNewGeoTiffPipeline:
+    def test_get_input_files(self, new_geotiff_pipeline: NewGeoTiffPipeline, geotiff_paths: List[Path]):
+        input_files = list(new_geotiff_pipeline.get_input_files())
+
+        assert sorted(input_files) == sorted(geotiff_paths)
+
+    def test_get_asset_metadata(self, new_geotiff_pipeline: NewGeoTiffPipeline, basic_asset_metadata_list: List[Path]):
+        metadata_list = list(new_geotiff_pipeline.get_asset_metadata())
+
+        sorted_actual_metadata_list = sorted(metadata_list)
+        sorted_expected_metadata_list = sorted(basic_asset_metadata_list)
+
+        expected_dicts = [e.to_dict() for e in sorted_expected_metadata_list]
+        actual_dicts = [a.to_dict() for a in sorted_actual_metadata_list]
+
+        for i, expected_md in enumerate(sorted_expected_metadata_list):
+            pprint.pprint(expected_md.get_differences(sorted_actual_metadata_list[i]))
+
+        assert expected_dicts == actual_dicts
+        assert sorted_actual_metadata_list == sorted_expected_metadata_list
+
+    def test_build_collection(self, new_geotiff_pipeline: NewGeoTiffPipeline):
+        pipeline = new_geotiff_pipeline
+        assert pipeline.collection is None
+
+        pipeline.build_collection()
+
+        assert pipeline.collection is not None
+        assert pipeline.collection_file is not None
+        assert pipeline.collection_file.exists()
+        Collection.validate_all(pipeline.collection)
+
+        collection = Collection.from_file(pipeline.collection_file)
+        collection.validate_all()
+
+    def test_build_grouped_collection(self, new_geotiff_pipeline_grouped: NewGeoTiffPipeline):
+        pipeline = new_geotiff_pipeline_grouped
+        assert pipeline.collection is None
+
+        pipeline.build_grouped_collections()
+
+        assert pipeline.collection_groups is not None
+        assert pipeline.collection is None
+
+        for coll in pipeline.collection_groups.values():
+            coll_path = Path(coll.self_href)
+            coll_path.exists()
+
+            collection = Collection.from_file(coll_path)
+            collection.validate_all()
+
+
 class TestAssetMetadataPipeline:
     def test_collect_metadata(self, asset_metadata_pipeline: AssetMetadataPipeline, basic_asset_metadata_list):
         metadata_list = list(asset_metadata_pipeline.get_metadata())
@@ -410,7 +541,7 @@ class TestAssetMetadataPipeline:
         for item in stac_items:
             len(item.assets) == 3
 
-        # Validation should not raise a pystac.errors.STACValidationError
+        # Validation should not raise any expections of type pystac.errors.STACValidationError
         for item in stac_items:
             item.validate()
 
@@ -424,6 +555,7 @@ class TestAssetMetadataPipeline:
         assert asset_metadata_pipeline.collection_file.exists()
         Collection.validate_all(asset_metadata_pipeline.collection)
 
+        # Validation should not raise any expections of type pystac.errors.STACValidationError
         collection = Collection.from_file(asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
@@ -439,22 +571,23 @@ class TestAssetMetadataPipeline:
             coll_path = Path(coll.self_href)
             coll_path.exists()
 
+            # Validation should not raise any expections of type pystac.errors.STACValidationError
             collection = Collection.from_file(coll_path)
             collection.validate_all()
 
 
-@pytest.fixture
-def simple_asset_metadata() -> AssetMetadata:
-    asset_md = AssetMetadata()
-    asset_md.asset_id = "asset123"
-    asset_md.item_id = "item456"
-    asset_md.collection_id = "collection789"
-    asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
-
-    return asset_md
-
-
 class TestAlternateLinksGenerator:
+    @pytest.fixture
+    def simple_asset_metadata(self) -> AssetMetadata:
+        """A very simple AssetMetadata with minimal data"""
+        asset_md = AssetMetadata()
+        asset_md.asset_id = "asset123"
+        asset_md.item_id = "item456"
+        asset_md.collection_id = "collection789"
+        asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
+
+        return asset_md
+
     def test_it_registers_callbacks(self):
         alternate_generator = AlternateHrefGenerator()
 
