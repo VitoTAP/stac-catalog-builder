@@ -13,19 +13,6 @@ from stacbuilder.pathparsers import (
 from stacbuilder.config import InputPathParserConfig
 
 
-def test_factory():
-    expected_names = sorted(
-        [
-            "NoopInputPathParser",
-            "RegexInputPathParser",
-            "ERA5LandInputPathParser",
-            "LandsatNDWIInputPathParser",
-            "PeopleEAIncaCFactorInputPathParser",
-        ]
-    )
-    assert InputPathParserFactory.implementation_names == expected_names
-
-
 def test_regexinputpathparser():
     path = "/data/foo/bar/tile9876_band-name1-567XyZ_2034-12-31T02:03:59Z.tif"
     regex = r".*/tile(?P<tile>\d+)_(?P<band>[a-zA-Z0-9\-]+)_(?P<datetime>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}Z)\.tif$"

@@ -75,14 +75,7 @@ class RasterMetadata:
 
 # TODO: convert Metadata to a dataclass, and add method (or class) that fills it in from a GeoTIFF.
 class AssetMetadata:
-    """Intermediate metadata that models the properties we actually use.
-
-    TODO: Decouple: turn this into a actual dataclass and extract all rasterio stuff from the constructor.
-        We should have a component that reads the file and then fills is or constructs a Metadata instance.
-        Now Metadata is tied completely to GeoTIFFs and we want to use it for any
-        data source as an intermediate step that makes it easier to create
-        STAC items with the same subset of metadata we want to have for every data source.
-    """
+    """Intermediate metadata that models the properties we actually use."""
 
     # This is metadata of an asset that belongs to a STAC item, not really the metadata of one STAC item.
     # (Realizing this now when reviewing the code, this class has been roughly the same since the earliest versions of the tool)
@@ -113,14 +106,16 @@ class AssetMetadata:
 
     # TODO: more explicit handling of data extracted from path or href, should be a class perhaps.
     PROPS_FROM_HREFS = [
-        "href",
-        "original_href",
         "item_id",
         "asset_id",
+        "collection_id",
         "asset_type",
         "datetime",
         "start_datetime",
         "end_datetime",
+        "title",
+        "tile_id",
+        "item_href",
     ]
 
     def __init__(
@@ -449,6 +444,7 @@ class AssetMetadata:
             "tags": self.tags,
             "bbox_lat_lon": self.bbox_lat_lon.to_dict() if self.bbox_lat_lon else None,
             "bbox_projected": self.bbox_projected.to_dict() if self.bbox_projected else None,
+            "transform": self.transform,
             "geometry_lat_lon": self.geometry_lat_lon,
             "raster_metadata": self.raster_metadata.to_dict() if self.raster_metadata else None,
             "file_size": self.file_size,
@@ -503,6 +499,8 @@ class AssetMetadata:
         else:
             metadata.bbox_lat_lon = None
 
+        metadata.transform = data.get("transform")
+
         metadata.geometry_lat_lon = data.get("geometry_lat_lon") or data.get("geometry")
 
         proj_bbox_dict = data.get("bbox_projected")
@@ -539,3 +537,72 @@ class AssetMetadata:
 
     def __str__(self):
         return str(self.to_dict())
+
+    def __eq__(self, other: "AssetMetadata") -> bool:
+        if other is self:
+            return True
+
+        return all(
+            [
+                self._asset_id == other._asset_id,
+                self._item_id == other._item_id,
+                self._href == other._href,
+                self._original_href == other._original_href,
+                self._asset_path == other._asset_path,
+                self._asset_type == other._asset_type,
+                self._datetime == other._datetime,
+                self._start_datetime == other._start_datetime,
+                self._end_datetime == other._end_datetime,
+                self._bbox_lat_lon == other._bbox_lat_lon,
+                self._bbox_projected == other._bbox_projected,
+                self._proj_epsg == other._proj_epsg,
+                self._geometry_lat_lon == other._geometry_lat_lon,
+                self.transform == other.transform,
+                self.shape == other.shape,
+                self.file_size == other.file_size,
+                self.tags == other.tags,
+                self.raster_metadata == other.raster_metadata,
+                self.title == other.title,
+                self.collection_id == other.collection_id,
+                self.tile_id == other.tile_id,
+                self.item_href == other.item_href,
+                self.media_type == other.media_type,
+            ]
+        )
+
+    def __gt__(self, other) -> bool:
+        # for sorting support
+        if other is self:
+            return True
+        return self._asset_id > other._asset_id
+
+    def __ge__(self, other) -> bool:
+        # for sorting support
+        if other is self:
+            return True
+        return self._asset_id >= other._asset_id
+
+    def __lt__(self, other) -> bool:
+        # for sorting support
+        if other is self:
+            return True
+        return self._asset_id < other._asset_id
+
+    def __le__(self, other) -> bool:
+        # for sorting support
+        if other is self:
+            return True
+        return self._asset_id <= other._asset_id
+
+    def get_differences(self, other) -> Dict[str, Any]:
+        if other is self:
+            return {}
+
+        differences = {}
+        self_dict = self.to_dict()
+        other_dict = other.to_dict()
+        for key in self_dict.keys():
+            if self_dict[key] != other_dict[key]:
+                differences[key] = (self_dict[key], other_dict[key])
+
+        return differences
