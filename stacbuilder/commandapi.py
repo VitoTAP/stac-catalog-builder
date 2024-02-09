@@ -12,7 +12,7 @@ functionality of the CLI, and that is harder to do directly on the CLI.
 """
 
 from pathlib import Path
-from typing import Dict, Hashable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 from pystac import Collection, Item
@@ -152,7 +152,7 @@ def list_asset_metadata(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
-) -> Dict[Hashable, List[AssetMetadata]]:
+) -> List[AssetMetadata]:
     """
     Return the AssetMetadata objects generated for each file.
 
@@ -163,7 +163,7 @@ def list_asset_metadata(
     :param input_dir: Root directory where the files are located.
     :param max_files: Maximum number of files to process.
     :param save_dataframe: Save the geodataframe of the metadata.
-    :return: Dictionary containing the groups as keys and the AssetMetadata objects for each file. If the collection is not grouped, the key is an empty string.
+    :return: List of AssetMetadata objects for each file.
     """
 
     collection_config_path = Path(collection_config_path).expanduser().absolute()
@@ -173,7 +173,7 @@ def list_asset_metadata(
 
     if save_dataframe:
         df = pipeline.get_metadata_as_geodataframe()
-        # TODO: Want better directory to save geodata, maybe use save_dataframe as path instead of flag.
+        # TODO: Want a better directory to save geodata, maybe use save_dataframe as path instead of flag.
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-assetmetadata"
         GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
 
