@@ -204,6 +204,22 @@ class AssetMetadata:
         # self.missions: Optional[List[str]] = None
 
     def process_href_info(self):
+        """Fills in metadata fields with values extracted from the asset's file path or href.
+        We receive the values as a dictionary, from the InputPathParser.
+
+        TODO: Generalize process_href_info, so the data can come from any source, not only from hrefs/paths.
+            Rationale:
+            - Essentially process_href_info only fills in a known set of fields, copying data from
+                a dict that we extracted from any source we want.
+            - Where we get the dictionary does not matter, as long as we can provide that information somehow.
+            - This set of fields are things we that AssetMetadata can not automatically derive.
+                They have to be received from the source data, but we support more than one source.
+                Currently we have two sources: OpenSearch and GeoTIFF files.
+                Likely, netCDF will  next.
+            - We don't have to keep this method, just the principle that we get a set of key-value pairs
+                from something that processes source data, and have a more standardized mechanism
+                to update the AssetMetadata object with that data.
+        """
         href_info = self._extract_href_info.parse(self.href)
         self._info_from_href = href_info
         for key, value in href_info.items():
