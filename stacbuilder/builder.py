@@ -326,21 +326,7 @@ class IMetadataCollector(IDataCollector):
         return self._metadata_list
 
 
-class IMapMetadataToSTACItem(Protocol):
-    """Interface for a mapping that converts intermediate Metadata objects STAC Items.
-
-    TODO: name could be better
-    TODO: Will we really have multiple implementations or not? If probability low, remove IMapMetadataToSTACItem
-    """
-
-    # TODO: replacing "map_one" entirely with "create_item" => refactor GeoTiffPipeline to use AssetMetadataPipeline
-    #   Map would do the same if each asset goes into a separate STAC item. So avoid duplicate code.
-    def create_item(self, assets: List[AssetMetadata]) -> Item:
-        """Create a STAC item that contains multiple assets, from a list of Metadata objects."""
-        ...
-
-
-class MapMetadataToSTACItem(IMapMetadataToSTACItem):
+class MapMetadataToSTACItem:
     """Converts Metadata objects to STAC Items.
 
     TODO: class name could be better
