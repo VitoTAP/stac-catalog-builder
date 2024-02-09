@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tupl
 # Third party libraries
 import geopandas as gpd
 import pandas as pd
-import rio_stac.stac as rst
 from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
 from pystac.errors import STACValidationError
 from pystac.layout import TemplateLayoutStrategy
@@ -31,10 +30,6 @@ from pystac.extensions.raster import RasterExtension, RasterBand
 
 # TODO: add datacube extension
 
-
-# our own libraries outside of this project
-from stacbuilder.metadata import GeodataframeExporter
-
 # Modules from this project
 from stacbuilder.exceptions import InvalidOperation, InvalidConfiguration
 from stacbuilder.config import (
@@ -43,7 +38,7 @@ from stacbuilder.config import (
     CollectionConfig,
     FileCollectorConfig,
 )
-from stacbuilder.metadata import AssetMetadata
+from stacbuilder.metadata import AssetMetadata, GeodataframeExporter
 from stacbuilder.timezoneformat import TimezoneFormatConverter
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector, MapGeoTiffToAssetMetadata
 
@@ -147,22 +142,9 @@ class AlternateHrefGenerator:
         return alt_link_gen
 
 
-def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file: Path):
-    """Creates a STAC item from a GeoTIFF file, using rio-stac.
-
-    This is the equivalent of the command `rio stac`.
-
-    TODO: VVVV Is this function still needed?
-    """
-    return rst.create_stac_item(
-        source=str(tiff_path),
-        collection=collection_id,
-        collection_url=str(collection_file),
-    )
-
 
 class MapMetadataToSTACItem:
-    """Converts Metadata objects to STAC Items.
+    """Converts AssetMetadata objects to STAC Items.
 
     TODO: class name could be better
     TODO: find better name for item_assets_configs, maybe asset_definition_configs.
@@ -393,7 +375,9 @@ class MapMetadataToSTACItem:
 
 
 class STACCollectionBuilder:
-    """Creates a STAC Collection from STAC Items."""
+    """Creates a STAC Collection from STAC Items.
+    TODO: reduce this class to functions in the class: AssetMetadataPipeline
+    """
 
     def __init__(self, collection_config: CollectionConfig, output_dir: Path, overwrite: bool = False) -> None:
         # Settings: these are just data, not components we delegate work to.
@@ -942,7 +926,9 @@ class AssetMetadataPipeline:
 
 
 class GeoTiffPipeline:
-    """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
+    """A pipeline to generate a STAC collection from a directory containing GeoTIFF files.
+    TODO: move remaining logic to AssetMetadataPipeline and remove this class.
+    """
 
     def __init__(
         self,
