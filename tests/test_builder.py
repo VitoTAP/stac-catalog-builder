@@ -478,7 +478,7 @@ class TestAssetMetadataPipeline:
         for item in stac_items:
             len(item.assets) == 3
 
-        # Validation should not raise any expections of type pystac.errors.STACValidationError
+        # Validation should not raise any exceptions of type pystac.errors.STACValidationError
         for item in stac_items:
             item.validate()
 
@@ -492,7 +492,7 @@ class TestAssetMetadataPipeline:
         assert asset_metadata_pipeline.collection_file.exists()
         Collection.validate_all(asset_metadata_pipeline.collection)
 
-        # Validation should not raise any expections of type pystac.errors.STACValidationError
+        # Validation should not raise any exceptions of type pystac.errors.STACValidationError
         collection = Collection.from_file(asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
@@ -508,7 +508,7 @@ class TestAssetMetadataPipeline:
             coll_path = Path(coll.self_href)
             coll_path.exists()
 
-            # Validation should not raise any expections of type pystac.errors.STACValidationError
+            # Validation should not raise any exceptions of type pystac.errors.STACValidationError
             collection = Collection.from_file(coll_path)
             collection.validate_all()
 
