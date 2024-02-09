@@ -138,10 +138,14 @@ def list_input_files(
     :return: List containing paths of all the found files.
     """
 
-    collector = FileCollector()
-    collector.input_dir = Path(input_dir)
-    collector.glob = glob
-    collector.max_files = max_files
+    collector = FileCollector(
+        input_dir=Path(input_dir),
+        glob=glob,
+        max_files=max_files,
+    )
+    # collector.input_dir = Path(input_dir)
+    # collector.glob = glob
+    # collector.max_files = max_files
     collector.collect()
     return collector.input_files
 
