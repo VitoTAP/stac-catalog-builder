@@ -246,7 +246,7 @@ def validate(collection_file):
 @click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def extract_item_bboxes(collection_file):
     """Extract and save the bounding boxes of the STAC items in the collection, to both ShapeFile and GeoParquet format."""
-    extract_item_bboxes(collection_file)
+    commandapi.extract_item_bboxes(collection_file)
 
 
 @cli.command

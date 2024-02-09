@@ -12,7 +12,7 @@ functionality of the CLI, and that is harder to do directly on the CLI.
 """
 
 from pathlib import Path
-from typing import Dict, Hashable, List, Optional
+from typing import Dict, Hashable, List, Optional, Tuple
 
 
 from pystac import Collection, Item
@@ -186,7 +186,7 @@ def list_stac_items(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
-) -> (List[Collection], List[Path]):
+) -> Tuple[List[Collection], List[Path]]:
     """
     Return the STAC items that are generated for each file and the files for which no stac item could be generated.
 
