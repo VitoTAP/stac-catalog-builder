@@ -17,13 +17,13 @@ from typing import List, Optional, Tuple
 
 from pystac import Collection, Item
 import terracatalogueclient as tcc
+from stacbuilder.metadata import GeodataframeExporter
+from stacbuilder.collector import FileCollector
 
 
 from stacbuilder.builder import (
     AssetMetadataPipeline,
-    FileCollector,
     GeoTiffPipeline,
-    GeodataframeExporter,
     PostProcessSTACCollectionFile,
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig

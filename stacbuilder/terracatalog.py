@@ -25,7 +25,7 @@ from terracatalogueclient.config import CatalogueEnvironment
 
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
-from stacbuilder.builder import IMetadataCollector
+from stacbuilder.collector import IMetadataCollector
 
 from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
 

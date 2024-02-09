@@ -10,17 +10,14 @@ import logging
 import shutil
 import tempfile
 from functools import partial
-from itertools import islice
 from pathlib import Path
-from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union
 
 
 # Third party libraries
 import geopandas as gpd
 import pandas as pd
-import rasterio
 import rio_stac.stac as rst
-from shapely.geometry import shape
 from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
 from pystac.errors import STACValidationError
 from pystac.layout import TemplateLayoutStrategy
@@ -34,28 +31,21 @@ from pystac.extensions.raster import RasterExtension, RasterBand
 
 # TODO: add datacube extension
 
-from stactools.core.io import ReadHrefModifier
 
 # our own libraries outside of this project
-from openeo.util import normalize_crs
-
+from stacbuilder.metadata import GeodataframeExporter
 
 # Modules from this project
-from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.exceptions import InvalidOperation, InvalidConfiguration
-from stacbuilder.pathparsers import (
-    InputPathParser,
-    InputPathParserFactory,
-)
 from stacbuilder.config import (
     AssetConfig,
     AlternateHrefConfig,
     CollectionConfig,
     FileCollectorConfig,
 )
-from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
-from stacbuilder.projections import reproject_bounding_box
+from stacbuilder.metadata import AssetMetadata
 from stacbuilder.timezoneformat import TimezoneFormatConverter
+from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector, MapGeoTiffToAssetMetadata
 
 
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
@@ -65,33 +55,14 @@ ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1
 _logger = logging.getLogger(__name__)
 
 
-class CreateAssetUrlFromPath:
-    """Implements stactools.core.io.ReadHrefModifier"""
-
-    def __init__(self, href_template: str, data_root: Path) -> None:
-        self.url_template = href_template
-        self.data_root = Path(data_root)
-
-    def __call__(self, asset_path: Path) -> str:
-        """This method must match the signature of ReadHrefModifier.
-        ReadHrefModifier is a type alias for Callable[[str], str]
-        """
-        return self.get_url(asset_path)
-
-    def get_url(self, asset_path: Path):
-        rel_path: Path = asset_path.relative_to(self.data_root)
-        return self.url_template.format(str(rel_path))
-
-
-# Type alias for the specific callable that AlternateHrefGenerator needs.
-AssetMetadataToURL = Callable[[AssetMetadata], str]
-
-
 class AlternateHrefGenerator:
     """Generates the alternate links for assets."""
 
+    # Type alias for the specific callable that AlternateHrefGenerator needs.
+    AssetMetadataToURL = Callable[[AssetMetadata], str]
+
     def __init__(self):
-        self._callbacks: Dict[str, AssetMetadataToURL] = {}
+        self._callbacks: Dict[str, self.AssetMetadataToURL] = {}
 
     def register_callback(self, key, converter=AssetMetadataToURL):
         self._callbacks[key] = converter
@@ -180,150 +151,14 @@ def get_item_from_rio_stac(tiff_path: Path, collection_id: str, collection_file:
     """Creates a STAC item from a GeoTIFF file, using rio-stac.
 
     This is the equivalent of the command `rio stac`.
+
+    TODO: VVVV Is this function still needed?
     """
     return rst.create_stac_item(
         source=str(tiff_path),
         collection=collection_id,
         collection_url=str(collection_file),
     )
-
-
-class IDataCollector(Protocol):
-    """Interface/Protocol for all DataCollector implementations."""
-
-    def collect(self) -> None:
-        """Collect the data and store it internally.
-
-        Each implementation needs to add a method to access the collected data,
-        because a specific method will be more clear that what we could add here.
-
-        At the level of this class here we could only add a method that returns
-        `Any`, and with a generic name that will be a bit too vague.
-        """
-        ...
-
-    def has_collected(self) -> bool:
-        """Has the collection been done/ does the collector contain any data."""
-        ...
-
-    def reset(self) -> None:
-        """Empty the collected data."""
-        ...
-
-
-class FileCollector(IDataCollector):
-    """Collects geotiff files that match a glob, in a directory.
-
-    Note that the values None and [] have a different meaning for self.input_files:
-    See :meth: FileCollector.has_collected
-    """
-
-    def __init__(
-        self, input_dir: Optional[Path] = None, glob: Optional[str] = "*", max_files: Optional[int] = -1
-    ) -> None:
-        #
-        # Settings: these are just data, not components we delegate work to.
-        #
-        # These are public members, or should have a public property.
-        self.input_dir: Path = input_dir
-        self.glob: str = glob
-        self.max_files: int = max_files
-        self._set_missing_fields_to_defaults()
-
-        # The result
-        self._input_files: List[Path] = None
-
-    def _set_missing_fields_to_defaults(self):
-        if not self.input_dir:
-            self.input_dir = None
-
-        if not self.glob:
-            self.glob = "*"
-
-        if not self.max_files:
-            self.max_files = -1
-
-    @staticmethod
-    def from_config(config: FileCollectorConfig) -> "FileCollector":
-        """Use the configuration object to create a new FileCollector instance."""
-        collector = FileCollector()
-        collector.setup(config)
-        return collector
-
-    def setup(self, config: FileCollectorConfig):
-        """Read the settings for this instance from the configuration object."""
-        self.input_dir = config.input_dir
-        self.glob = config.glob
-        self.max_files = config.max_files
-        self._set_missing_fields_to_defaults()
-        self.reset()
-
-    def collect(self):
-        input_files = (f for f in self.input_dir.glob(self.glob) if f.is_file())
-
-        if self.max_files > 0:
-            input_files = islice(input_files, self.max_files)
-
-        self._input_files = list(input_files)
-
-    def has_collected(self) -> bool:
-        """Whether or not the data has been collected.
-
-        Note that the values None and [] have a different meaning here:
-        Namely:
-            `self.input_files == []`
-            means no files were found during collection,
-        but in contrast:
-            `self.input_files is None`
-            means the collection was never run in the first place.
-        """
-        return self._input_files is not None
-
-    def reset(self):
-        """Reset the collector: clear the collected files."""
-        self._input_files = None
-
-    @property
-    def input_files(self) -> List[Path]:
-        """Get the collected input files."""
-        return self._input_files or []
-
-
-class IMetadataCollector(IDataCollector):
-    """Interface/Protocol for collector that gets Metadata objects from a source.
-
-    You need still to implement the method `collect`.
-
-    Note that the values None and [] have a different meaning for self.metadata_list,
-    See :meth: IMetadataCollector.has_collected
-    """
-
-    def __init__(self):
-        self._metadata_list: List[AssetMetadata] = None
-
-    def has_collected(self) -> bool:
-        """Whether or not the data has been collected.
-
-        Note that the values None and [] have a different meaning here:
-        Namely:
-            `self.metadata_list == []`
-            means no asset metadata were found during collection,
-        but in contrast:
-            `self.metadata_list is None`
-            means the collection was never run in the first place.
-        """
-        return self._metadata_list is not None
-
-    def reset(self):
-        """Reset the collector: clear the collected asset metadata,
-
-        Value must be `None`, as if it was never run.
-        """
-        self._metadata_list = None
-
-    @property
-    def metadata_list(self) -> List[AssetMetadata]:
-        return self._metadata_list
 
 
 class MapMetadataToSTACItem:
@@ -555,118 +390,6 @@ class MapMetadataToSTACItem:
         if asset_type not in self.item_assets_configs:
             return None
         return self.item_assets_configs[asset_type]
-
-
-# TODO: Probably better to eliminate RasterBBoxReader now.
-#    Putting all raster reading code in MapGeoTiffToAssetMetadata seems better.
-class RasterBBoxReader:
-    """Reads bounding box info from a raster file format.
-
-    TODO: this is very much unfinished untested code.
-        This is an preliminary implementation, and completely UNTESTED.
-        We want to extract all the raster reading stuff out of the module `metadata`
-        into a separate module, and this class is the start of the process.
-        It is therefore more "thinking in writing" than finished code.
-    """
-
-    @classmethod
-    def from_raster_path(cls, path: Path) -> Tuple[BoundingBox, BoundingBox, List[float]]:
-        with rasterio.open(path) as dataset:
-            return cls.from_rasterio_dataset(dataset)
-
-    @staticmethod
-    def from_rasterio_dataset(dataset) -> Tuple[BoundingBox, BoundingBox, List[float]]:
-        bbox_lat_lon = None
-        bbox_projected = None
-        proj_epsg = None
-
-        # TODO: once this works well, integrate normalize_crs into  proj_epsg
-        normalized_epsg = normalize_crs(dataset.crs)
-        if normalized_epsg is not None:
-            proj_epsg = normalized_epsg
-        elif hasattr(dataset.crs, "to_epsg"):
-            proj_epsg = dataset.crs.to_epsg()
-
-        if not proj_epsg:
-            proj_epsg = 4326
-
-        bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
-
-        if proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
-            bbox_lat_lon = bbox_projected
-        else:
-            west, south, east, north = bbox_projected.to_list()
-            bbox_list = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
-            bbox_lat_lon = BoundingBox.from_list(bbox_list, epsg=4326)
-
-        transform = list(dataset.transform)[0:6]
-
-        return bbox_lat_lon, bbox_projected, transform
-
-
-class MapGeoTiffToAssetMetadata:
-    """Extracts AssetMetadata from each GeoTIFF file.
-
-    TODO: name could be better
-    """
-
-    def __init__(
-        self,
-        path_parser: InputPathParser,
-        href_modifier: Optional[ReadHrefModifier] = None,
-    ) -> None:
-        # Store dependencies: components that have to be provided to constructor
-        self._path_parser = path_parser
-        # TODO: remove MakeRelativeToCollection as default. This is a hack to test it quickly.
-        self._href_modifier = href_modifier or None
-
-    def to_metadata(
-        self,
-        asset_path: Union[Path, str],
-    ) -> AssetMetadata:
-        if not asset_path:
-            raise ValueError(
-                f'Argument "asset_path" must have a value, it can not be None or the empty string. {asset_path=}'
-            )
-        if not isinstance(asset_path, (Path, str)):
-            raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
-
-        asset_meta = AssetMetadata(extract_href_info=self._path_parser)
-        asset_meta.original_href = asset_path
-        asset_meta.asset_path = asset_path
-        asset_meta.asset_id = Path(asset_path).stem
-        asset_meta.item_id = Path(asset_path).stem
-        asset_meta.datetime = dt.datetime.utcnow()
-
-        if self._href_modifier:
-            asset_meta.href = self._href_modifier(asset_path)
-        else:
-            asset_meta.href = asset_path
-
-        with rasterio.open(asset_path) as dataset:
-            asset_meta.shape = dataset.shape
-            bboxes_result = RasterBBoxReader.from_rasterio_dataset(dataset)
-            asset_meta.bbox_lat_lon, asset_meta.bbox_projected, asset_meta.transform = bboxes_result
-
-            bands = []
-            tags = dataset.tags() or {}
-            units = tags.get("units")
-            for i in range(dataset.count):
-                # TODO: if tags contains unit, add the unit
-                band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
-                bands.append(band_md)
-            raster_meta = RasterMetadata(shape=dataset.shape, bands=bands)
-            # TODO: Decide: do we really need the raster tags. If so, where is the best place to store them.
-            asset_meta.tags = dataset.tags()
-            # TODO: currently there are two places to store tags. That is confusing, pick one.
-            asset_meta.raster_metadata = raster_meta
-
-        asset_meta.process_href_info()
-
-        file_stat = asset_path.stat()
-        asset_meta.file_size = file_stat.st_size
-
-        return asset_meta
 
 
 class STACCollectionBuilder:
@@ -1218,105 +941,6 @@ class AssetMetadataPipeline:
             post_processor.process_collection(coll_file)
 
 
-class GeoTiffMetadataCollector(IMetadataCollector):
-    def __init__(
-        self,
-        collection_config: CollectionConfig,
-        file_collector: FileCollector,
-    ):
-        super().__init__()
-
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
-        if file_collector is None:
-            raise ValueError('Argument "file_collector" can not be None, must be a FileCollector instance.')
-
-        # Components / dependencies that must be provided
-        self._file_collector = file_collector
-
-        # Settings: these are just data, not components we delegate work to.
-        self._collection_config = collection_config
-
-        # Components / dependencies that we set up internally
-        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
-        self._path_parser: InputPathParser = None
-
-        self._setup_internals()
-
-    def _setup_internals(self):
-        # TODO: implement href modified that translates file path to a URL with a configurable base URL
-        href_modifier = None
-        collection_conf = self._collection_config
-
-        cfg_href_modifier = collection_conf.asset_href_modifier
-        if cfg_href_modifier:
-            href_modifier = CreateAssetUrlFromPath(
-                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
-            )
-
-        path_parser = None
-        if collection_conf.input_path_parser:
-            path_parser = InputPathParserFactory.from_config(collection_conf.input_path_parser)
-
-        self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
-            path_parser=path_parser, href_modifier=href_modifier
-        )
-
-    @staticmethod
-    def from_config(
-        collection_config: CollectionConfig,
-        file_coll_cfg: FileCollectorConfig,
-    ) -> "GeoTiffMetadataCollector":
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
-        if file_coll_cfg is None:
-            raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
-
-        file_collector = FileCollector.from_config(file_coll_cfg)
-
-        return GeoTiffMetadataCollector(
-            collection_config=collection_config,
-            file_collector=file_collector,
-        )
-
-    @property
-    def collection_config(self) -> CollectionConfig:
-        return self._collection_config
-
-    @property
-    def file_collector(self) -> FileCollector:
-        return self._file_collector
-
-    @property
-    def path_parser(self) -> InputPathParser:
-        return self._path_parser
-
-    @property
-    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
-        return self._geotiff_to_metadata_mapper
-
-    def reset(self) -> None:
-        super().reset()
-        self._file_collector.reset()
-
-    def get_input_files(self) -> Iterable[Path]:
-        """Collect the input files for processing."""
-        if not self._file_collector.has_collected():
-            self._file_collector.collect()
-
-        for file in self._file_collector.input_files:
-            yield file
-
-    def collect(self) -> None:
-        self._metadata_list = []
-
-        for file in self.get_input_files():
-            metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
-            self._metadata_list.append(metadata)
-
-
 class GeoTiffPipeline:
     """A pipeline to generate a STAC collection from a directory containing GeoTIFF files."""
 
@@ -1456,125 +1080,3 @@ class GeoTiffPipeline:
     def build_grouped_collections(self):
         self.reset()
         self._asset_metadata_pipeline.build_grouped_collections()
-
-
-class GeodataframeExporter:
-    """Utility class to export metadata and STAC items as geopandas GeoDataframes.
-
-    TODO: find a better name for GeodataframeExporter
-    TODO: This is currently a class with only static methods, perhaps a module would be beter.
-    """
-
-    @classmethod
-    def stac_items_to_geodataframe(cls, stac_item_list: List[Item]) -> gpd.GeoDataFrame:
-        if not stac_item_list:
-            raise InvalidOperation("stac_item_list is empty or None. Can not create a GeoDataFrame")
-
-        if not isinstance(stac_item_list, list):
-            stac_item_list = list(stac_item_list)
-
-        epsg = stac_item_list[0].properties.get("proj:epsg", 4326)
-        records = cls.convert_dict_records_to_strings(i.to_dict() for i in stac_item_list)
-        # TODO: limit the number of fields to what we need to see. Something like the code below.
-        #
-        # Not working yet, coming back to this but it is not a priority.
-        #
-        # it: Item
-        # records = cls.convert_records_to_strings(
-        #     (it.id, it.collection_id, it.bbox, it.datetime) for it in stac_item_list
-        # )
-        shapes = [shape(item.geometry) for item in stac_item_list]
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
-
-    @staticmethod
-    def stac_items_to_dataframe(stac_item_list: List[Item]) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
-        return pd.DataFrame.from_records(md.to_dict() for md in stac_item_list)
-
-    @classmethod
-    def metadata_to_geodataframe(cls, metadata_list: List[AssetMetadata]) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the intermediate metadata."""
-        if not metadata_list:
-            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
-
-        epsg = metadata_list[0].proj_epsg
-        geoms = [m.proj_bbox_as_polygon for m in metadata_list]
-        records = cls.convert_dict_records_to_strings(m.to_dict() for m in metadata_list)
-
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
-
-    @staticmethod
-    def metadata_to_dataframe(metadata_list: List[AssetMetadata]) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        if not metadata_list:
-            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
-
-        return pd.DataFrame.from_records(md.to_dict() for md in metadata_list)
-
-    @staticmethod
-    def convert_dict_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        out_records = [dict(rec) for rec in records]
-        for rec in out_records:
-            for key, val in rec.items():
-                if isinstance(val, dt.datetime):
-                    rec[key] = val.isoformat()
-                elif isinstance(val, list):
-                    rec[key] = json.dumps(val)
-                elif isinstance(val, (int, float, bool, str)):
-                    rec[key] = val
-                else:
-                    rec[key] = str(val)
-        return out_records
-
-    @staticmethod
-    def convert_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        temp_records = list(records)
-        out_records = []
-
-        for record in temp_records:
-            convert_record = []
-            for column in record:
-                if isinstance(column, dt.datetime):
-                    convert_record.append(column.isoformat())
-                elif isinstance(column, list):
-                    convert_record.append(json.dumps(column))
-                elif isinstance(column, (int, float, bool, str)):
-                    convert_record.append(column)
-                else:
-                    convert_record.append(str(column))
-            out_records.append(convert_record)
-        return out_records
-
-    @staticmethod
-    def save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
-        shp_dir = out_dir / "shp"
-        if not shp_dir.exists():
-            shp_dir.mkdir(parents=True)
-
-        csv_path = out_dir / f"{table_name}.pipe.csv"
-        shapefile_path = out_dir / f"shp/{table_name}.shp"
-        parquet_path = out_dir / f"{table_name}.parquet"
-
-        print(f"Saving pipe-separated CSV file to: {csv_path}")
-        gdf.to_csv(csv_path, sep="|")
-
-        print(f"Saving shapefile to: {shapefile_path }")
-        gdf.to_file(shapefile_path)
-
-        print(f"Saving geoparquet to: {parquet_path}")
-        gdf.to_parquet(parquet_path)
-
-    @staticmethod
-    def visualization_dir(collection: Collection):
-        collection_path = Path(collection.self_href)
-        return collection_path.parent / "tmp" / "visualization" / collection.id
-
-    @classmethod
-    def export_item_bboxes(cls, collection: Collection):
-        out_dir: Path = cls.visualization_dir(collection)
-        if not out_dir.exists():
-            out_dir.mkdir(parents=True)
-
-        items = collection.get_all_items()
-        gdf: gpd.GeoDataFrame = cls.stac_items_to_geodataframe(items)
-        cls.save_geodataframe(gdf, out_dir, "stac_item_bboxes")
