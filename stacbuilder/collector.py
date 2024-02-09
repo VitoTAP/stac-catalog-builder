@@ -6,8 +6,8 @@ from openeo.util import normalize_crs
 import rasterio
 
 from stactools.core.io import ReadHrefModifier
-from stacbuilder.boundingbox import BoundingBox
 
+from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
 from stacbuilder.pathparsers import InputPathParser, InputPathParserFactory
@@ -38,7 +38,7 @@ class IDataCollector(Protocol):
 
 
 class FileCollector(IDataCollector):
-    """Collects geotiff files that match a glob, in a directory.
+    """Collects files that match a glob, in a directory.
 
     Note that the values None and [] have a different meaning for self.input_files:
     See :meth: FileCollector.has_collected
@@ -204,6 +204,7 @@ class MapGeoTiffToAssetMetadata:
     """Extracts AssetMetadata from each GeoTIFF file.
 
     TODO: name could be better
+    TODO: VVVV move functionality to GeoTiffMetadataCollector
     """
 
     def __init__(
