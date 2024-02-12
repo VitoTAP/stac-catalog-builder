@@ -155,15 +155,8 @@ class IMetadataCollector(IDataCollector):
 class RasterBBoxReader:
     """Reads bounding box info from a raster file format.
 
-    TODO: this is very much unfinished untested code.
-        This is an preliminary implementation, and completely UNTESTED.
-        We want to extract all the raster reading stuff out of the module `metadata`
-        into a separate module, and this class is the start of the process.
-        It is therefore more "thinking in writing" than finished code.
+    # TODO: Move functionality to GeoTiffMetadataCollector along with MapGeoTiffToAssetMetadata
     """
-
-    # TODO: Probably better to eliminate RasterBBoxReader now.
-    #    Putting all raster reading code in MapGeoTiffToAssetMetadata seems better.
 
     @classmethod
     def from_raster_path(cls, path: Path) -> Tuple[BoundingBox, BoundingBox, List[float]]:
@@ -268,7 +261,7 @@ class MapGeoTiffToAssetMetadata:
 
 class CreateAssetUrlFromPath:
     """Implements stactools.core.io.ReadHrefModifier
-    TODO: VVVV is this class still used?
+    TODO: VVVV is this class still used? Answer: Yes: this is the hrefmodifier that GeoTiffMetadataCollector needs.
     """
 
     def __init__(self, href_template: str, data_root: Path) -> None:

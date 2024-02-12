@@ -100,7 +100,7 @@ COLLECTION_CONFIG := $(WORKSPACE)/${DATASET_NAME}/config-collection.json
 # ------------------------------------------------------------------------------
 # Directory containing the GeoTIFF input files.
 #
-# This can be one of its parents / ancesters, because we also use a glob pattern
+# This can be one of its parents / ancestors, because we also use a glob pattern
 # to find the files. This allows us to work with files that are grouped per
 # per, or per date.
 TIFF_INPUT_DIR := /data/users/Public/emile.sonneveld/ERA5-Land-monthly-averaged-data-v2/tiff_collection/
@@ -127,7 +127,7 @@ CATALOG_VERSION := v0.1
 # ------------------------------------------------------------------------------
 # OUT_DIR_ROOT
 # ------------------------------------------------------------------------------
-# Base/root directort for the test output.
+# Base/root directory for the test output.
 # This is where you test and review the STAC files, so this is not the PUBLISH_DIR
 OUT_DIR_ROOT := $(WORKSPACE)/${DATASET_NAME}
 

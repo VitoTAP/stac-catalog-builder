@@ -222,7 +222,7 @@ TIFF_INPUT_DIR := /data/MTDA/PEOPLE_EA/Landsat_three-annual_NDWI_v1/
 GLOB_PATTERN := */*.tif
 ```
 
-`OUT_DIR_ROOT`: Base/root directort for the test output.
+`OUT_DIR_ROOT`: Base/root directory for the test output.
 
 This is where you test and review the "work-in-progress" STAC files, so this is not the PUBLISH_DIR
 
