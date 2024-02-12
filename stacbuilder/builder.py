@@ -28,7 +28,7 @@ from pystac.extensions.file import FileExtension
 from pystac.extensions.eo import EOExtension, Band as EOBand
 from pystac.extensions.raster import RasterExtension, RasterBand
 
-# TODO: add datacube extension
+# TODO: add datacube extension: https://github.com/VitoTAP/stac-catalog-builder/issues/19
 
 # Modules from this project
 from stacbuilder.exceptions import InvalidOperation, InvalidConfiguration
@@ -142,7 +142,6 @@ class AlternateHrefGenerator:
         return alt_link_gen
 
 
-
 class MapMetadataToSTACItem:
     """Converts AssetMetadata objects to STAC Items.
 
@@ -207,10 +206,11 @@ class MapMetadataToSTACItem:
                 # "product_tile": metadata.tile,
             },
         )
+
         # TODO: support optional parts: store the tile ID if dataset uses that.
         #   We would need a way to customize extracting that tile ID for the specific dataset.
 
-        # TODO: looks like we should get description from a sourse/config at the item level.
+        # TODO: looks like we should get description from a source/config at the item level.
         description = self.item_assets_configs[first_asset.asset_type].description
         item.common_metadata.description = description
 
@@ -508,7 +508,7 @@ class STACCollectionBuilder:
             extent=self.get_default_extent(),
             # summaries=constants.SUMMARIES,
         )
-        # TODO: Add support for summaries.
+        # TODO: Add support for summaries: https://github.com/VitoTAP/stac-catalog-builder/issues/18
 
         item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
         item_assets_ext.item_assets = self._get_item_assets_definitions()
@@ -516,7 +516,7 @@ class STACCollectionBuilder:
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
 
-        # TODO: Add support for links in the collection.
+        # TODO: Add support for custom links in the collection, like there was in the early scripts.
         ## collection.add_links(
         ##     [
         ##         constants.PRODUCT_FACT_SHEET,
@@ -549,7 +549,10 @@ class STACCollectionBuilder:
 
         for band_name, asset_config in asset_configs.items():
             asset_def: AssetDefinition = asset_config.to_asset_definition()
-            # TODO: check whether we do need to store the collection as the owner here.
+            # TODO: check whether we do need to store the collection or the items as the asset owner here.
+            #   see also pystac docs: https://pystac.readthedocs.io/en/stable/api/pystac.html#pystac.Asset.owner
+            #   Looks like there are two situations: item_assets occurs both at the level of the STAC collection and
+            #   at the level of the STAC item, so the owner should be set accordingly.
             asset_def.owner = self.collection
             asset_definitions[band_name] = asset_def
 
@@ -565,6 +568,7 @@ class PostProcessSTACCollectionFile:
         to the notation with "+00:00" . This will be removed when the related GitHub issue is fixed:
 
         See also https://github.com/Open-EO/openeo-geopyspark-driver/issues/568
+        TODO: Issue is fixed and removing this step is now planned: https://github.com/VitoTAP/stac-catalog-builder/issues/20
 
     - Step 2) overriding specific key-value pairs in the collections's dictionary with fixed values that we want.
         This helps to set some values quickly when things don't quite work as expected.
@@ -769,10 +773,10 @@ class AssetMetadataPipeline:
         """Setup the internal components based on the components that we receive via dependency injection."""
 
         self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
-        # self._metadata_group_creator = GroupMetadataByYear()
+
+        # The default way we group items into multiple collections is by year
         self._func_find_item_group = lambda item: item.datetime.year
 
-        # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
         if group and not self.uses_collection_groups:
             raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
 
@@ -904,7 +908,6 @@ class AssetMetadataPipeline:
         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
         post_processor.process_collection(coll_file)
 
-    # TODO: disabling support for collection groups until AssetMetadataPipeline works for regular collections first.
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)
 
@@ -927,7 +930,7 @@ class AssetMetadataPipeline:
 
 class GeoTiffPipeline:
     """A pipeline to generate a STAC collection from a directory containing GeoTIFF files.
-    TODO: move remaining logic to AssetMetadataPipeline and remove this class.
+    TODO: move remaining logic (from_config) to commandapi and remove this class. Follow example of command `vpp_build_collection`
     """
 
     def __init__(
@@ -990,6 +993,8 @@ class GeoTiffPipeline:
 
         Also we do not want to mix these (volatile) path settings with the
         stable/fixed settings in the general config file.
+
+        # TODO: this setup can be done in commandapi.py, analogous to the command vpp_build_collection.
         """
         if output_dir and not isinstance(output_dir, Path):
             raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")

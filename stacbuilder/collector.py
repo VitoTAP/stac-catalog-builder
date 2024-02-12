@@ -169,7 +169,6 @@ class RasterBBoxReader:
         bbox_projected = None
         proj_epsg = None
 
-        # TODO: once this works well, integrate normalize_crs into  proj_epsg
         normalized_epsg = normalize_crs(dataset.crs)
         if normalized_epsg is not None:
             proj_epsg = normalized_epsg

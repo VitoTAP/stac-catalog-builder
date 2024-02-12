@@ -32,7 +32,6 @@ class ProviderModel(BaseModel):
     """Model for Providers in STAC."""
 
     name: str
-    # TODO: [decide]: use a set or just a list at the risk of having duplicates.
     roles: Set[ProviderRole] = DEFAULT_PROVIDER_ROLES
     url: Optional[HttpUrl] = None
 
@@ -204,6 +203,7 @@ class AssetConfig(BaseModel):
         if eo_bands:
             # TODO: Switch to EOExtension to add eo:bands in the correct way.
             #   Our content for eo:bands is not 100% standard: data_type belongs in raster:bands.
+            #   For the items we already use the EO extension, but we should do the same for STAC collection.
             properties["eo:bands"] = eo_bands
 
         if raster_bands:
@@ -221,12 +221,6 @@ class FileCollectorConfig(BaseModel):
 class AssetHrefModifierConfig(BaseModel):
     url_template: str
     data_root: str
-
-
-# TODO add config class for AlternateLinksGenerator and its descendants.
-#   Problem is that the AlternateLinksGenerator system could be simpler I think.
-#   However, having subclasses would make it easier to load the right
-#   implementation from a configuration.
 
 
 class AlternateHrefConfig(BaseModel):
