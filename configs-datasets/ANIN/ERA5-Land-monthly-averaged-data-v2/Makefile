@@ -220,9 +220,11 @@ show-config:
 	@echo "COLLECTION_CONFIG=$(COLLECTION_CONFIG)"
 	@echo "TIFF_INPUT_DIR=$(TIFF_INPUT_DIR)"
 	@echo "GLOB_PATTERN=$(GLOB_PATTERN)"
+	@echo "CATALOG_VERSION"=$(CATALOG_VERSION)"
 	@echo "TEST_OUTPUT_DIR=$(TEST_OUTPUT_DIR)"
 	@echo "TEST_OPENEO_DIR=$(TEST_OPENEO_DIR)"
 	@echo "PUBLISH_DIR=$(PUBLISH_DIR)"
+	@echo "OPENEO_BACKEND_URL=$(OPENEO_BACKEND_URL)"
 .PHONY: show-config
 
 
@@ -240,7 +242,7 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
-.PHONY: build_grouped_collections
+.PHONY: build-grouped-collections
 build-grouped-collections:
 ## Build the STAC collections, grouped per year
 	$(PYTHON) stacbuilder \
@@ -291,7 +293,6 @@ list-items:
 show-collection:
 ## Load and display the contents of the STAC collection file.
 	$(PYTHON) stacbuilder show-collection "$(TEST_OUTPUT_DIR)/collection.json"
-
 
 
 .PHONY: extract-item-bboxes

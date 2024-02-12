@@ -214,23 +214,12 @@ show-config:
 	@echo "COLLECTION_CONFIG=$(COLLECTION_CONFIG)"
 	@echo "TIFF_INPUT_DIR=$(TIFF_INPUT_DIR)"
 	@echo "GLOB_PATTERN=$(GLOB_PATTERN)"
+	@echo "CATALOG_VERSION"=$(CATALOG_VERSION)"
 	@echo "TEST_OUTPUT_DIR=$(TEST_OUTPUT_DIR)"
 	@echo "TEST_OPENEO_DIR=$(TEST_OPENEO_DIR)"
 	@echo "PUBLISH_DIR=$(PUBLISH_DIR)"
+	@echo "OPENEO_BACKEND_URL=$(OPENEO_BACKEND_URL)"
 .PHONY: show-config
-
-
-.PHONY: build-collection
-build-collection-old-pipeline:
-## Build the STAC collection
-	$(PYTHON) stacbuilder \
-		-v build-collection-old-pipeline \
-		-g "$(GLOB_PATTERN)" \
-		-c $(COLLECTION_CONFIG) \
-		--overwrite \
-		--max-files $(MAX_TIFF_FILES) \
-		$(TIFF_INPUT_DIR) \
-		$(TEST_OUTPUT_DIR)
 
 
 .PHONY: build-collection
@@ -246,7 +235,7 @@ build-collection:
 		$(TEST_OUTPUT_DIR)
 
 
-.PHONY: build_grouped_collections
+.PHONY: build-grouped-collections
 build-grouped-collections:
 ## Build the STAC collections, grouped per year
 	$(PYTHON) stacbuilder \
@@ -280,7 +269,6 @@ list-metadata:
 		$(TIFF_INPUT_DIR)
 
 
-
 .PHONY: list-items
 list-items:
 ## For each tiff file, show what the STAC Item looks like.
@@ -298,8 +286,13 @@ show-collection:
 ## Load and display the contents of the STAC collection file.
 	$(PYTHON) stacbuilder show-collection "$(TEST_OUTPUT_DIR)/collection.json"
 
-# 	--bbox='[3220000.0, 3950700.0, 3230000.0, 3960700.0]' \
-# 	--epsg=3035 \
+
+.PHONY: extract-item-bboxes
+extract-item-bboxes:
+## Load and display the contents of the STAC collection file.
+	$(PYTHON) stacbuilder extract-item-bboxes "$(TEST_OUTPUT_DIR)/collection.json"
+
+
 .PHONY: validate
 validate:
 ## Validate the contents of the STAC collection file.

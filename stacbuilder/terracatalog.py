@@ -155,6 +155,12 @@ class CollectionConfigBuilder:
         return asset_configs
 
     def guess_datatype(self, bit_per_value: int) -> str:
+        # TODO: need to add setting so we know if we should assume it is an int type or a a float type
+        #   While float types with less than 32 bits doe exist, they are not common.
+        #   Not sure if EO ever uses those, but they do exist in other industries
+        #   (for example it is commonly used in the EXR image format, but I haven't heard of any other examples)
+        #   So for 16 bits and less we could assume it must be an int.
+        #    For 32 and 64 bit it could be either float or int.
         return f"uint{bit_per_value}"
 
     def get_media_type(self) -> MediaType:
