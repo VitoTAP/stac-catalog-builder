@@ -48,5 +48,8 @@
                 }
             ]
         }
+    },
+    "overrides": {
+        "level_1/level_2": {"test_key": "test_value"}
     }
 }
