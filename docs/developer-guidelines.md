@@ -1,8 +1,10 @@
 # Software Development Guidelines
 
-The packaging is based on Hatch and Hatchling.
+We follow the same guidelines as openeo.org. But below we mention a few specific points to make them easier to find.
 
-[Hatch docs: https://hatch.pypa.io/](https://hatch.pypa.io/)
+[Openeo: Developers > Introduction: https://openeo.org/documentation/1.0/developers/](https://openeo.org/documentation/1.0/developers/)
+
+[Openeo: Software Developer Guidelines: https://openeo.org/documentation/software-guidelines.html](https://openeo.org/documentation/software-guidelines.html)
 
 ## pre-commit
 
@@ -16,13 +18,23 @@ Pre-commit automates the linting and formatting tools and makes sure they are ru
 pre-commit install
 ```
 
-## Build the Python wheel
+## Packaging and building the Python Wheel
+
+The packaging is based on Hatch and Hatchling.
+
+[Hatch docs: https://hatch.pypa.io/](https://hatch.pypa.io/)
 
 This commands builds the wheel, and also the source distribution.
 You can use the wheel to install the tool if you are not doing any development on it or if you want to containerize it.
 
 ```shell
 hatch build
+```
+
+Help about hatch
+
+```shell
+hatch --help
 ```
 
 ## Versioning
