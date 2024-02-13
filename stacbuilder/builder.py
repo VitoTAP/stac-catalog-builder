@@ -800,7 +800,6 @@ class AssetMetadataPipeline:
         else:
             self._collection_dir = self._output_base_dir
 
-        self._collection_dir = self._output_base_dir
         self._collection_builder = STACCollectionBuilder(
             collection_config=self._collection_config,
             overwrite=self._overwrite,

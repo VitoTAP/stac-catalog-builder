@@ -206,10 +206,16 @@ class TestGeoTiffPipeline:
         assert pipeline.collection_groups is not None
         assert pipeline.collection is None
 
+        # Verify that each collection is written to its own separate file. (i.e. all paths are unique)
+        collection_files = set(coll.self_href for coll in pipeline.collection_groups.values())
+        assert len(collection_files) == len(pipeline.collection_groups)
+
         for coll in pipeline.collection_groups.values():
+            # Each collection file must effectively exist.
             coll_path = Path(coll.self_href)
             coll_path.exists()
 
+            # Each collection must be valid.
             collection = Collection.from_file(coll_path)
             collection.validate_all()
 
