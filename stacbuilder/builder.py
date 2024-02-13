@@ -561,13 +561,13 @@ class STACCollectionBuilder:
 class PostProcessSTACCollectionFile:
     """Takes an existing STAC collection file and runs our common postprocessing steps
 
-    Currently this include 2 steps:
+    Until recently this includes 2 steps, but now it has been reduced to only applying the overrides:
 
-    # - Step 1) converting UTC timezones marked with TZ "Z" (AKA Zulu time)
-    #     to the notation with "+00:00" . This will be removed when the related GitHub issue is fixed:
-    #
-    #     See also https://github.com/Open-EO/openeo-geopyspark-driver/issues/568
-    #     TODO: Issue is fixed and removing this step is now planned: https://github.com/VitoTAP/stac-catalog-builder/issues/20
+    - Step 1) REMOVED converting UTC timezones marked with TZ "Z" (AKA Zulu time)
+        to the notation with "+00:00" . This will be removed when the related GitHub issue is fixed:
+
+        See also https://github.com/Open-EO/openeo-geopyspark-driver/issues/568
+        TODO: Issue is fixed and removing this step is now planned: https://github.com/VitoTAP/stac-catalog-builder/issues/20
 
     - Step 2) overriding specific key-value pairs in the collections's dictionary with fixed values that we want.
         This helps to set some values quickly when things don't quite work as expected.
@@ -585,73 +585,89 @@ class PostProcessSTACCollectionFile:
         return self._collection_overrides
 
     def process_collection(self, collection_file: Path, output_dir: Optional[Path] = None):
+        process_in_place = self.is_in_place_processing(collection_file, output_dir)
+
         if not self.collection_overrides:
             _logger.warning(
                 "There is nothing to postprocess because no collection overrides are specified in "
                 + "self.collection_overrides."
             )
+            # If this is postprocessing is performed in-place on the collection file then we don't need to apply any changes.
+            # But if an output_dir was specified we still need to copy the files to the new directory.
+            # (Unless output_dir actually points to where the collection is located)
+            if process_in_place:
+                # Nothing left to do.
+                return
 
-        out_dir: Path = output_dir or collection_file.parent
-        new_coll_file, _ = self._create_post_proc_directory_structure(collection_file, out_dir, copy_files=True)
-        self._override_collection_components(new_coll_file)
+        if not process_in_place:
+            self._create_post_proc_directory_structure(collection_file, output_dir, copy_files=True)
+
+        new_coll_file = self.get_converted_collection_path(collection_file, output_dir)
+        data = self._load_collection_as_dict(new_coll_file)
+        self._override_collection_components(data)
+        self._save_collection_as_dict(data, new_coll_file)
 
         # Check if the new file is still valid STAC.
         self._validate_collection(Collection.from_file(new_coll_file))
 
-    @classmethod
-    def _create_post_proc_directory_structure(
-        cls, collection_file: Path, output_dir: Optional[Path] = None, copy_files: bool = False
-    ):
-        in_place = False
-        if not output_dir:
-            in_place = True
-        elif output_dir.exists() and output_dir.samefile(collection_file.parent):
-            in_place = True
+    def is_in_place_processing(self, collection_file: Path, output_dir: Path) -> bool:
+        return not output_dir or (output_dir.exists() and collection_file.parent.samefile(output_dir))
 
-        item_paths = cls.get_item_paths_for_coll_file(collection_file)
-
-        if in_place:
-            converted_out_dir = collection_file.parent
-            collection_converted_file = collection_file
-            new_item_paths = item_paths
+    def get_converted_collection_path(self, collection_file, output_dir) -> Path:
+        if self.is_in_place_processing(collection_file, output_dir):
+            return collection_file
         else:
-            converted_out_dir = output_dir
-            collection_converted_file = output_dir / collection_file.name
+            return output_dir / collection_file.name
 
-            # Overwriting => remove and re-create the old directory
-            if converted_out_dir.exists():
-                shutil.rmtree(converted_out_dir)
+    def get_converted_item_paths(self, collection_file: Path, output_dir: Path):
+        item_paths = self.get_item_paths_for_coll_file(collection_file)
+        if self.is_in_place_processing(collection_file, output_dir):
+            return item_paths
 
-            # (re)create the entire directory structure
-            converted_out_dir.mkdir(parents=True)
-            relative_paths = [ip.relative_to(collection_file.parent) for ip in item_paths]
-            new_item_paths = [output_dir / rp for rp in relative_paths]
+        relative_paths = [ip.relative_to(collection_file.parent) for ip in item_paths]
+        return [output_dir / rp for rp in relative_paths]
 
-            sub_directories = set(p.parent for p in new_item_paths)
-            for sub_dir in sub_directories:
-                if not sub_dir.exists():
-                    sub_dir.mkdir(parents=True)
-
-            if copy_files:
-                shutil.copy2(collection_file, collection_converted_file)
-                for old_path, new_path in zip(item_paths, new_item_paths):
-                    shutil.copy2(old_path, new_path)
-
-        return collection_converted_file, new_item_paths
-
-    @staticmethod
-    def get_item_paths_for_collection(collection: Collection) -> List[Path]:
+    def get_item_paths_for_collection(self, collection: Collection) -> List[Path]:
         items = collection.get_all_items()
         return [Path(item.self_href) for item in items]
 
-    @classmethod
-    def get_item_paths_for_coll_file(cls, collection_file: Path) -> List[Path]:
+    def get_item_paths_for_coll_file(self, collection_file: Path) -> List[Path]:
         collection = Collection.from_file(collection_file)
-        return cls.get_item_paths_for_collection(collection)
+        return self.get_item_paths_for_collection(collection)
 
-    def _override_collection_components(self, collection_file: Path) -> None:
+    def _create_post_proc_directory_structure(
+        self, collection_file: Path, output_dir: Optional[Path] = None, copy_files: bool = False
+    ):
+        if self.is_in_place_processing(collection_file, output_dir):
+            raise InvalidOperation(
+                "Can not create identical directory structure when post-processing is executed in place."
+                + f"{collection_file=}, {output_dir=}"
+            )
+
+        # Overwriting => remove and re-create the old directory
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+        # Replicate the entire directory structure, so also the subfolders where items are grouped,
+        # as specified by the layout_strategy_item_template in CollectionConfig
+        output_dir.mkdir(parents=True)
+        new_item_paths = self.get_converted_item_paths(collection_file, output_dir)
+
+        sub_directories = set(p.parent for p in new_item_paths)
+        for sub_dir in sub_directories:
+            if not sub_dir.exists():
+                sub_dir.mkdir(parents=True)
+
+        # Also copy the relevant files if requested.
+        if copy_files:
+            collection_converted_file = self.get_converted_collection_path(collection_file, output_dir)
+            shutil.copy2(collection_file, collection_converted_file)
+            item_paths = self.get_item_paths_for_coll_file(collection_file)
+            for old_path, new_path in zip(item_paths, new_item_paths):
+                shutil.copy2(old_path, new_path)
+
+    def _override_collection_components(self, data: Dict[str, Any]) -> None:
         print("Overriding components of STAC collection that we want to give some fixed value ...")
-        data = self._load_collection_as_dict(collection_file)
         overrides = self.collection_overrides
 
         for key, new_value in overrides.items():
@@ -665,9 +681,8 @@ class PostProcessSTACCollectionFile:
                 sub_dict = sub_dict[sub_key]
             sub_dict[deepest_key] = new_value
 
-        self._save_collection_as_dict(data, collection_file)
-
-    def _validate_collection(self, collection: Collection):
+    @staticmethod
+    def _validate_collection(collection: Collection):
         """Run STAC validation on the collection."""
         try:
             num_items_validated = collection.validate_all(recursive=True)
