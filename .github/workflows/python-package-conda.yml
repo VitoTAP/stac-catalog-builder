@@ -25,5 +25,5 @@ jobs:
         auto-activate-base: false
     - name: Test with pytest
       run: |
-        conda list
+        conda activate stac-catalog-builder
         pytest
