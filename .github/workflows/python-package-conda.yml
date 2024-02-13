@@ -28,5 +28,5 @@ jobs:
         conda env update --file conda-environment.yaml
     - name: Test with pytest
       run: |
-        conda install pytest
+        pip install pytest
         pytest
