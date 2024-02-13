@@ -559,21 +559,21 @@ class STACCollectionBuilder:
 
 
 class PostProcessSTACCollectionFile:
-    """Takes an existing STAC collection file and runs our common postprocessing steps
+    """Takes an existing STAC collection file and runs optional postprocessing steps.
 
-    Until recently this includes 2 steps, but now it has been reduced to only applying the overrides:
+    Sometimes there are situations where we need to fix small things quickly, and the easiest way
+    is to do some post processing. For example overriding proj:bbox in at the collection level.
+    This is what the PostProcessSTACCollectionFile is for.
 
-    - Step 1) REMOVED converting UTC timezones marked with TZ "Z" (AKA Zulu time)
-        to the notation with "+00:00" . This will be removed when the related GitHub issue is fixed:
+    Most of this could be done by hand, but making it part of the pipeline and the configuration file
+    makes it reproducible, and easy to repeat.
 
-        See also https://github.com/Open-EO/openeo-geopyspark-driver/issues/568
-        TODO: Issue is fixed and removing this step is now planned: https://github.com/VitoTAP/stac-catalog-builder/issues/20
 
-    - Step 2) overriding specific key-value pairs in the collections's dictionary with fixed values that we want.
-        This helps to set some values quickly when things don't quite work as expected.
-        For example overriding proj:bbox in at the collection level.
+    Until recently processing included 2 steps, but now it has been reduced to one step, applying some simple overrides.
 
-        This is intended as a simple solution for situations where a quick result is needed and a bug fix may take too long.
+    These are specific key-value pairs in the JSON file, that we just fill in or overwrite
+    with fixed values, after generating the collection file.
+    These keys and values are read from the collection config file or CollectionConfig object.
     """
 
     def __init__(self, collection_overrides: Optional[Dict[str, Any]]) -> None:
@@ -588,7 +588,7 @@ class PostProcessSTACCollectionFile:
         process_in_place = self.is_in_place_processing(collection_file, output_dir)
 
         if not self.collection_overrides:
-            _logger.warning(
+            _logger.info(
                 "There is nothing to postprocess because no collection overrides are specified in "
                 + "self.collection_overrides."
             )
@@ -938,8 +938,8 @@ class AssetMetadataPipeline:
             self._collection_builder.build_collection(metadata_list)
             self._collection_groups[group] = self._collection_builder.collection
 
-            coll_file = self._collection_builder.collection_file
             post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+            coll_file = Path(self._collection_groups[group].self_href)
             post_processor.process_collection(coll_file)
 
 
