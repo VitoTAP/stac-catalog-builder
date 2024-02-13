@@ -168,7 +168,9 @@ class TestCommandAPI:
         assert "level_2" in collection_as_dict["level_1"]
         assert collection_as_dict["level_1"]["level_2"] == {"test_key": "test_value"}
 
-    def test_command_postprocess_collection_is_noop_when_no_overrides(self, data_dir, tmp_path, collection_config_file):
+    def test_command_postprocess_collection_only_copies_files_when_no_overrides(
+        self, data_dir, tmp_path, collection_config_file
+    ):
         """There are no overrides to apply but the files and directories should be copied to the new output directory.
         The collection filess should have identical contents.
         """
