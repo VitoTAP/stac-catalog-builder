@@ -77,7 +77,7 @@ class AlternateHrefGenerator:
         return self._callbacks[key](asset_metadata)
 
     def add_MEP(self):
-        self.register_callback("MEP", lambda asset_md: str(asset_md.asset_path))
+        self.register_callback("MEP", lambda asset_md: asset_md.asset_path.as_posix())
 
     def add_basic_S3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
         """Add a S3 with an S3 bucket and the asset's file path concatenated to that bucket.
@@ -103,7 +103,7 @@ class AlternateHrefGenerator:
 
     @classmethod
     def to_S3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
-        path = cls.remove_leading_trailing_slash(str(asset_md.asset_path))
+        path = cls.remove_leading_trailing_slash(asset_md.asset_path.as_posix())
         if s3_root_path:
             s3_url = f"s3://{s3_bucket}/{s3_root_path}/{path}"
         else:
@@ -462,7 +462,7 @@ class STACCollectionBuilder:
         layout_template = self._collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
 
-        output_dir_str = str(self.output_dir)
+        output_dir_str = self.output_dir.as_posix()
         if output_dir_str.endswith("/"):
             output_dir_str = output_dir_str[-1]
         self._collection.normalize_hrefs(output_dir_str, strategy=strategy)
