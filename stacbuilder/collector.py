@@ -259,9 +259,7 @@ class MapGeoTiffToAssetMetadata:
 
 
 class CreateAssetUrlFromPath:
-    """Implements stactools.core.io.ReadHrefModifier
-    TODO: VVVV is this class still used? Answer: Yes: this is the hrefmodifier that GeoTiffMetadataCollector needs.
-    """
+    """Implements stactools.core.io.ReadHrefModifier"""
 
     def __init__(self, href_template: str, data_root: Path) -> None:
         self.url_template = href_template
