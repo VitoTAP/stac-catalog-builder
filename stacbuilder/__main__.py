@@ -22,7 +22,7 @@ import pydantic.errors
 
 from stacbuilder import commandapi
 from stacbuilder.config import CollectionConfig
-from stacbuilder.verify_openeo import verify_in_openeo
+from stacbuilder import verify_openeo
 
 
 _logger = logging.getLogger(__name__)
@@ -334,7 +334,7 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
     print(f"CLI test_openeo:: {start_datetime=}")
     print(f"CLI test_openeo:: {end_datetime=}")
 
-    verify_in_openeo(
+    verify_openeo.verify_in_openeo(
         backend_url=backend_url,
         collection_path=collection_file,
         output_dir=out_dir,
@@ -346,6 +346,14 @@ def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_si
         dry_run=dry_run,
         verbose=verbose,
     )
+
+
+@cli.command
+@click.argument("job_id", type=str)
+@click.argument("output_dir", type=click.Path(dir_okay=True, file_okay=False, writable=True))
+def check_openeo_job(job_id: str):
+    """Check status of openeo job, and if it has finished download the files."""
+    verify_openeo.check_openeo_job(job_id=job_id, output_dir="tmp")
 
 
 #
