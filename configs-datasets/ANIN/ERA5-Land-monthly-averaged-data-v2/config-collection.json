@@ -17,15 +17,15 @@
             "url": "https://cds.climate.copernicus.eu/"
         }
     ],
-    "layout_strategy_item_template": "${collection}/${year}",
+    "layout_strategy_item_template": "${collection}/${year}/${month}/${day}",
     "input_path_parser": {
         "classname": "ERA5LandInputPathParser",
         "parameters": {
-            "regex_pattern": ".*/(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})_(?P<asset_type>[a-zA-Z0-9\\_]+)\\.tiff$"
+            "regex_pattern": ".*/(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})_(?P<asset_type>[a-zA-Z0-9\\_]+)\\.tif$"
         }
     },
     "item_assets": {
-        "10_metre_u_wind_component": {
+        "u10": {
             "title": "10m u-component of wind speed, monthly mean",
             "description": "Eastward component of the 10m wind. It is the horizontal speed of air moving towards the east, at a height of ten metres above the surface of the Earth, in metres per second. Care should be taken when comparing this variable with observations, because wind observations vary on small space and time scales and are affected by the local terrain, vegetation and buildings that are represented only on average in the ECMWF Integrated Forecasting System. This variable can be combined with the V component of 10m wind to give the speed and direction of the horizontal 10m wind. (m/s)",
             "eo_bands": [
@@ -42,7 +42,7 @@
                 }
             ]
         },
-        "10_metre_v_wind_component": {
+        "v10": {
             "title": "10m v-component of wind, monthly mean (m/s)",
             "description": "Northward component of the 10m wind. It is the horizontal speed of air moving towards the north, at a height of ten metres above the surface of the Earth, in metres per second. Care should be taken when comparing this variable with observations, because wind observations vary on small space and time scales and are affected by the local terrain, vegetation and buildings that are represented only on average in the ECMWF Integrated Forecasting System. This variable can be combined with the U component of 10m wind to give the speed and direction of the horizontal 10m wind. (m/s)",
             "eo_bands": [
@@ -60,7 +60,7 @@
                 }
             ]
         },
-        "2_metre_dewpoint_temperature": {
+        "d2m": {
             "title": "2m dewpoint temperature, monthly mean (Kelvin)",
             "description": "Mean dewpoint temperature at a height of 2 metres above the surface over the period 00h-24h local time. The dew point is the temperature to which air must be cooled to become saturated with water vapor. In combination with the air temperature it is used to assess relative humidity. (Kelvin)",
             "eo_bands": [
@@ -96,7 +96,7 @@
                 }
             ]
         },
-        "surface_pressure": {
+        "sp": {
             "title": "surface pressure, monthly mean (Pa)",
             "description": "Pressure (force per unit area) of the atmosphere on the surface of land, sea and in-land water. It is a measure of the weight of all the air in a column vertically above the area of the Earth's surface represented at a fixed point. Surface pressure is often used in combination with temperature to calculate air density. The strong variation of pressure with altitude makes it difficult to see the low and high pressure systems over mountainous areas, so mean sea level pressure, rather than surface pressure, is normally used for this purpose. The units of this variable are Pascals (Pa). Surface pressure is often measured in hPa and sometimes is presented in the old units of millibars, mb (1 hPa = 1 mb = 100 Pa). (Pa)",
             "eo_bands": [
@@ -114,7 +114,7 @@
                 }
             ]
         },
-        "surface_solar_radiation_downwards": {
+        "ssrd": {
             "title": "total precipitation (J / m^2) ",
             "description": "Amount of solar radiation (also known as shortwave radiation) reaching the surface of the Earth. This variable comprises both direct and diffuse solar radiation. Radiation from the Sun (solar, or shortwave, radiation) is partly reflected back to space by clouds and particles in the atmosphere (aerosols) and some of it is absorbed. The rest is incident on the Earth's surface (represented by this variable). To a reasonably good approximation, this variable is the model equivalent of what would be measured by a pyranometer (an instrument used for measuring solar radiation) at the surface. However, care should be taken when comparing model variables with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box and model time step. This variable is accumulated from the beginning of the for (J / m^2)",
             "eo_bands": [
@@ -132,7 +132,7 @@
                 }
             ]
         },
-        "total_precipitation": {
+        "tp": {
             "title": "total precipitation (m)",
             "description": "Accumulated liquid and frozen water, including rain and snow, that falls to the Earth's surface. It is the sum of large-scale precipitation (that precipitation which is generated by large-scale weather patterns, such as troughs and cold fronts) and convective precipitation (generated by convection which occurs when air at lower levels in the atmosphere is warmer and less dense than the air above, so it rises). Precipitation variables do not include fog, dew or the precipitation that evaporates in the atmosphere before it lands at the surface of the Earth. This variable is accumulated from the beginning of the forecast time to the end of the forecast step. The units of precipitation are depth in metres. It is the depth the water would have if it were spread evenly over the grid box. Care should be taken when comparing model variables with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box and model time step. (m)",
             "eo_bands": [

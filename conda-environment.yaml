@@ -16,6 +16,7 @@ dependencies:
   - stac-validator=3.3.*
   - stactools=0.5.*
   - ipykernel
+  - jupyter
   - pytest
   - pip
   - pip:
