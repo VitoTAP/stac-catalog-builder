@@ -379,12 +379,12 @@ class STACCollectionBuilder:
     """
 
     def __init__(
-            self, 
-            collection_config: CollectionConfig, 
-            output_dir: Path, 
-            overwrite: bool = False, 
-            root_dir : Optional[Path] = None
-        ) -> None:
+        self,
+        collection_config: CollectionConfig,
+        output_dir: Path,
+        overwrite: bool = False,
+        root_dir: Optional[Path] = None,
+    ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
 
@@ -419,7 +419,7 @@ class STACCollectionBuilder:
         (and the items as well, but those tend to be in subdirectories)
         """
         return self._output_dir
-    
+
     @property
     def root_dir(self) -> Path:
         """The root directory of the STAC collection.
@@ -452,14 +452,19 @@ class STACCollectionBuilder:
     def collection(self) -> Optional[Collection]:
         return self._collection
 
-    def build_collection(self, stac_items: Iterable[Item], root_collection: Optional[Collection] = None) -> None:
+    def build_collection(
+        self,
+        stac_items: Iterable[Item],
+        root_collection: Optional[Collection] = None,
+        group: Optional[str | int] = None,
+    ) -> None:
         """Create and save the STAC collection."""
         self.reset()
         self._stac_items = list(stac_items) or []
-        self.create_empty_collection(root_collection=root_collection)
+        self.create_empty_collection(root_collection=root_collection, group=group)
         self.add_items_to_collection()
         self.normalize_hrefs()
-        self.save_collection()
+        # self.save_collection()
 
         # We save before we validate, because when the validation fails we want
         # to be able to inspect the incorrect result.
@@ -481,7 +486,7 @@ class STACCollectionBuilder:
             self._collection.add_item(item)
 
         self._collection.update_extent_from_items()
-    
+
     def normalize_hrefs(self, skip_unresolved: bool = False):
         layout_template = self._collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
@@ -518,13 +523,22 @@ class STACCollectionBuilder:
     def providers(self):
         return [p.to_provider() for p in self._collection_config.providers]
 
-    def create_empty_collection(self, root_collection: Optional[Collection] = None,) -> None:
+    def create_empty_collection(
+        self, root_collection: Optional[Collection] = None, group: Optional[str | int] = None
+    ) -> None:
         """Creates a STAC Collection with no STAC items."""
-
         coll_config: CollectionConfig = self._collection_config
+
+        if group:
+            id = coll_config.collection_id + f"_{group}"
+            title = coll_config.title + f" {group}"
+        else:
+            id = coll_config.collection_id
+            title = coll_config.title
+
         collection = Collection(
-            id=coll_config.collection_id,
-            title=coll_config.title,
+            id=id,
+            title=title,
             description=coll_config.description,
             keywords=coll_config.keywords,
             providers=self.providers,
@@ -721,7 +735,6 @@ class PostProcessSTACCollectionFile:
                 print(f"Collection valid: number of items validated: {num_items_validated}")
                 return
         raise latest_exception
-        
 
     @staticmethod
     def _load_collection_as_dict(coll_file: Path) -> dict:
@@ -950,6 +963,7 @@ class AssetMetadataPipeline:
         self.reset()
 
         self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection_builder.save_collection()
         self._collection = self._collection_builder.collection
 
         coll_file = self._collection_builder.collection_file
@@ -964,7 +978,7 @@ class AssetMetadataPipeline:
 
         if not self.uses_collection_groups:
             raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
-        
+
         self._root_collection_builder = STACCollectionBuilder(
             collection_config=self._collection_config,
             overwrite=self._overwrite,
@@ -975,15 +989,20 @@ class AssetMetadataPipeline:
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
             self._setup_internals(group=group)
 
-            self._collection_builder.build_collection(metadata_list, self._root_collection_builder.collection)
+            self._collection_builder.build_collection(
+                stac_items=metadata_list, root_collection=self._root_collection_builder.collection, group=group
+            )
             self._collection_groups[group] = self._collection_builder.collection
 
-            post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        self._root_collection_builder.normalize_hrefs()
+        self._root_collection_builder.save_collection()
+
+        # post process
+        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        post_processor.process_collection(self._root_collection_builder.collection_file)
+        for group in self._collection_groups.keys():
             coll_file = Path(self._collection_groups[group].self_href)
             post_processor.process_collection(coll_file)
-        
-        self._root_collection_builder.normalize_hrefs(skip_unresolved=True)
-        self._root_collection_builder.save_collection()
 
 
 class GeoTiffPipeline:
