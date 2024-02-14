@@ -53,10 +53,13 @@ def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | 
 
 
 class CollectionConfigBuilder:
+    """Creates CollectionConfig objects from collection info we receive from terracatalogueclient."""
+
     def __init__(self, tcc_collection: tcc.Collection):
         self.tcc_collection = tcc_collection
 
     def get_collection_config(self) -> CollectionConfig:
+        """Create a CollectionConfig for the Current tcc collection."""
         coll = self.tcc_collection
         collection_id = coll.id
         title = coll.properties.get("title")
@@ -94,6 +97,16 @@ class CollectionConfigBuilder:
     def get_platforms(
         self,
     ) -> Optional[List[str]]:
+        """Get the platform or platforms
+
+        Mapping:
+        - Oscars: properties.acquisitionInformation.platform.platformShortName
+        - STAC Collection: platform (singular)
+            https://github.com/radiantearth/stac-spec/blob/master/item-spec/common-metadata.md#instrument
+            pystac: Item: item.common_metadata.platform
+
+        In case we have multiple platforms, we will concatenate them as a comma-separated list in the JSON representation.
+        """
         platforms = []
         acq_info = self.get_acquisition_info()
         for info in acq_info:
@@ -104,6 +117,14 @@ class CollectionConfigBuilder:
         return list(set(platforms))
 
     def get_instruments(self) -> Optional[List[str]]:
+        """Get the platform or platforms
+
+        Mapping:
+        - Oscars: properties.acquisitionInformation.instrument.instrumentShortName
+        - STAC Collection: instruments
+            https://github.com/radiantearth/stac-spec/blob/master/item-spec/common-metadata.md#instrument
+            pystac: Item: item.common_metadata.instruments
+        """
         instruments = []
         acq_info = self.get_acquisition_info()
         for info in acq_info:
@@ -114,18 +135,23 @@ class CollectionConfigBuilder:
         return list(set(instruments))
 
     def get_acquisition_info(self) -> Dict[str, Any]:
+        """Helper method to get acquisitionInformation property"""
         return self.tcc_collection.properties.get("acquisitionInformation", [])
 
     def get_product_info(self) -> Dict[str, Any]:
+        """Helper method to get productInformation property"""
         return self.tcc_collection.properties.get("productInformation", {})
 
-    def get_format(self) -> Optional[str]:
+    def get_file_format(self) -> Optional[str]:
+        """Get the file format, AKA the MediaType in pystac terms"""
         prod_info = self.get_product_info()
         return prod_info.get("format")
 
     def get_asset_config(self) -> List[AssetConfig]:
+        """Create an AssetConfig object from band band information in the current tcc.Collection"""
         media_type = self.get_media_type()
 
+        # TODO: eo:bands will also need the wavelength, from properties.acquisitionInformation.instrument.wavelengths.discreteWavelengths
         asset_configs = {}
         band_info = self.tcc_collection.properties.get("bands")
         for band in band_info:
@@ -155,6 +181,9 @@ class CollectionConfigBuilder:
         return asset_configs
 
     def guess_datatype(self, bit_per_value: int) -> str:
+        """We have to make an educated guess for datatype because is not clearly specified in the tcc.Collection.
+        To be improved
+        """
         # TODO: need to add setting so we know if we should assume it is an int type or a a float type
         #   While float types with less than 32 bits doe exist, they are not common.
         #   Not sure if EO ever uses those, but they do exist in other industries
@@ -164,7 +193,8 @@ class CollectionConfigBuilder:
         return f"uint{bit_per_value}"
 
     def get_media_type(self) -> MediaType:
-        format = self.get_format()
+        """Get the corresponding pystac MediaType value for the file type."""
+        format = self.get_file_format()
         media_type = None
         if format.lower() in ["geotif", "geotiff", "tiff"]:
             media_type = MediaType.GEOTIFF
@@ -173,10 +203,13 @@ class CollectionConfigBuilder:
         return media_type
 
     def get_product_types(self):
+        """List the product types that are available in this collection."""
         return self.get_product_info().get("productType")
 
 
 class HRLVPPMetadataCollector(IMetadataCollector):
+    """Collects AssetMetadata for further processing for the HRL VPP collections from OpenSearch."""
+
     def __init__(self):
         super().__init__()
 
@@ -204,6 +237,11 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
     @property
     def max_products(self) -> int:
+        """Set max_products to a value > 0 to process only that many products.
+
+        There are a large amount of products per collection (order of 10k)
+        This is a meant to help develop an troubleshoot with a lot less products.
+        """
         return self._max_products
 
     @max_products.setter
@@ -213,6 +251,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._max_products = int(value) if value else -1
 
     def collect(self):
+        """Collect and store the AssetMetadata objects."""
         if self.has_collected():
             _logger.info("Already collected data. Returning")
             return
@@ -224,20 +263,32 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._metadata_list = self._convert_to_asset_metadata(self._df_products)
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
+        """Get the terracatalogueclient's Catalogue to query data from."""
         config = CatalogueConfig.from_environment(CatalogueEnvironment.HRVPP)
         return tcc.Catalogue(config)
 
     def get_tcc_collections(self) -> List[tcc.Collection]:
+        """Get a list of available collections from the terracatalogueclient."""
         catalogue = self.get_tcc_catalogue()
         return list(catalogue.get_collections())
 
     def get_tcc_collection(self) -> tcc.Collection:
+        """Get the collection from the terracatalogueclient (tcc)
+
+        Note This is *not* a STAC/pystac collection, but a class from the terracatalogueclient.
+        """
         for coll in self.get_tcc_collections():
             if coll.id == self.collection_id:
                 return coll
         return None
 
     def get_collection_config(self) -> CollectionConfig:
+        """Build a CollectionConfig based on the collection info we receive from terracatalogueclient.
+
+        Most of the information can be retrieved from the terracatalogueclient,
+        and for these collections it may be a lot more work to set up a CollectionConfig by hand.
+        Fortunately we don't need to.
+        """
         tcc_collection = self.get_tcc_collection()
         if not tcc_collection:
             return None
@@ -246,6 +297,13 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         return self._cfg_builder.get_collection_config()
 
     def get_products_as_dataframe(self) -> gpd.GeoDataFrame:
+        """Collect the products / assets info from the terracatalogueclient, into a GeoDataframe,
+        and save the GeoDataframe to disk.
+
+        This allows us to retrieve all products first and then process them. This makes it easier
+        to group the products that belong to one STAC item, because we don't have much control
+        over what order we receive them.
+        """
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
         num_prods = catalogue.get_product_count(collection.id)
@@ -321,7 +379,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         return pd.concat(data_frames)
 
     @staticmethod
-    def _convert_to_asset_metadata(df: pd.DataFrame):
+    def _convert_to_asset_metadata(df: pd.DataFrame) -> List[AssetMetadata]:
+        """Convert the pandas dataframe to a list of AssetMetadata objects."""
         md_list = []
         for i in range(len(df)):
             record = df.iloc[i, :]
@@ -330,6 +389,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         return md_list
 
     def create_asset_metadata(self, product: tcc.Product) -> AssetMetadata:
+        """Create a AssetMetadata object containing all relevant info from the product in OpenSearch/terracatalogueclient"""
         props = product.properties
         data_links = props.get("links", {}).get("data", [])
         # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
@@ -435,6 +495,12 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
 
 def parse_tile_id(tile_id: str) -> Tuple[str, str]:
+    """Parse the tile ID into its easting and northing components.
+
+    The expected format is what we receive from OpenSearch.
+    For example: "E09N27"
+    """
+
     pos_N = tile_id.find("N")
     pos_S = tile_id.find("S")
     start_northing = None
@@ -449,7 +515,8 @@ def parse_tile_id(tile_id: str) -> Tuple[str, str]:
     return (northing, easting)
 
 
-def main():
+def display_collection_configs():
+    """Just a small test function to show the CollectionConfig for each collection in HRL VPP"""
     collector = HRLVPPMetadataCollector()
 
     for coll in collector.get_tcc_collections():
@@ -462,4 +529,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    display_collection_configs()
