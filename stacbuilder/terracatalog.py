@@ -100,7 +100,7 @@ class CollectionConfigBuilder:
         """Get the platform or platforms
 
         Mapping:
-        - Oscars: properties.acquisitionInformation.platform.platformShortName
+        - terracatalogueclient: properties.acquisitionInformation.platform.platformShortName
         - STAC Collection: platform (singular)
             https://github.com/radiantearth/stac-spec/blob/master/item-spec/common-metadata.md#instrument
             pystac: Item: item.common_metadata.platform
@@ -120,7 +120,7 @@ class CollectionConfigBuilder:
         """Get the platform or platforms
 
         Mapping:
-        - Oscars: properties.acquisitionInformation.instrument.instrumentShortName
+        - terracatalogueclient: properties.acquisitionInformation.instrument.instrumentShortName
         - STAC Collection: instruments
             https://github.com/radiantearth/stac-spec/blob/master/item-spec/common-metadata.md#instrument
             pystac: Item: item.common_metadata.instruments
