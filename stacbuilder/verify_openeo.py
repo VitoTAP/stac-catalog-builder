@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import openeo
 from openeo.rest.datacube import DataCube
 from openeo.util import rfc3339
-from openeo.rest.job import BatchJob, JobFailedException
+from openeo.rest.job import BatchJob, JobFailedException, JobResults
 
 
 import pystac
@@ -397,14 +397,16 @@ def verify_in_openeo(
     else:
         print(job.get_results_metadata_url())
 
-        out_path = job.download_results(output_dir)
-        print(f"{out_path=}")
+        job_results: JobResults = job.get_results()
+        print(f"Saving job results to {output_dir=}")
+        job_results.download_files(target=output_dir)
+
         get_logs(job, job_log_file)
 
-    print("DONE")
+    print("\nDONE\n")
 
 
-def check_job(
+def check_openeo_job(
     job_id: str,
     output_dir: Union[str, Path],
     backend_url: Optional[str] = None,
@@ -414,25 +416,27 @@ def check_job(
     connection = connect(backend_url)
 
     output_dir = Path(output_dir)
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True)
+
     job_log_file = output_dir / "job-logs.json"
 
     if job_id:
-        job = connection.job(job_id=job_id)
+        job: BatchJob = connection.job(job_id=job_id)
         print(f"=== job_id: {job_id}")
         print(f"Job status: {job.status()}")
         get_logs(job, job_log_file)
 
         if job.status() == "finished":
-            out_path = job.download_results(output_dir)
-            print(f"{out_path=}")
+            job_results: JobResults = job.get_results()
+            out_file_paths = job_results.download_files(target=output_dir)
+
+            print("Downloaded files:")
+            for p in out_file_paths:
+                print(p)
 
 
 def get_logs(job: BatchJob, job_log_file: Optional[Path] = None) -> None:
-    # print("=== logs ===")
-    # for record in job.logs():
-    #     print(record)
-    # print("=== === ===")
-
     if job_log_file:
         with open(job_log_file, "wt", encoding="utf8") as f_log:
             json.dump(job.logs(), f_log, indent=2)

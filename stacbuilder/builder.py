@@ -259,6 +259,8 @@ class MapMetadataToSTACItem:
             item_eo = EOExtension.ext(item, add_if_missing=True)
             eo_bands = []
 
+            # TODO: detect if the band is an Electro-Optical one.
+            # TODO: https://github.com/VitoTAP/stac-catalog-builder/issues/29 set band's common_name property if common band, and wavelenght info when available
             for band_cfg in asset_config.eo_bands:
                 new_band: EOBand = EOBand.create(
                     name=band_cfg.name,
@@ -546,6 +548,9 @@ class STACCollectionBuilder:
             # summaries=constants.SUMMARIES,
         )
         # TODO: Add support for summaries: https://github.com/VitoTAP/stac-catalog-builder/issues/18
+        #   Summaries should, among other things, contain the platforms, instruments and mission, when available.
+        #   In STAC these are singular but in fact there can be multiple.
+        #   If there are multiple values we encode it as a string containing comma-separated values.
 
         item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
         item_assets_ext.item_assets = self._get_item_assets_definitions()
