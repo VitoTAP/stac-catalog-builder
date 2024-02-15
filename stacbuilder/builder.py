@@ -5,6 +5,7 @@ This contains the classes that generate the STAC catalogs, collections and items
 
 # Standard libraries
 import datetime as dt
+from http.client import RemoteDisconnected
 import json
 import logging
 import shutil
@@ -443,21 +444,13 @@ class STACCollectionBuilder:
     def build_collection(
         self,
         stac_items: Iterable[Item],
-        # root_collection: Optional[Collection] = None,
         group: Optional[str | int] = None,
     ) -> None:
         """Create and save the STAC collection."""
-        # TODO: vvvv remove comments
         self.reset()
         self._stac_items = list(stac_items) or []
         self.create_empty_collection(group=group)
         self.add_items_to_collection()
-        # self.normalize_hrefs()
-        # self.save_collection()
-
-        # We save before we validate, because when the validation fails we want
-        # to be able to inspect the incorrect result.
-        # self.validate_collection(self.collection)
 
     def add_items_to_collection(
         self,
@@ -480,10 +473,10 @@ class STACCollectionBuilder:
         layout_template = self._collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
 
-        root_dir_str = self.root_dir.as_posix()
-        if root_dir_str.endswith("/"):
-            root_dir_str = root_dir_str[-1]
-        self._collection.normalize_hrefs(root_href=root_dir_str, strategy=strategy, skip_unresolved=skip_unresolved)
+        out_dir_str = self.output_dir.as_posix()
+        if out_dir_str.endswith("/"):
+            out_dir_str = out_dir_str[-1]
+        self._collection.normalize_hrefs(root_href=out_dir_str, strategy=strategy, skip_unresolved=skip_unresolved)
 
     def validate_collection(self, collection: Collection):
         """Run STAC validation on the collection."""
@@ -492,6 +485,8 @@ class STACCollectionBuilder:
         except STACValidationError as exc:
             print(exc)
             raise
+        except RemoteDisconnected:
+            print("Skipped this step validation due to RemoteDisconnected.")
         else:
             print(f"Collection valid: number of items validated: {num_items_validated}")
 
@@ -695,7 +690,6 @@ class PostProcessSTACCollectionFile:
                 shutil.copy2(old_path, new_path)
 
     def _override_collection_components(self, data: Dict[str, Any]) -> None:
-        # print("Overriding components of STAC collection that we want to give some fixed value ...")
         overrides = self.collection_overrides
 
         for key, new_value in overrides.items():
@@ -711,18 +705,19 @@ class PostProcessSTACCollectionFile:
 
     @staticmethod
     def _validate_collection(collection: Collection):
-        """Run STAC validation on the collection."""
-        latest_exception = None
-        for i in range(5):
-            try:
-                num_items_validated = collection.validate_all(recursive=True)
-            except STACValidationError as exc:
-                print(exc)
-                latest_exception = exc
-            else:
-                print(f"Collection valid: number of items validated: {num_items_validated}")
-                return
-        raise latest_exception
+        """Run STAC validation on the collection.
+        TODO: remove this function, it is not used.
+        """
+        try:
+            num_items_validated = collection.validate_all(recursive=True)
+        except STACValidationError as exc:
+            print(exc)
+            raise exc
+        except RemoteDisconnected:
+            # print(exc)
+            print("Skipped this step validation due to RemoteDisconnected.")
+        else:
+            print(f"Collection valid: number of items validated: {num_items_validated}")
 
     @staticmethod
     def _load_collection_as_dict(coll_file: Path) -> dict:
@@ -909,7 +904,11 @@ class AssetMetadataPipeline:
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
-                stac_item.validate()
+                try:
+                    stac_item.validate()
+                except RemoteDisconnected:
+                    # print(exc)
+                    print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
                 yield stac_item
 
     # TODO: [simplify] [refactor] Merge this into collect_stac_items once it works well and it has tests.
@@ -948,6 +947,7 @@ class AssetMetadataPipeline:
         self.reset()
 
         self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection_builder.normalize_hrefs()
         self._collection_builder.save_collection()
         self._collection = self._collection_builder.collection
 
