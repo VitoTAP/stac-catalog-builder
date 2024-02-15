@@ -385,7 +385,6 @@ class STACCollectionBuilder:
         collection_config: CollectionConfig,
         output_dir: Path,
         overwrite: bool = False,
-        root_dir: Optional[Path] = None,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
@@ -396,11 +395,6 @@ class STACCollectionBuilder:
                 + f"{output_dir=!r}"
             )
         self._output_dir = Path(output_dir)
-
-        if not root_dir:
-            self._root_dir = self._output_dir
-        else:
-            self._root_dir = Path(root_dir)
 
         self._overwrite_output = overwrite
 
@@ -421,14 +415,6 @@ class STACCollectionBuilder:
         (and the items as well, but those tend to be in subdirectories)
         """
         return self._output_dir
-
-    @property
-    def root_dir(self) -> Path:
-        """The root directory of the STAC collection.
-
-        This is the directory where the root collection.json file will be saved.
-        """
-        return self._root_dir
 
     @output_dir.setter
     def output_dir(self, directory: Path) -> None:
@@ -457,15 +443,16 @@ class STACCollectionBuilder:
     def build_collection(
         self,
         stac_items: Iterable[Item],
-        root_collection: Optional[Collection] = None,
+        # root_collection: Optional[Collection] = None,
         group: Optional[str | int] = None,
     ) -> None:
         """Create and save the STAC collection."""
+        # TODO: vvvv remove comments
         self.reset()
         self._stac_items = list(stac_items) or []
-        self.create_empty_collection(root_collection=root_collection, group=group)
+        self.create_empty_collection(group=group)
         self.add_items_to_collection()
-        self.normalize_hrefs()
+        # self.normalize_hrefs()
         # self.save_collection()
 
         # We save before we validate, because when the validation fails we want
@@ -525,9 +512,7 @@ class STACCollectionBuilder:
     def providers(self):
         return [p.to_provider() for p in self._collection_config.providers]
 
-    def create_empty_collection(
-        self, root_collection: Optional[Collection] = None, group: Optional[str | int] = None
-    ) -> None:
+    def create_empty_collection(self, group: Optional[str | int] = None) -> None:
         """Creates a STAC Collection with no STAC items."""
         coll_config: CollectionConfig = self._collection_config
 
@@ -565,8 +550,6 @@ class STACCollectionBuilder:
         ##         constants.PROJECT_WEBSITE,
         ##     ]
         ## )
-        if root_collection:
-            root_collection.add_child(collection)
 
         self._collection = collection
 
@@ -805,7 +788,6 @@ class AssetMetadataPipeline:
         collection_config: CollectionConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
-        root_dir: Optional[Path] = None,
     ) -> None:
         """Set up an existing instance using the specified dependencies and configuration settings."""
 
@@ -824,7 +806,6 @@ class AssetMetadataPipeline:
         self._collection_config = collection_config
         self._output_base_dir = self._get_output_dir_or_default(output_dir)
         self._overwrite = overwrite
-        self._root_dir = root_dir
 
         self._setup_internals()
 
@@ -855,7 +836,6 @@ class AssetMetadataPipeline:
             collection_config=self._collection_config,
             overwrite=self._overwrite,
             output_dir=self._collection_dir,
-            root_dir=self._root_dir,
         )
 
     @property
@@ -994,12 +974,12 @@ class AssetMetadataPipeline:
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
             self._setup_internals(group=group)
 
-            self._collection_builder.build_collection(
-                stac_items=metadata_list, root_collection=self._root_collection_builder.collection, group=group
-            )
+            self._collection_builder.build_collection(stac_items=metadata_list, group=group)
+            self._root_collection_builder.collection.add_child(self._collection_builder.collection)
             self._collection_groups[group] = self._collection_builder.collection
 
         self._root_collection_builder.normalize_hrefs()
+        self._root_collection_builder.collection.update_extent_from_items()
         self._root_collection_builder.save_collection()
 
         # post process
