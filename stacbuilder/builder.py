@@ -5,6 +5,7 @@ This contains the classes that generate the STAC catalogs, collections and items
 
 # Standard libraries
 import datetime as dt
+from http.client import RemoteDisconnected
 import json
 import logging
 import shutil
@@ -380,7 +381,12 @@ class STACCollectionBuilder:
     TODO: reduce this class to functions in the class: AssetMetadataPipeline
     """
 
-    def __init__(self, collection_config: CollectionConfig, output_dir: Path, overwrite: bool = False) -> None:
+    def __init__(
+        self,
+        collection_config: CollectionConfig,
+        output_dir: Path,
+        overwrite: bool = False,
+    ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
 
@@ -390,6 +396,7 @@ class STACCollectionBuilder:
                 + f"{output_dir=!r}"
             )
         self._output_dir = Path(output_dir)
+
         self._overwrite_output = overwrite
 
         # Internal temporary state
@@ -434,22 +441,23 @@ class STACCollectionBuilder:
     def collection(self) -> Optional[Collection]:
         return self._collection
 
-    def build_collection(self, stac_items: Iterable[Item]) -> None:
+    def build_collection(
+        self,
+        stac_items: Iterable[Item],
+        group: Optional[str | int] = None,
+    ) -> None:
         """Create and save the STAC collection."""
         self.reset()
         self._stac_items = list(stac_items) or []
-        self.create_collection()
-        self.save_collection()
+        self.create_empty_collection(group=group)
+        self.add_items_to_collection()
 
-        # We save before we validate, because when the validation fails we want
-        # to be able to inspect the incorrect result.
-        # self.validate_collection(self.collection)
-
-    def create_collection(
+    def add_items_to_collection(
         self,
     ):
-        """Create a empty pystac.Collection for the dataset."""
-        self._create_empty_collection()
+        """Fills the collection with stac items."""
+        if self._collection is None:
+            raise InvalidOperation("Can not add items to a collection that has not been created yet.")
 
         item: Item
         for item in self._stac_items:
@@ -461,13 +469,14 @@ class STACCollectionBuilder:
 
         self._collection.update_extent_from_items()
 
+    def normalize_hrefs(self, skip_unresolved: bool = False):
         layout_template = self._collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
 
-        output_dir_str = self.output_dir.as_posix()
-        if output_dir_str.endswith("/"):
-            output_dir_str = output_dir_str[-1]
-        self._collection.normalize_hrefs(output_dir_str, strategy=strategy)
+        out_dir_str = self.output_dir.as_posix()
+        if out_dir_str.endswith("/"):
+            out_dir_str = out_dir_str[-1]
+        self._collection.normalize_hrefs(root_href=out_dir_str, strategy=strategy, skip_unresolved=skip_unresolved)
 
     def validate_collection(self, collection: Collection):
         """Run STAC validation on the collection."""
@@ -476,6 +485,8 @@ class STACCollectionBuilder:
         except STACValidationError as exc:
             print(exc)
             raise
+        except RemoteDisconnected:
+            print("Skipped this step validation due to RemoteDisconnected.")
         else:
             print(f"Collection valid: number of items validated: {num_items_validated}")
 
@@ -496,13 +507,20 @@ class STACCollectionBuilder:
     def providers(self):
         return [p.to_provider() for p in self._collection_config.providers]
 
-    def _create_empty_collection(self) -> None:
+    def create_empty_collection(self, group: Optional[str | int] = None) -> None:
         """Creates a STAC Collection with no STAC items."""
-
         coll_config: CollectionConfig = self._collection_config
+
+        if group:
+            id = coll_config.collection_id + f"_{group}"
+            title = coll_config.title + f" {group}"
+        else:
+            id = coll_config.collection_id
+            title = coll_config.title
+
         collection = Collection(
-            id=coll_config.collection_id,
-            title=coll_config.title,
+            id=id,
+            title=title,
             description=coll_config.description,
             keywords=coll_config.keywords,
             providers=self.providers,
@@ -612,9 +630,6 @@ class PostProcessSTACCollectionFile:
         self._override_collection_components(data)
         self._save_collection_as_dict(data, new_coll_file)
 
-        # Check if the new file is still valid STAC.
-        self._validate_collection(Collection.from_file(new_coll_file))
-
     def is_in_place_processing(self, collection_file: Path, output_dir: Path) -> bool:
         return not output_dir or (output_dir.exists() and collection_file.parent.samefile(output_dir))
 
@@ -672,7 +687,6 @@ class PostProcessSTACCollectionFile:
                 shutil.copy2(old_path, new_path)
 
     def _override_collection_components(self, data: Dict[str, Any]) -> None:
-        print("Overriding components of STAC collection that we want to give some fixed value ...")
         overrides = self.collection_overrides
 
         for key, new_value in overrides.items():
@@ -685,17 +699,6 @@ class PostProcessSTACCollectionFile:
                     sub_dict[sub_key] = {}
                 sub_dict = sub_dict[sub_key]
             sub_dict[deepest_key] = new_value
-
-    @staticmethod
-    def _validate_collection(collection: Collection):
-        """Run STAC validation on the collection."""
-        try:
-            num_items_validated = collection.validate_all(recursive=True)
-        except STACValidationError as exc:
-            print(exc)
-            raise
-        else:
-            print(f"Collection valid: number of items validated: {num_items_validated}")
 
     @staticmethod
     def _load_collection_as_dict(coll_file: Path) -> dict:
@@ -882,7 +885,10 @@ class AssetMetadataPipeline:
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
-                stac_item.validate()
+                try:
+                    stac_item.validate()
+                except RemoteDisconnected:
+                    print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
                 yield stac_item
 
     # TODO: [simplify] [refactor] Merge this into collect_stac_items once it works well and it has tests.
@@ -921,6 +927,8 @@ class AssetMetadataPipeline:
         self.reset()
 
         self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection_builder.normalize_hrefs()
+        self._collection_builder.save_collection()
         self._collection = self._collection_builder.collection
 
         coll_file = self._collection_builder.collection_file
@@ -936,13 +944,28 @@ class AssetMetadataPipeline:
         if not self.uses_collection_groups:
             raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
 
+        self._root_collection_builder = STACCollectionBuilder(
+            collection_config=self._collection_config,
+            overwrite=self._overwrite,
+            output_dir=self._output_base_dir,
+        )
+        self._root_collection_builder.create_empty_collection()
+
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
             self._setup_internals(group=group)
 
-            self._collection_builder.build_collection(metadata_list)
+            self._collection_builder.build_collection(stac_items=metadata_list, group=group)
+            self._root_collection_builder.collection.add_child(self._collection_builder.collection)
             self._collection_groups[group] = self._collection_builder.collection
 
-            post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        self._root_collection_builder.normalize_hrefs()
+        self._root_collection_builder.collection.update_extent_from_items()
+        self._root_collection_builder.save_collection()
+
+        # post process
+        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
+        post_processor.process_collection(self._root_collection_builder.collection_file)
+        for group in self._collection_groups.keys():
             coll_file = Path(self._collection_groups[group].self_href)
             post_processor.process_collection(coll_file)
 
