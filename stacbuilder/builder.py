@@ -630,9 +630,6 @@ class PostProcessSTACCollectionFile:
         self._override_collection_components(data)
         self._save_collection_as_dict(data, new_coll_file)
 
-        # Check if the new file is still valid STAC.
-        # self._validate_collection(Collection.from_file(new_coll_file))
-
     def is_in_place_processing(self, collection_file: Path, output_dir: Path) -> bool:
         return not output_dir or (output_dir.exists() and collection_file.parent.samefile(output_dir))
 
@@ -714,7 +711,6 @@ class PostProcessSTACCollectionFile:
             print(exc)
             raise exc
         except RemoteDisconnected:
-            # print(exc)
             print("Skipped this step validation due to RemoteDisconnected.")
         else:
             print(f"Collection valid: number of items validated: {num_items_validated}")
@@ -907,7 +903,6 @@ class AssetMetadataPipeline:
                 try:
                     stac_item.validate()
                 except RemoteDisconnected:
-                    # print(exc)
                     print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
                 yield stac_item
 
