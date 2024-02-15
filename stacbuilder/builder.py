@@ -701,21 +701,6 @@ class PostProcessSTACCollectionFile:
             sub_dict[deepest_key] = new_value
 
     @staticmethod
-    def _validate_collection(collection: Collection):
-        """Run STAC validation on the collection.
-        TODO: remove this function, it is not used.
-        """
-        try:
-            num_items_validated = collection.validate_all(recursive=True)
-        except STACValidationError as exc:
-            print(exc)
-            raise exc
-        except RemoteDisconnected:
-            print("Skipped this step validation due to RemoteDisconnected.")
-        else:
-            print(f"Collection valid: number of items validated: {num_items_validated}")
-
-    @staticmethod
     def _load_collection_as_dict(coll_file: Path) -> dict:
         with open(coll_file, "r") as f_in:
             return json.load(f_in)
