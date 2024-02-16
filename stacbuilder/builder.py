@@ -180,10 +180,7 @@ class MapMetadataToSTACItem:
 
         known_assets = [a for a in assets if is_known_asset_type(a)]
         if not known_assets:
-            error_msg = (
-                "None of the assets in 'assets' is a known item type, not defined in collection configuration: "
-                + f"{assets}, returning item=None"
-            )
+            error_msg = "None of the assets in 'assets' is a known item type, not defined in collection configuration."
             _logger.warning(error_msg)
             return None
 
