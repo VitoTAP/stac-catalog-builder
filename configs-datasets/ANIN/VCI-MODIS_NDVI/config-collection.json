@@ -17,7 +17,7 @@
             "url": "https://www.vito.be/"
         }
     ],
-    "layout_strategy_item_template": "${collection}/{year}",
+    "layout_strategy_item_template": "${collection}",
     "input_path_parser": {
         "classname": "GeneralInputPathParser",
         "parameters": {
