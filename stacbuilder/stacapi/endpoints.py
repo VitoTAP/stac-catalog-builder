@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List
 
 from pystac import Collection, Item, ItemCollection
@@ -12,19 +13,39 @@ from requests.auth import AuthBase
 _logger = logging.Logger(__name__)
 
 
+_EXPECTED_STATUS_GET = [200]
+_EXPECTED_STATUS_POST = [201, 202]
+_EXPECTED_STATUS_PUT = [200, 202, 204]
+_EXPECTED_STATUS_DELETE = _EXPECTED_STATUS_PUT
+
+
+def _check_response_status(response, expected_status_codes=[200, 202, 204]):
+    response.raise_for_status()
+    if response.status_code not in expected_status_codes:
+        _logger.warning(
+            f"Expecting HTTP status to be any of {expected_status_codes} "
+            + f"but received {response.status_code!r}, response body:\n{response.text}"
+        )
+
+
 class CollectionsEndpoint:
     def __init__(self, stac_api_url: URL, auth: AuthBase | None) -> None:
         self._stac_api_url = URL(stac_api_url)
-        self._endpoint_url = self._stac_api_url / "collections"
+        self._collections_url = self._stac_api_url / "collections"
         self._auth = auth or None
 
     @property
-    def endpoint_url(self) -> URL:
-        return self._endpoint_url
+    def stac_api_url(self) -> URL:
+        return self._stac_api_url
+
+    @property
+    def collections_url(self) -> URL:
+        return self._collections_url
 
     def get_all(self) -> List[Collection]:
-        response = requests.get(self.endpoint_url)
-        response.raise_for_status()
+        response = requests.get(self.collections_url, auth=self._auth)
+
+        _check_response_status(response, _EXPECTED_STATUS_GET)
         data = response.json()
         if not isinstance(data, dict):
             raise Exception(f"Expected a dict in the JSON body but received type {type(data)}, value={data!r}")
@@ -34,54 +55,40 @@ class CollectionsEndpoint:
         if not collection_id:
             raise ValueError(f'Argument "collection_id" must have a value of type str. {collection_id=!r}')
 
-        response = requests.get(self.endpoint_url / str(collection_id))
-        response.raise_for_status()
-        if not response.status_code == 200:
-            _logger.warning(
-                f"Expecting HTTP status 200 but received {response.status_code!r}, response body:\n{response.text}"
-            )
+        response = requests.get(self.collections_url / str(collection_id), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_GET)
         return Collection.from_dict(response.json())
 
     def exists(self, collection_id: str) -> bool:
-        response = requests.get(self.endpoint_url / str(collection_id))
+        response = requests.get(self.collections_url / str(collection_id), auth=self._auth)
 
         # We do expect HTTP 404 when it doesn't exist.
         # Any other error status means there is an actual problem.
         if response.status_code == 404:
             return False
-        response.raise_for_status()
+        _check_response_status(response, _EXPECTED_STATUS_GET)
         return True
 
     def create(self, collection: Collection):
         collection.validate()
-        response = requests.post(self.endpoint_url, json=collection.to_dict())
-        response.raise_for_status()
-        if not response.status_code == 201:
-            _logger.warning(
-                f"Expecting HTTP status 201 but received {response.status_code!r}, response body:\n{response.text}"
-            )
+        response = requests.post(self.collections_url, json=collection.to_dict(), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
     def update(self, collection: Collection):
         collection.validate()
-        response = requests.put(self.endpoint_url, json=collection.to_dict())
-        response.raise_for_status()
-        # TODO what is the expected HTTP status code for updated?
-        expected_status_codes = [200, 204]
-        if response.status_code not in expected_status_codes:
-            _logger.warning(
-                f"Expecting HTTP status to be any of {expected_status_codes} "
-                + f"but received {response.status_code!r}, response body:\n{response.text}"
-            )
+        response = requests.put(self.collections_url, json=collection.to_dict(), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_PUT)
         return response.json()
 
     def delete(self, collection: Collection):
         collection.validate()
-        response = requests.delete(self.endpoint_url, json=collection.to_dict())
-        response.raise_for_status()
+        response = requests.delete(self.collections_url, json=collection.to_dict(), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_DELETE)
         return response.json()
 
     def create_or_update(self, collection: Collection):
+        # TODO: decide: Another strategy could be to handle HTTP 409 conflict and the fall back to a self.update / PUT request
         if self.exists(collection.id):
             self.update(collection)
         else:
@@ -115,28 +122,31 @@ class ItemsEndpoint:
         return self.get_items_url_for_id(item.collection_id, item.id)
 
     def get_all(self, collection_id) -> ItemCollection:
-        response = requests.get(self.get_items_url(collection_id))
+        url = self.get_items_url(collection_id)
+        response = requests.get(url, auth=self._auth)
         response.raise_for_status()
+        _check_response_status(response, _EXPECTED_STATUS_GET)
         data = response.json()
-        # TODO: decide, Do we need to be strict about the expected HTTP status? For now this just logs a warning.
         if not isinstance(data, dict):
             raise Exception(f"Expected a dict in the JSON body but received type {type(data)}, value={data!r}")
 
         return ItemCollection.from_dict(data)
 
     def get(self, collection_id: str, item_id: str) -> Item:
-        response = requests.get(self.get_items_url_for_id(collection_id, item_id))
-        response.raise_for_status()
+        url = self.get_items_url_for_id(collection_id, item_id)
+        response = requests.get(url, auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_GET)
         return Item.from_dict(response.json())
 
     def exists_by_id(self, collection_id: str, item_id: str) -> bool:
-        response = requests.get(self.get_items_url_for_id(collection_id, item_id))
+        url = self.get_items_url_for_id(collection_id, item_id)
+        response = requests.get(url, auth=self._auth)
 
         # We do expect HTTP 404 when it doesn't exist.
         # Any other error status means there is an actual problem.
         if response.status_code == 404:
             return False
-        response.raise_for_status()
+        _check_response_status(response, _EXPECTED_STATUS_GET)
         return True
 
     def exists(self, item: Item) -> bool:
@@ -144,20 +154,16 @@ class ItemsEndpoint:
 
     def create(self, item: Item):
         item.validate()
-        response = requests.post(self.get_items_url(item.collection_id), item.to_dict())
-        response.raise_for_status()
-        if not response.status_code == 201:
-            # TODO: decide, Do we need to be strict about the expectes HTTP status? For now this just logs a warning.
-            _logger.warning(
-                f"Expecting HTTP status 201 but received {response.status_code!r}, response body:\n{response.text}"
-            )
+        url = self.get_items_url(item.collection_id)
+        response = requests.post(url, json=item.to_dict(), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
     def update(self, item: Item):
         item.validate()
-        response = requests.put(self.get_items_url(item.collection_id), item.to_dict())
-        response.raise_for_status()
-        # TODO: should we log a warning when the HTTP status code is not one of the specific 2xx codes?
+        url = self.get_items_url_for_id(item.collection_id, item.id)
+        response = requests.put(url, json=item.to_dict(), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_PUT)
         return response.json()
 
     def create_or_update(self, item: Item):
@@ -167,9 +173,31 @@ class ItemsEndpoint:
             self.create(item)
 
     def delete_by_id(self, collection_id: str, item_id: str) -> bool:
-        response = requests.delete(self.get_items_url_for_id(collection_id, item_id))
-        response.raise_for_status()
+        url = self.get_items_url_for_id(collection_id, item_id)
+        response = requests.delete(url, auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_DELETE)
         return response.json()
 
     def delete_item(self, item: Item) -> bool:
         return self.delete_by_id(item.collection_id, item.id)
+
+
+class Ingestor:
+    def __init__(self, stac_api_url: URL, auth: AuthBase | None) -> None:
+        self._stac_api_url = URL(stac_api_url)
+        self._auth = auth or None
+        self._collections_endpoint = CollectionsEndpoint(stac_api_url=self._stac_api_url, auth=self._auth)
+        self._items_endpoint = ItemsEndpoint(stac_api_url=self._stac_api_url, auth=self._auth)
+
+    def ingest_collection(self, path_collection: Path):
+        collection = Collection.from_file(path_collection)
+        collection.validate()
+        self._collections_endpoint.create_or_update(collection)
+
+    def ingest_item(self, path_item: Path):
+        item = Item.from_file(path_item)
+        item.validate()
+        self._items_endpoint.create_or_update(item)
+
+
+__all__ = ["CollectionsEndpoint", "ItemsEndpoint", "Ingestor"]
