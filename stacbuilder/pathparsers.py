@@ -54,6 +54,10 @@ class InputPathParserFactory:
     @property
     def implementation_names(cls):
         """Get the class names of all known implementations."""
+        # TODO: class properties are deprecated in python 3.11 and will not be supported in Python 3.13.
+        #   However, I cannot find a call to this property, so perhaps we can just remove it.
+        #   If we still need it, then turn it into a method as it does not need to be a property per se.
+        #   Maybe even rename it get_implementation_names for clarity. (Or get_implementation_classnames ? )
         return sorted(cls._implementations.keys())
 
     @classmethod
