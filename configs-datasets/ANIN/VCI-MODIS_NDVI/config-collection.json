@@ -1,0 +1,57 @@
+{
+    "collection_id": "MODIS_NDVI_DERIVATIONS",
+    "title": "MODIS NDVI Derivations",
+    "description": "Min and max NDVI values for the period 2000-2019, derived from MODIS data",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/{year}",
+    "input_path_parser": {
+        "classname": "GeneralInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<asset_type>MIN|MAX)/(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})\\.tif$",
+            "period": "Monthly"
+        }
+    },
+    "item_assets": {
+        "MAX": {
+            "title": "Max NVDI",
+            "description": "Max normalized Difference Vegetation Index",
+            "eo_bands": [
+                {
+                    "name": "NDVI",
+                    "description": "Normalized Difference Vegetation Index",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 300
+                }
+            ]
+        },
+        "MIN": {
+            "title": "Min NVDI",
+            "description": "Min normalized Difference Vegetation Index",
+            "eo_bands": [
+                {
+                    "name": "NDVI",
+                    "description": "Normalized Difference Vegetation Index",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 300
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
