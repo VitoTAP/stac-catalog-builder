@@ -6,6 +6,7 @@ Normally these are paths to GeoTIFF files, but this could include other file for
 import abc
 import calendar
 import datetime as dt
+from enum import Enum
 import logging
 import re
 from pathlib import Path
@@ -177,7 +178,15 @@ class RegexInputPathParser(InputPathParser):
         return self._type_converters
 
 
-class GeneralInputPathParser(RegexInputPathParser):
+class Period(Enum):
+    """Enum for the possible periods that can be used in the DefaultInputPathParser."""
+
+    YEARLY = "yearly"
+    MONTHLY = "monthly"
+    DAILY = "daily"
+
+
+class DefaultInputPathParser(RegexInputPathParser):
     """Path parser that uses regular expressions to extract properties from a path.
     This input parser overrides the datetime, start_datetime and end_datetime properties.
     """
@@ -192,21 +201,25 @@ class GeneralInputPathParser(RegexInputPathParser):
         super().__init__(type_converters=type_converters, *args, **kwargs)
 
     def _set_period(self, period: Optional[str] = None):
-        period = period or "Daily"
-
-        possible_periods = ["Yearly", "Monthly", "Daily"]
-        if period not in possible_periods:
-            raise ValueError(f"Period must be one of {possible_periods}")
-        self._period = period
+        period = period.lower() or "daily"
+        match period:
+            case "yearly":
+                self._period = Period.YEARLY
+            case "monthly":
+                self._period = Period.MONTHLY
+            case "daily":
+                self._period = Period.DAILY
+            case _:
+                raise ValueError(f"Period argument {period} must be one of {[p.value for p in Period]}")
 
     @property
-    def period(self):
+    def period(self) -> Period:
         return self._period
 
     def _fill_missing_data(self):
-        if self._period == "Yearly" and "month" not in self._data:
+        if self.period is Period.YEARLY and "month" not in self._data:
             self._data["month"] = 1
-        if (self.period == "Yearly" or self.period == "Monthly") and "day" not in self._data:
+        if (self.period is Period.YEARLY or self.period is Period.MONTHLY) and "day" not in self._data:
             self._data["day"] = 1
 
     def _post_process_data(self):
@@ -223,9 +236,9 @@ class GeneralInputPathParser(RegexInputPathParser):
         start_dt = self._get_start_datetime()
         year = start_dt.year
 
-        if self._period == "Yearly":
+        if self.period is Period.YEARLY:
             return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
-        elif self._period == "Monthly":
+        elif self.period is Period.MONTHLY:
             month = start_dt.month
             end_month = calendar.monthrange(year, month)[1]
             return dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
