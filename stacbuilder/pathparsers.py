@@ -173,6 +173,62 @@ class RegexInputPathParser(InputPathParser):
         return self._type_converters
 
 
+class GeneralInputPathParser(RegexInputPathParser):
+    """Path parser that uses regular expressions to extract properties from a path.
+    This input parser overrides the datetime, start_datetime and end_datetime properties.
+    """
+
+    def __init__(self, period: Optional[str] = None, *args, **kwargs) -> None:
+        type_converters = {
+            "year": int,
+            "month": int,
+            "day": int,
+        }
+        self._set_period(period)
+        super().__init__(type_converters=type_converters, *args, **kwargs)
+
+    def _set_period(self, period: Optional[str] = None):
+        period = period or "Daily"
+
+        possible_periods = ["Yearly", "Monthly", "Daily"]
+        if period not in possible_periods:
+            raise ValueError(f"Period must be one of {possible_periods}")
+        self._period = period
+
+    @property
+    def period(self):
+        return self._period
+
+    def _fill_missing_data(self):
+        if self._period == "Yearly" and "month" not in self._data:
+            self._data["month"] = 1
+        if (self.period == "Yearly" or self.period == "Monthly") and "day" not in self._data:
+            self._data["day"] = 1
+
+    def _post_process_data(self):
+        self._fill_missing_data()
+        start_dt = self._get_start_datetime()
+        self._data["datetime"] = start_dt
+        self._data["start_datetime"] = start_dt
+        self._data["end_datetime"] = self._get_end_datetime()
+
+    def _get_start_datetime(self):
+        return dt.datetime(self._data["year"], self._data["month"], self._data["day"], 0, 0, 0, tzinfo=dt.timezone.utc)
+
+    def _get_end_datetime(self):
+        start_dt = self._get_start_datetime()
+        year = start_dt.year
+
+        if self._period == "Yearly":
+            return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
+        elif self._period == "Monthly":
+            month = start_dt.month
+            end_month = calendar.monthrange(year, month)[1]
+            return dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
+        else:
+            return dt.datetime(year, start_dt.month, start_dt.day, 23, 59, 59, tzinfo=dt.timezone.utc)
+
+
 class LandsatNDWIInputPathParser(RegexInputPathParser):
     def __init__(self, *args, **kwargs) -> None:
         type_converters = {
