@@ -22,17 +22,17 @@
         "classname": "GeneralInputPathParser",
         "parameters": {
             "regex_pattern": ".*/(?P<asset_type>MIN|MAX)/(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})\\.tif$",
-            "period": "Monthly"
+            "period": "monthly"
         }
     },
     "item_assets": {
         "MAX": {
             "title": "Max NVDI",
-            "description": "Max normalized Difference Vegetation Index",
+            "description": "Max Normalized Difference Vegetation Index",
             "eo_bands": [
                 {
-                    "name": "NDVI",
-                    "description": "Normalized Difference Vegetation Index",
+                    "name": "NDVI_MAX",
+                    "description": "Max Normalized Difference Vegetation Index",
                     "data_type": "float32",
                     "sampling": "area",
                     "spatial_resolution": 300
@@ -44,8 +44,8 @@
             "description": "Min normalized Difference Vegetation Index",
             "eo_bands": [
                 {
-                    "name": "NDVI",
-                    "description": "Normalized Difference Vegetation Index",
+                    "name": "NDVI_MIN",
+                    "description": "Min Normalized Difference Vegetation Index",
                     "data_type": "float32",
                     "sampling": "area",
                     "spatial_resolution": 300
