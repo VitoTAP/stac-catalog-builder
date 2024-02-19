@@ -381,9 +381,16 @@ def vpp_build_all_collections(
 
 
 def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Optional[int]) -> str:
+    if not collection_id and not collection_number:
+        raise ValueError(
+            "No collection was specified. "
+            + "You must specify either a collection_id, or the number of the collection "
+            + "in the list on available collections. Both arguments had no value."
+        )
     if collection_id and collection_number:
         raise ValueError(
-            "You must specify either a collection_id, or the number of the collection "
+            "Conflicting parameters for collection: "
+            + "You must specify EITHER a collection_id, OR the number of the collection "
             + "in the list on available collections. You can't have both."
         )
     if collection_id and not isinstance(collection_id, str):
