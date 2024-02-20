@@ -40,7 +40,7 @@ from stacbuilder.config import (
     FileCollectorConfig,
 )
 from stacbuilder.metadata import AssetMetadata, GeodataframeExporter
-from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector, MapGeoTiffToAssetMetadata
+from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
 
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
@@ -726,7 +726,6 @@ class AssetMetadataPipeline:
         self._metadata_collector: IMetadataCollector = metadata_collector
 
         # Components / dependencies that we set up internally
-        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
         self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
         # self._metadata_group_creator: IGroupMetadataBy = None
         self._func_find_item_group: Optional[Callable[[Item], str]] = None
@@ -837,10 +836,6 @@ class AssetMetadataPipeline:
     @property
     def collection_builder(self) -> STACCollectionBuilder:
         return self._collection_builder
-
-    @property
-    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
-        return self._geotiff_to_metadata_mapper
 
     @property
     def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
