@@ -415,3 +415,12 @@ def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Opti
 
     collection = tcc_collections[collection_number - 1]
     return collection.id
+
+
+def upload_to_stac_api(collection_path: Path):
+    if isinstance(collection_path, str):
+        collection_path = Path(collection_path)
+
+    from stacbuilder.stacapi.endpoints import Uploader
+
+    Uploader.upload_collection_and_items(collection_path)
