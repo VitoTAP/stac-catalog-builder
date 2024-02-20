@@ -28,7 +28,8 @@ from stacbuilder.builder import (
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
-from stacbuilder.terracatalog import HRLVPPMetadataCollector
+from stacbuilder.terracatalog import HRLVPPMetadataCollector, CollectionConfigBuilder
+from stacbuilder.stacapi.upload import Uploader
 
 
 def build_collection(
@@ -329,7 +330,7 @@ def vpp_build_collection(
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
-    collector = HRLVPPMetadataCollector()
+    collector = HRLVPPMetadataCollector(temp_dir=output_dir)
     collection_id = _get_tcc_collection_id(collection_id, collection_number)
     collector.collection_id = collection_id
     collector.max_products = max_products
@@ -417,10 +418,39 @@ def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Opti
     return collection.id
 
 
-def upload_to_stac_api(collection_path: Path):
+def upload_to_stac_api(collection_path: Path) -> None:
+    """Upload a collection to the STAC API.
+
+    TODO: The STAC API has to be configured via a settings file.
+    """
     if isinstance(collection_path, str):
         collection_path = Path(collection_path)
 
-    from stacbuilder.stacapi.endpoints import Uploader
+    uploader = Uploader.from_settings()
+    uploader.upload_collection_and_items(collection_path)
 
-    Uploader.upload_collection_and_items(collection_path)
+
+def vpp_get_tcc_collections() -> list[tcc.Collection]:
+    """Display the CollectionConfig for each of the collections in HRL VPP."""
+    collector = HRLVPPMetadataCollector()
+    return list(collector.get_tcc_collections())
+
+
+def vpp_count_products() -> list[tcc.Collection]:
+    """Display the CollectionConfig for each of the collections in HRL VPP."""
+    collector = HRLVPPMetadataCollector()
+    catalogue = collector.get_tcc_catalogue()
+    collections = list(collector.get_tcc_collections())
+    return {c.id: catalogue.get_product_count(c.id) for c in collections}
+
+
+def vpp_get_collection_configs() -> list[CollectionConfig]:
+    """Display the CollectionConfig for each of the collections in HRL VPP."""
+    collector = HRLVPPMetadataCollector()
+
+    configs = []
+    for coll in collector.get_tcc_collections():
+        conf_builder = CollectionConfigBuilder(coll)
+        configs.append(conf_builder.get_collection_config())
+
+    return configs
