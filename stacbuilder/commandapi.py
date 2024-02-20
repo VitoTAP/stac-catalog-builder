@@ -358,7 +358,7 @@ def vpp_build_all_collections(
     max_products: Optional[int] = -1,
     # save_dataframe: Optional[bool] = False,
 ) -> None:
-    """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
+    """Build a STAC collection for each of the collections in HRL VPP (OpenSearch)."""
 
     collector = HRLVPPMetadataCollector()
     collector.max_products = max_products
