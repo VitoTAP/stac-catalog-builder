@@ -19,10 +19,12 @@ _logger = logging.Logger(__name__)
 
 _EXPECTED_STATUS_GET = [requests.status_codes.codes.ok]
 _EXPECTED_STATUS_POST = [
+    requests.status_codes.codes.ok,
     requests.status_codes.codes.created,
     requests.status_codes.codes.accepted,
 ]
 _EXPECTED_STATUS_PUT = [
+    requests.status_codes.codes.ok,
     requests.status_codes.codes.created,
     requests.status_codes.codes.accepted,
     requests.status_codes.codes.no_content,
@@ -30,7 +32,7 @@ _EXPECTED_STATUS_PUT = [
 _EXPECTED_STATUS_DELETE = _EXPECTED_STATUS_PUT
 
 
-def _check_response_status(response, expected_status_codes=[200, 202, 204]):
+def _check_response_status(response: requests.Response, expected_status_codes: list[int]):
     response.raise_for_status()
     if response.status_code not in expected_status_codes:
         _logger.warning(
