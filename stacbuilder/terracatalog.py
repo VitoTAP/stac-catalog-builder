@@ -9,6 +9,7 @@ At present, all code in this module is still very experimental (d.d. 2024-01-29)
 
 import datetime as dt
 import logging
+from pathlib import Path
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -210,7 +211,7 @@ class CollectionConfigBuilder:
 class HRLVPPMetadataCollector(IMetadataCollector):
     """Collects AssetMetadata for further processing for the HRL VPP collections from OpenSearch."""
 
-    def __init__(self):
+    def __init__(self, temp_dir: Path | None = None):
         super().__init__()
 
         # components: objects that we delegate work to.
@@ -220,6 +221,9 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._df_products: Optional[gpd.GeoDataFrame] = None
         self._collection_id: Optional[str] = None
         self._max_products = -1
+
+        self.temp_dir: Path = Path(temp_dir) if temp_dir else None
+        self.geodataframe_path: Path | None = None
 
     @property
     def collection_id(self) -> Optional[str]:
@@ -257,9 +261,16 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             return
 
         if not self._df_products:
-            _logger.debug(f"Downloading products to dataframe. Max products to retrieve: {self.max_products}")
+            _logger.info(f"PROGRESS: Downloading products to dataframe. Max products to retrieve: {self.max_products}")
             self._df_products = self.get_products_as_dataframe()
 
+            if self.temp_dir:
+                self.geodataframe_path = self.temp_dir / f"{self.collection_id}.parquet"
+                if not self.temp_dir.exists():
+                    self.temp_dir.mkdir(parents=True)
+                self._df_products.to_parquet(path=self.geodataframe_path, index=True)
+
+        _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
         self._metadata_list = self._convert_to_asset_metadata(self._df_products)
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
@@ -322,11 +333,11 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         for i, slot_start in enumerate(dt_ranges[:-1]):
             slot_end = dt_ranges[i + 1]
             prod_types = self._cfg_builder.get_product_types()
-
             # Sometimes getting the data per data still hits the limit of how many
             # products you can retrieve in one go.
             # Therefore, dividing it up into product types as well.
             for prod_type in prod_types:
+                _logger.info(f"PROGRESS: time slot from {slot_start} to {slot_end}, {prod_type=}")
                 products = list(
                     catalogue.get_products(collection.id, start=slot_start, end=slot_end, productType=prod_type)
                 )
@@ -436,7 +447,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         epsg_code = None
         if data_links:
-            # conformsTo': 'http://www.opengis.net/def/crs/EPSG/0/3035'
+            # example:
+            #   conformsTo': 'http://www.opengis.net/def/crs/EPSG/0/3035'
             epsg_url = first_link.get("conformsTo")
             parts_epsg_code = epsg_url.split("/")
             if "EPSG" in parts_epsg_code:

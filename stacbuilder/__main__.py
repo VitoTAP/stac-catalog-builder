@@ -1,7 +1,7 @@
 """
 The main module, which is run as the program.
 
-This defines the Commane Line Interface of the application.
+This defines the Command Line Interface of the application.
 We want to keep this layer thin so we can write unit/integration tests for the
 functionality underneath without dealing directly with the CLI.
 
@@ -43,15 +43,13 @@ def cli(verbose):
     if verbose:
         log_level = logging.DEBUG
 
-    _logger.setLevel(log_level)
     # create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setLevel(log_level)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
     # create formatter and add it to the handlers
-    formatter = logging.Formatter("%(levelname)-7s | %(message)s")
-    ch.setFormatter(formatter)
-    # add the handlers to the logger
-    _logger.addHandler(ch)
+    formatter = logging.Formatter("%(levelname)-7s | %(asctime)s | %(message)s")
+    console_handler.setFormatter(formatter)
+    logging.basicConfig(handlers=[console_handler], level=log_level)
 
 
 @cli.command
@@ -420,6 +418,41 @@ def vpp_list_items(collection: str, number: int, max_products: int):
     )
     for item in stac_items:
         pprint.pprint(item.to_dict())
+
+
+@cli.command
+@click.argument("collection_path")
+def vpp_upload_to_stac_api(collection_path: str):
+    """Upload a collection to the STAC API."""
+    commandapi.upload_to_stac_api(Path(collection_path))
+
+
+@cli.command
+def vpp_show_collection_configs():
+    """Display the CollectionConfig for each of the collections in HRL VPP."""
+
+    coll_cfg: CollectionConfig
+    for coll_cfg in commandapi.vpp_get_collection_configs():
+        pprint.pprint(coll_cfg.model_dump())
+        print()
+
+
+@cli.command
+@click.option("-p", "--properties", is_flag=True, help="Also show collection's properties (OpenSearch)")
+def vpp_list_tcc_collections(properties):
+    for coll in commandapi.vpp_get_tcc_collections():
+        print(coll.id)
+
+        if properties:
+            pprint.pprint(coll.properties)
+
+        # num_prods = catalogue.get_product_count(collection.id)
+        # pprint(f"product count for coll_id {collection.id}: {num_prods}")
+
+
+@cli.command
+def vpp_count_products():
+    pprint.pprint(commandapi.vpp_count_products())
 
 
 #
