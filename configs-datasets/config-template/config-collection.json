@@ -19,7 +19,11 @@
     ],
     "layout_strategy_item_template": "${collection}/{year}",
     "input_path_parser": {
-        "classname": "RegexInputPathParser"
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<asset_type>MIN|MAX)/(?P<year>\\d{4})-(?P<month>\\d{2}).tif$",
+            "period": "monthly"
+        }
     },
     "item_assets": {
         "REPLACE_THIS--BAND_NAME": {

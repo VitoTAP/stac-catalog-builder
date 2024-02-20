@@ -1,3 +1,4 @@
+import calendar
 import datetime as dt
 from typing import List
 
@@ -5,6 +6,8 @@ import pytest
 
 
 from stacbuilder.pathparsers import (
+    DefaultInputPathParser,
+    Period,
     InputPathParserFactory,
     RegexInputPathParser,
     ERA5LandInputPathParser,
@@ -84,6 +87,73 @@ class TestRegexInputPathParser:
             parser.regex.pattern
             == ".*/reanalysis-era5-land-monthly-means_(?P<band>[a-zA-Z0-9\\_]+_monthly)_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})\\.tif$"
         )
+
+
+class TestDefaultInputPathParser:
+    REGEX_PATTERN = ".*/(?P<band>[a-zA-Z0-9]+)/(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})\\.tif$"
+
+    @pytest.mark.parametrize(
+        ["path", "band", "year", "month", "day"],
+        [
+            (
+                "/data/somewhere/MAX/2020-01-01.tif",
+                "MAX",
+                2020,
+                1,
+                1,
+            ),
+            (
+                "/data/somewhere/MIN/2020-01-01.tif",
+                "MIN",
+                2020,
+                1,
+                1,
+            ),
+            (
+                "/data/somewhere/MAX/2020-12-31.tif",
+                "MAX",
+                2020,
+                12,
+                31,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("period", ["daily", "monthly", "yearly"])
+    def test_default_input_path_parser(self, period, path, band, year, month, day):
+        config = InputPathParserConfig(
+            classname="DefaultInputPathParser",
+            parameters={
+                "regex_pattern": self.REGEX_PATTERN,
+                "period": period,
+            },
+        )
+        parser = InputPathParserFactory.from_config(config)
+        assert isinstance(parser, DefaultInputPathParser)
+        match period:
+            case "daily":
+                assert parser.period == Period.DAILY
+            case "monthly":
+                assert parser.period == Period.MONTHLY
+            case "yearly":
+                assert parser.period == Period.YEARLY
+
+        parsed = parser.parse(path)
+        assert parsed["band"] == band
+        assert parsed["year"] == year
+        assert parsed["month"] == month
+        assert parsed["day"] == day
+        assert parsed["datetime"] == dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.UTC)
+        assert parsed["start_datetime"] == dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.UTC)
+
+        match period:
+            case "daily":
+                assert parsed["end_datetime"] == dt.datetime(year, month, day, 23, 59, 59, tzinfo=dt.UTC)
+            case "monthly":
+                assert parsed["end_datetime"] == dt.datetime(
+                    year, month, calendar.monthrange(year, month)[1], 23, 59, 59, tzinfo=dt.UTC
+                )
+            case "yearly":
+                assert parsed["end_datetime"] == dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.UTC)
 
 
 class TestERA5LandInputPathParser:
