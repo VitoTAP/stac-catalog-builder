@@ -8,6 +8,7 @@ At present, all code in this module is still very experimental (d.d. 2024-01-29)
 """
 
 import datetime as dt
+import inspect
 import logging
 from pathlib import Path
 from pprint import pprint
@@ -22,7 +23,7 @@ from pystac.provider import ProviderRole
 import terracatalogueclient as tcc
 from terracatalogueclient.config import CatalogueConfig
 from terracatalogueclient.config import CatalogueEnvironment
-
+from terracatalogueclient import ProductFile
 
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
@@ -248,12 +249,13 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._cfg_builder: CollectionConfigBuilder = None
 
         # state / collected information
+        self._df_asset_metadata: Optional[gpd.GeoDataFrame] = None
         self._df_products: Optional[gpd.GeoDataFrame] = None
+
         self._collection_id: Optional[str] = None
         self._max_products = -1
 
         self.temp_dir: Path = Path(temp_dir) if temp_dir else None
-        self.geodataframe_path: Path | None = None
 
     @property
     def collection_id(self) -> Optional[str]:
@@ -284,25 +286,46 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             raise TypeError(f"Value for max_products must be an int. {type(value)=}, {value=}")
         self._max_products = int(value) if value else -1
 
+    def _log_progress_message(self, message: str) -> None:
+        calling_method_name = inspect.stack()[1][3]
+        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+
     def collect(self):
         """Collect and store the AssetMetadata objects."""
+        self._log_progress_message("START: collect")
+
         if self.has_collected():
             _logger.info("Already collected data. Returning")
             return
 
-        if not self._df_products:
-            _logger.info(f"PROGRESS: Downloading products to dataframe. Max products to retrieve: {self.max_products}")
-            self._df_products = self.get_products_as_dataframe()
+        if not self._df_asset_metadata:
+            self._log_progress_message(
+                "Downloading products to dataframe. Max products to retrieve: {self.max_products}"
+            )
+            self._df_asset_metadata = self.get_products_as_dataframe()
 
             if self.temp_dir:
                 if not self.temp_dir.exists():
                     self.temp_dir.mkdir(parents=True)
 
-                self.geodataframe_path = self.temp_dir / f"{self.collection_id}.parquet"
-                self._df_products.to_parquet(path=self.geodataframe_path, index=True)
+                self._save_geodataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
+                self._save_geodataframe(self._df_products, f"products-{self.collection_id}")
 
         _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
-        self._metadata_list = self._convert_to_asset_metadata(self._df_products)
+        self._metadata_list = self._convert_to_asset_metadata(self._df_asset_metadata)
+
+        self._log_progress_message("DONE: collect")
+
+    def _save_geodataframe(self, gdf: gpd.GeoDataFrame, table_name: str) -> Path:
+        if not self.temp_dir.exists():
+            self.temp_dir.mkdir(parents=True)
+
+        geodataframe_path = self.temp_dir / f"{table_name}.parquet"
+        self._log_progress_message(f"Saving {table_name} as GeoDataFrame (geoparquet), path={geodataframe_path}")
+        gdf.to_parquet(path=geodataframe_path, index=True)
+        self._log_progress_message(f"DONE saved download products to {geodataframe_path}")
+
+        return geodataframe_path
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
         """Get the terracatalogueclient's Catalogue to query data from."""
@@ -346,6 +369,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         to group the products that belong to one STAC item, because we don't have much control
         over what order we receive them.
         """
+        self._log_progress_message("START: get_products_as_dataframe")
+
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
         num_prods = catalogue.get_product_count(collection.id)
@@ -357,9 +382,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         dt_ranges = pd.date_range(dt_start, dt_end, freq="D")
         pprint(dt_ranges)
 
-        data_frames = []
+        df_all_asset_md = None
         slot_start = dt_ranges[0]
         num_products_processed = 0
+        max_prods_for_progress = self._max_products if self._max_products > 0 else num_prods
 
         for i, slot_start in enumerate(dt_ranges[:-1]):
             slot_end = dt_ranges[i + 1]
@@ -368,11 +394,15 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             # products you can retrieve in one go.
             # Therefore, dividing it up into product types as well.
             for prod_type in prod_types:
-                _logger.info(f"PROGRESS: time slot from {slot_start} to {slot_end}, {prod_type=}")
+                self._log_progress_message(
+                    f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}"
+                )
+                self._log_progress_message(f"Retrieved {num_products_processed} of {max_prods_for_progress} products")
                 products = list(
                     catalogue.get_products(collection.id, start=slot_start, end=slot_end, productType=prod_type)
                 )
                 assets_md = []
+                products_as_dicts = []
                 if not products:
                     # There is no data for this time range.
                     continue
@@ -386,14 +416,28 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
                     asset_metadata = self.create_asset_metadata(product)
                     assets_md.append(asset_metadata)
+                    products_as_dicts.append(self._product_to_dict(product))
 
                 # The extra break statements are needed so we don't end up with
                 # an empty dataframe here, which is something we cannot process.
-                data = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
-                geoms = [md.geometry_lat_lon for md in assets_md]
-                gdf = gpd.GeoDataFrame(data=data, crs=4326, geometry=geoms)
+                product_records = [{k: v for k, v in pr.items() if k != "geometry"} for pr in products_as_dicts]
+                product_geoms = [pr["geometry"] for pr in products_as_dicts]
+                gdf_products = gpd.GeoDataFrame(data=product_records, crs=4326, geometry=product_geoms)
+                gdf_products.index = gdf_products["id"]
+                if not self._df_products:
+                    self._df_products = gdf_products
+                else:
+                    self._df_products = pd.concat(self._df_products, gdf_products)
+
+                asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
+                asset_geoms = [md.geometry_lat_lon for md in assets_md]
+                gdf = gpd.GeoDataFrame(data=asset_records, crs=4326, geometry=asset_geoms)
                 gdf.index = gdf["asset_id"]
-                data_frames.append(gdf)
+
+                if not df_all_asset_md:
+                    df_all_asset_md = gdf
+                else:
+                    df_all_asset_md = pd.concat(df_all_asset_md, gdf)
 
                 # Apply our own max_products limit for testing & troubleshooting:
                 #   Break out of the second loop.
@@ -405,11 +449,36 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             if self._max_products > 0 and num_products_processed > self._max_products:
                 break
 
-        return pd.concat(data_frames)
+        self._log_progress_message("DONE: get_products_as_dataframe")
+        return df_all_asset_md
 
-    @staticmethod
-    def _convert_to_asset_metadata(df: pd.DataFrame) -> List[AssetMetadata]:
+    def _product_to_dict(self, product: tcc.Product) -> dict[str, Any]:
+        return {
+            "id": product.id,
+            "title": product.title,
+            "geojson": product.geojson,
+            "geometry": product.geometry,
+            "bbox": product.bbox,
+            "beginningDateTime": product.beginningDateTime,
+            "endingDateTime": product.endingDateTime,
+            "properties": product.properties,
+            "data": [self._product_file_to_dict(f) for f in product.data],
+            "related": [self._product_file_to_dict(f) for f in product.related],
+            "previews": [self._product_file_to_dict(f) for f in product.previews],
+        }
+
+    def _product_file_to_dict(self, product_file: ProductFile) -> dict[str, Any]:
+        return {
+            "href": product_file.href,
+            "length": product_file.length,
+            "title": product_file.title,
+            "type": product_file.type,
+            "category": product_file.category,
+        }
+
+    def _convert_to_asset_metadata(self, df: pd.DataFrame) -> List[AssetMetadata]:
         """Convert the pandas dataframe to a list of AssetMetadata objects."""
+        self._log_progress_message("START: _convert_to_asset_metadata")
         md_list = []
 
         # Log some progress every 1000 records. Without this output it is hard to see what is happening.
@@ -417,14 +486,14 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         num_products = len(df)
         for i in range(num_products):
             if i % progress_chunk_size == 0:
-                _logger.info(f"PROGRESS: {i} of {num_products} converted to AssetMetadata")
+                self._log_progress_message(f"Converted {i} of {num_products} to AssetMetadata")
 
             record = df.iloc[i, :]
             metadata = AssetMetadata.from_geoseries(record)
             md_list.append(metadata)
 
-        _logger.info(f"PROGRESS: {i+1} of {num_products} converted to AssetMetadata")
-
+        self._log_progress_message(f"DONE: {i+1} of {num_products} converted to AssetMetadata")
+        self._log_progress_message("DONE: _convert_to_asset_metadata")
         return md_list
 
     def create_asset_metadata(self, product: tcc.Product) -> AssetMetadata:
