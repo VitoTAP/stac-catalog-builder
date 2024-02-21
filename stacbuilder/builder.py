@@ -488,17 +488,28 @@ class STACCollectionBuilder:
         items = [i for i in self._stac_items if i is not None]
         item: Item
         for item in items:
-            for asset in item.assets:
-                asset.owner = self._collection
+            item.collection = self._collection
 
-        stac_item_dir = self.output_dir / self.collection.id
-        if not self.stac_item_dir.exists():
-            self.stac_item_dir.mkdir(parents=True)
+        stac_item_dir = self.output_dir / "temp" / self.collection.id
+        if not stac_item_dir.exists():
+            stac_item_dir.mkdir(parents=True)
 
-        from pystac import ItemCollection
+        num_items = len(items)
+        for i, item in enumerate(items):
+            if i % 1000 == 0:
+                self._log_progress_message(f"Saved {i} of {num_items} STAC items")
 
-        item_collection = ItemCollection(items)
-        item_collection.save_object(dest_href=stac_item_dir)
+            item.validate()
+            year = f"{item.datetime.year:04}"
+            month = f"{item.datetime.month:02}"
+            day = f"{item.datetime.day:02}"
+            item_path = stac_item_dir / year / month / day / f"{item.id}.json"
+            if not item_path.parent.exists():
+                item_path.parent.mkdir(parents=True)
+            item.save_object(dest_href=item_path)
+
+        # item_collection = ItemCollection(items)
+        # item_collection.save_object(dest_href=stac_item_dir)
 
         self._log_progress_message("updating collection extent")
         self._collection.extent = Extent.from_items(items)
@@ -531,7 +542,7 @@ class STACCollectionBuilder:
 
     def save_collection(self) -> None:
         """Save the STAC collection to file."""
-        self._log_progress_message("START: Saving files ...")
+        self._log_progress_message("START: Saving collection ...")
 
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
@@ -541,7 +552,7 @@ class STACCollectionBuilder:
         # The href links to asset files also have the be relative (to the location of the STAC item)
         # This needs to be done via the href_modifier
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
-        self._log_progress_message("DONE: Saving files ...")
+        self._log_progress_message("DONE: Saving collection.")
 
     @property
     def providers(self):
@@ -624,7 +635,7 @@ class STACCollectionBuilder:
         return asset_definitions
 
     def _log_progress_message(self, message: str) -> None:
-        calling_method_name = inspect.stack()[2][3]
+        calling_method_name = inspect.stack()[1][3]
         _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
 
@@ -1026,7 +1037,7 @@ class AssetMetadataPipeline:
         self._log_progress_message("DONE: build_grouped_collections")
 
     def _log_progress_message(self, message: str) -> None:
-        calling_method_name = inspect.stack()[2][3]
+        calling_method_name = inspect.stack()[1][3]
         _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
 

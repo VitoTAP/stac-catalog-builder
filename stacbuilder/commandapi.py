@@ -272,15 +272,14 @@ def validate_collection(
 
 def vpp_list_metadata(
     collection_id: Optional[str] = None,
-    collection_number: Optional[int] = None,
     max_products: Optional[int] = -1,
 ) -> List[AssetMetadata]:
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
+    _check_tcc_collection_id(collection_id)
     collector = HRLVPPMetadataCollector()
-    collection_id = _get_tcc_collection_id(collection_id, collection_number)
     collector.collection_id = collection_id
     collector.max_products = max_products
 
@@ -296,15 +295,14 @@ def vpp_list_metadata(
 
 def vpp_list_stac_items(
     collection_id: Optional[str] = None,
-    collection_number: Optional[int] = None,
     max_products: Optional[int] = -1,
 ) -> List[Item]:
     """Show the STAC items that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
+    _check_tcc_collection_id(collection_id)
     collector = HRLVPPMetadataCollector()
-    collection_id = _get_tcc_collection_id(collection_id, collection_number)
     collector.collection_id = collection_id
     collector.max_products = max_products
 
@@ -318,20 +316,16 @@ def vpp_list_stac_items(
     return list(pipeline.collect_stac_items())
 
 
-# TODO: Decide what to do with saving the geodateframe used to visualize the bounding boxes.
-#   Do we also need it for VPP? Idem for vpp_build_all_collections
 def vpp_build_collection(
     collection_id: Optional[str] = None,
-    collection_number: Optional[int] = None,
     output_dir: Optional[Path] = None,
     overwrite: Optional[bool] = False,
     max_products: Optional[int] = -1,
-    # save_dataframe: Optional[bool] = False,
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
+    _check_tcc_collection_id(collection_id)
     collector = HRLVPPMetadataCollector(temp_dir=output_dir)
-    collection_id = _get_tcc_collection_id(collection_id, collection_number)
     collector.collection_id = collection_id
     collector.max_products = max_products
 
@@ -346,11 +340,7 @@ def vpp_build_collection(
         output_dir=output_dir,
         overwrite=overwrite,
     )
-
-    pipeline.build_collection()
-
-    # if save_dataframe:
-    #     GeodataframeExporter.export_item_bboxes(pipeline.collection)
+    pipeline.build_collection(link_items=False)
 
 
 def vpp_build_all_collections(
@@ -381,27 +371,12 @@ def vpp_build_all_collections(
         pipeline.build_collection()
 
 
-# TODO: remove _get_tcc_collection_id, makes the commands too complicated and we have a better solution now.
-#        Now that we can list the HRL VPP collection names we can copy paste from that output.
-def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Optional[int]) -> str:
+def _check_tcc_collection_id(collection_id: Optional[str]) -> str:
     """DEPRECATED Helper method to select the collection without dealing with long names"""
-    if not collection_id and not collection_number:
-        raise ValueError(
-            "No collection was specified. "
-            + "You must specify either a collection_id, or the number of the collection "
-            + "in the list on available collections. Both arguments had no value."
-        )
-    if collection_id and collection_number:
-        raise ValueError(
-            "Conflicting parameters for collection: "
-            + "You must specify EITHER a collection_id, OR the number of the collection "
-            + "in the list on available collections. You can't have both."
-        )
+    if not collection_id:
+        raise ValueError("No collection was specified. collection_id must have a non-empty string value.")
     if collection_id and not isinstance(collection_id, str):
         raise TypeError(f"Type of collection_id must be str. {type(collection_id)=}, {collection_id=!r}")
-    if collection_number is not None and not isinstance(collection_number, int):
-        raise TypeError(f"Type of collection_number must be int. {type(collection_number)=}, {collection_number=!r}")
-
     collector = HRLVPPMetadataCollector()
     tcc_collections = collector.get_tcc_collections()
 
@@ -409,16 +384,6 @@ def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Opti
         if collection_id not in [c.id for c in tcc_collections]:
             raise ValueError(f'collection_id "{collection_id}" does not exists.')
         return collection_id
-
-    if collection_number < 1:
-        raise ValueError(f"An int value for collection_number must be 1 or higher. {collection_number=!r}")
-
-    num_colls = len(tcc_collections)
-    if collection_number > num_colls:
-        raise ValueError(f"{collection_number=} but there are only {num_colls} collections.")
-
-    collection = tcc_collections[collection_number - 1]
-    return collection.id
 
 
 def upload_to_stac_api(collection_path: Path) -> None:
@@ -449,10 +414,8 @@ def vpp_count_products() -> list[tcc.Collection]:
 
 def vpp_get_collection_config(collection_id: str) -> list[CollectionConfig]:
     """Display the CollectionConfig for each of the collections in HRL VPP."""
-    if not collection_id:
-        raise ValueError(f'Argument "collection_id" must have a value. {collection_id=!r}, {type(collection_id)=}')
+    _check_tcc_collection_id(collection_id)
     collector = HRLVPPMetadataCollector()
-
     collector.collection_id = collection_id
     tcc_coll = collector.get_tcc_collection()
     conf_builder = CollectionConfigBuilder(tcc_coll)
