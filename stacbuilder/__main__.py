@@ -428,11 +428,23 @@ def vpp_upload_to_stac_api(collection_path: str):
 
 
 @cli.command
-def vpp_show_collection_configs():
+@click.option("-o", "--output-file", type=click.File(mode="w", encoding="utf8"))
+@click.argument("collection_id", type=click.STRING)
+def vpp_get_collection_config(collection_id: str, output_file):
+    """Display the CollectionConfig for the specified collection in HRL VPP."""
+    coll_cfg: CollectionConfig = commandapi.vpp_get_collection_config(collection_id)
+    pprint.pprint(coll_cfg.model_dump())
+
+    if output_file:
+        output_file.write(coll_cfg.model_dump_json(indent=2))
+
+
+@cli.command
+def vpp_show_all_collection_configs():
     """Display the CollectionConfig for each of the collections in HRL VPP."""
 
     coll_cfg: CollectionConfig
-    for coll_cfg in commandapi.vpp_get_collection_configs():
+    for coll_cfg in commandapi.vpp_get_all_collection_configs():
         pprint.pprint(coll_cfg.model_dump())
         print()
 
@@ -445,9 +457,6 @@ def vpp_list_tcc_collections(properties):
 
         if properties:
             pprint.pprint(coll.properties)
-
-        # num_prods = catalogue.get_product_count(collection.id)
-        # pprint(f"product count for coll_id {collection.id}: {num_prods}")
 
 
 @cli.command

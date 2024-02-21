@@ -727,6 +727,7 @@ class GeodataframeExporter:
         print(f"Saving pipe-separated CSV file to: {csv_path}")
         gdf.to_csv(csv_path, sep="|")
 
+        # TODO: Shapefile has too many problems with unsupported column types. Going to remove it (but in a separate branch/PR).
         print(f"Saving shapefile to: {shapefile_path }")
         gdf.to_file(shapefile_path)
 

@@ -37,18 +37,48 @@ _logger = logging.getLogger(__name__)
 def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | None, dt.datetime | None]:
     acquisitionInformation = collection.properties["acquisitionInformation"]
     pprint(acquisitionInformation)
+
+    # acquisitionInformation contains one or more acquisitionParameters, and each has a start + end datetime.
+    # It looks like this is mainly used to describe the period for each platform,
+    #  for example Sentinal S2A, but also S2B.
+    #
+    # Example:
+    #  'acquisitionInformation': [{'acquisitionParameters': {'beginningDateTime': '2017-01-01T00:00:00Z',
+    #                                                    'endingDateTime': '2023-09-30T23:59:59Z'},
+    #                          'instrument': {'instrumentShortName': 'MSI',
+    #                                         'sensorType': 'OPTICAL'},
+    #                          'platform': {'platformSerialIdentifier': 'S2A',
+    #                                       'platformShortName': 'SENTINEL-2'}},
+    #                         {'acquisitionParameters': {'beginningDateTime': '2017-03-07T01:49:00Z',
+    #                                                    'endingDateTime': '2023-09-30T23:59:59Z'},
+    #                          'instrument': {'instrumentShortName': 'MSI',
+    #                                         'sensorType': 'OPTICAL'},
+    #                          'platform': {'platformSerialIdentifier': 'S2B',
+    #                                       'platformShortName': 'SENTINEL-2'}}],
+    dt_start = None
+    dt_end = None
     for info in acquisitionInformation:
         print(info.get("acquisitionParameters", {}))
 
-        dt_start = info.get("acquisitionParameters", {}).get("beginningDateTime")
-        dt_end = info.get("acquisitionParameters", {}).get("endingDateTime")
+        new_dt_start = info.get("acquisitionParameters", {}).get("beginningDateTime")
+        new_dt_end = info.get("acquisitionParameters", {}).get("endingDateTime")
 
-        print(dt_start, dt_end)
-        print(dt.datetime.fromisoformat(dt_start))
-        print(dt.datetime.fromisoformat(dt_end))
+        print(new_dt_start, new_dt_start)
+        print(dt.datetime.fromisoformat(new_dt_start))
+        print(dt.datetime.fromisoformat(new_dt_start))
 
-        dt_start = dt.datetime.fromisoformat(dt_start)
-        dt_end = dt.datetime.fromisoformat(dt_end)
+        new_dt_start = dt.datetime.fromisoformat(new_dt_start)
+        new_dt_end = dt.datetime.fromisoformat(new_dt_end)
+
+        if not dt_start:
+            dt_start = new_dt_start
+        elif new_dt_start < dt_start:
+            dt_start = new_dt_start
+
+        if not dt_end:
+            dt_end = new_dt_end
+        elif dt_end < new_dt_end:
+            dt_end = new_dt_end
 
     return dt_start, dt_end
 
@@ -265,9 +295,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             self._df_products = self.get_products_as_dataframe()
 
             if self.temp_dir:
-                self.geodataframe_path = self.temp_dir / f"{self.collection_id}.parquet"
                 if not self.temp_dir.exists():
                     self.temp_dir.mkdir(parents=True)
+
+                self.geodataframe_path = self.temp_dir / f"{self.collection_id}.parquet"
                 self._df_products.to_parquet(path=self.geodataframe_path, index=True)
 
         _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
@@ -353,21 +384,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     if self._max_products > 0 and num_products_processed > self._max_products:
                         break
 
-                    # print("-" * 50)
-                    # print(product.id)
-                    # print(product.title)
-                    # print("product properties:")
-                    # pprint(product.properties)
-                    # print("... end properties ...")
-
                     asset_metadata = self.create_asset_metadata(product)
                     assets_md.append(asset_metadata)
-                    # pprint(asset_metadata.to_dict())
-
-                    # asset_bbox: BoundingBox = asset_metadata.bbox_lat_lon
-                    # print(f"{asset_bbox.as_polygon()=}")
-                    # print(f"{product.geometry}")
-                    # print("-" * 50)
 
                 # The extra break statements are needed so we don't end up with
                 # an empty dataframe here, which is something we cannot process.
@@ -393,10 +411,20 @@ class HRLVPPMetadataCollector(IMetadataCollector):
     def _convert_to_asset_metadata(df: pd.DataFrame) -> List[AssetMetadata]:
         """Convert the pandas dataframe to a list of AssetMetadata objects."""
         md_list = []
-        for i in range(len(df)):
+
+        # Log some progress every 1000 records. Without this output it is hard to see what is happening.
+        progress_chunk_size = 1000
+        num_products = len(df)
+        for i in range(num_products):
+            if i % progress_chunk_size == 0:
+                _logger.info(f"PROGRESS: {i} of {num_products} converted to AssetMetadata")
+
             record = df.iloc[i, :]
             metadata = AssetMetadata.from_geoseries(record)
             md_list.append(metadata)
+
+        _logger.info(f"PROGRESS: {i+1} of {num_products} converted to AssetMetadata")
+
         return md_list
 
     def create_asset_metadata(self, product: tcc.Product) -> AssetMetadata:
