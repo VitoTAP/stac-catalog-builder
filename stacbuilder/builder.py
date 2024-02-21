@@ -6,6 +6,7 @@ This contains the classes that generate the STAC catalogs, collections and items
 # Standard libraries
 import datetime as dt
 from http.client import RemoteDisconnected
+import inspect
 import json
 import logging
 import shutil
@@ -442,17 +443,23 @@ class STACCollectionBuilder:
         self,
         stac_items: Iterable[Item],
         group: Optional[str | int] = None,
+        link_items: bool = True,
     ) -> None:
         """Create and save the STAC collection."""
         self.reset()
         self._stac_items = list(stac_items) or []
         self.create_empty_collection(group=group)
-        self.add_items_to_collection()
+        if link_items:
+            self.add_items_to_collection()
+        else:
+            self.save_items_outside_collection()
 
     def add_items_to_collection(
         self,
     ):
         """Fills the collection with stac items."""
+        self._log_progress_message("START: add_items_to_collection")
+
         if self._collection is None:
             raise InvalidOperation("Can not add items to a collection that has not been created yet.")
 
@@ -464,7 +471,39 @@ class STACCollectionBuilder:
                 continue
             self._collection.add_item(item)
 
+        self._log_progress_message("updating collection extent")
         self._collection.update_extent_from_items()
+
+        self._log_progress_message("DONE: add_items_to_collection")
+
+    def save_items_outside_collection(
+        self,
+    ):
+        """Fills the collection with stac items."""
+        self._log_progress_message("START: save_items_outside_collection")
+
+        if self._collection is None:
+            raise InvalidOperation("Can not add items to a collection that has not been created yet.")
+
+        items = [i for i in self._stac_items if i is not None]
+        item: Item
+        for item in items:
+            for asset in item.assets:
+                asset.owner = self._collection
+
+        stac_item_dir = self.output_dir / self.collection.id
+        if not self.stac_item_dir.exists():
+            self.stac_item_dir.mkdir(parents=True)
+
+        from pystac import ItemCollection
+
+        item_collection = ItemCollection(items)
+        item_collection.save_object(dest_href=stac_item_dir)
+
+        self._log_progress_message("updating collection extent")
+        self._collection.extent = Extent.from_items(items)
+
+        self._log_progress_message("DONE: save_items_outside_collection")
 
     def normalize_hrefs(self, skip_unresolved: bool = False):
         layout_template = self._collection_config.layout_strategy_item_template
@@ -477,6 +516,7 @@ class STACCollectionBuilder:
 
     def validate_collection(self, collection: Collection):
         """Run STAC validation on the collection."""
+        self._log_progress_message("START: validate_collection")
         try:
             num_items_validated = collection.validate_all(recursive=True)
         except STACValidationError as exc:
@@ -487,9 +527,11 @@ class STACCollectionBuilder:
         else:
             print(f"Collection valid: number of items validated: {num_items_validated}")
 
+        self._log_progress_message("DONE: validate_collection")
+
     def save_collection(self) -> None:
         """Save the STAC collection to file."""
-        _logger.info("Saving files ...")
+        self._log_progress_message("START: Saving files ...")
 
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
@@ -499,6 +541,7 @@ class STACCollectionBuilder:
         # The href links to asset files also have the be relative (to the location of the STAC item)
         # This needs to be done via the href_modifier
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
+        self._log_progress_message("DONE: Saving files ...")
 
     @property
     def providers(self):
@@ -506,6 +549,8 @@ class STACCollectionBuilder:
 
     def create_empty_collection(self, group: Optional[str | int] = None) -> None:
         """Creates a STAC Collection with no STAC items."""
+        self._log_progress_message("START: create_empty_collection")
+
         coll_config: CollectionConfig = self._collection_config
 
         if group:
@@ -544,6 +589,7 @@ class STACCollectionBuilder:
         ## )
 
         self._collection = collection
+        self._log_progress_message("DONE: create_empty_collection")
 
     def get_default_extent(self):
         end_dt = dt.datetime.utcnow()
@@ -576,6 +622,10 @@ class STACCollectionBuilder:
             asset_definitions[band_name] = asset_def
 
         return asset_definitions
+
+    def _log_progress_message(self, message: str) -> None:
+        calling_method_name = inspect.stack()[2][3]
+        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
 
 class PostProcessSTACCollectionFile:
@@ -720,7 +770,7 @@ class AssetMetadataPipeline:
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
         self._collection_dir: Path = None
-        self._overwrite: bool = overwrite
+        self._overwrite: bool = bool(overwrite)
 
         # Components / dependencies that must be provided
         self._metadata_collector: IMetadataCollector = metadata_collector
@@ -870,6 +920,7 @@ class AssetMetadataPipeline:
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
+        self._log_progress_message("START: collect_stac_items")
 
         groups = self.group_metadata_by_item_id(self.get_metadata())
         for assets in groups.values():
@@ -882,6 +933,8 @@ class AssetMetadataPipeline:
                 except RemoteDisconnected:
                     print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
                 yield stac_item
+
+        self._log_progress_message("DONE: collect_stac_items")
 
     # TODO: [simplify] [refactor] Merge this into collect_stac_items once it works well and it has tests.
     @staticmethod
@@ -914,11 +967,16 @@ class AssetMetadataPipeline:
         """Return a pandas DataFrame representing the STAC Items, without the geometry."""
         return GeodataframeExporter.stac_items_to_dataframe(list(self.collect_stac_items()))
 
-    def build_collection(self):
+    def build_collection(
+        self,
+        link_items: Optional[bool] = True,
+    ):
         """Build the entire STAC collection."""
+        self._log_progress_message("START: build_collection")
+
         self.reset()
 
-        self._collection_builder.build_collection(self.collect_stac_items())
+        self._collection_builder.build_collection(self.collect_stac_items(), link_items=link_items)
         self._collection_builder.normalize_hrefs()
         self._collection_builder.save_collection()
         self._collection = self._collection_builder.collection
@@ -927,10 +985,14 @@ class AssetMetadataPipeline:
         post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
         post_processor.process_collection(coll_file)
 
+        self._log_progress_message("DONE: build_collection")
+
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)
 
     def build_grouped_collections(self):
+        self._log_progress_message("START: build_grouped_collections")
+
         self.reset()
 
         if not self.uses_collection_groups:
@@ -960,6 +1022,12 @@ class AssetMetadataPipeline:
         for group in self._collection_groups.keys():
             coll_file = Path(self._collection_groups[group].self_href)
             post_processor.process_collection(coll_file)
+
+        self._log_progress_message("DONE: build_grouped_collections")
+
+    def _log_progress_message(self, message: str) -> None:
+        calling_method_name = inspect.stack()[2][3]
+        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
 
 class GeoTiffPipeline:

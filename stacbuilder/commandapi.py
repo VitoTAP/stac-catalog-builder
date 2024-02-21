@@ -381,7 +381,10 @@ def vpp_build_all_collections(
         pipeline.build_collection()
 
 
+# TODO: remove _get_tcc_collection_id, makes the commands too complicated and we have a better solution now.
+#        Now that we can list the HRL VPP collection names we can copy paste from that output.
 def _get_tcc_collection_id(collection_id: Optional[str], collection_number: Optional[int]) -> str:
+    """DEPRECATED Helper method to select the collection without dealing with long names"""
     if not collection_id and not collection_number:
         raise ValueError(
             "No collection was specified. "
@@ -444,7 +447,19 @@ def vpp_count_products() -> list[tcc.Collection]:
     return {c.id: catalogue.get_product_count(c.id) for c in collections}
 
 
-def vpp_get_collection_configs() -> list[CollectionConfig]:
+def vpp_get_collection_config(collection_id: str) -> list[CollectionConfig]:
+    """Display the CollectionConfig for each of the collections in HRL VPP."""
+    if not collection_id:
+        raise ValueError(f'Argument "collection_id" must have a value. {collection_id=!r}, {type(collection_id)=}')
+    collector = HRLVPPMetadataCollector()
+
+    collector.collection_id = collection_id
+    tcc_coll = collector.get_tcc_collection()
+    conf_builder = CollectionConfigBuilder(tcc_coll)
+    return conf_builder.get_collection_config()
+
+
+def vpp_get_all_collection_configs() -> list[CollectionConfig]:
     """Display the CollectionConfig for each of the collections in HRL VPP."""
     collector = HRLVPPMetadataCollector()
 
