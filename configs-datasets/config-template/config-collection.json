@@ -22,7 +22,9 @@
         "classname": "DefaultInputPathParser",
         "parameters": {
             "regex_pattern": ".*/(?P<asset_type>MIN|MAX)/(?P<year>\\d{4})-(?P<month>\\d{2}).tif$",
-            "period": "monthly"
+            "period": "monthly",
+            "fixed_values": {
+            }
         }
     },
     "item_assets": {
