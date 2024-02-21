@@ -1,0 +1,47 @@
+{
+    "collection_id": "CROP_MASK",
+    "title": "CROP MASK",
+    "description": "crop masks are based on two land use/land cover sources which are CCI LAND COVER - S2 PROTOTYPE LAND COVER 20M MAP OF AFRICA 2016 and GlobCover 2009 land cover map.",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}).tif$",
+            "period": "monthly",
+            "fixed_values": {
+                "asset_type": "CROP_MASK"
+            }
+        }
+    },
+    "item_assets": {
+        "CROP_MASK": {
+            "title": "CROP_MASK",
+            "description": "crop masks are based on two land use/land cover sources which are CCI LAND COVER - S2 PROTOTYPE LAND COVER 20M MAP OF AFRICA 2016 and GlobCover 2009 land cover map.",
+            "eo_bands": [
+                {
+                    "name": "CROP_MASK",
+                    "description": "crop masks are based on two land use/land cover sources which are CCI LAND COVER - S2 PROTOTYPE LAND COVER 20M MAP OF AFRICA 2016 and GlobCover 2009 land cover map.",
+                    "data_type": "int16",
+                    "sampling": "area",
+                    "spatial_resolution": 300
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
