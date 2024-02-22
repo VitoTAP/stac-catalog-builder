@@ -412,6 +412,13 @@ def vpp_count_products() -> list[tcc.Collection]:
     return {c.id: catalogue.get_product_count(c.id) for c in collections}
 
 
+def vpp_count_products_per_query_slot(collection_id: str) -> None:
+    _check_tcc_collection_id(collection_id)
+    collector = HRLVPPMetadataCollector()
+    collector.collection_id = collection_id
+    collector.list_num_prods_per_query_slot(collection_id)
+
+
 def vpp_get_collection_config(collection_id: str) -> list[CollectionConfig]:
     """Display the CollectionConfig for each of the collections in HRL VPP."""
     _check_tcc_collection_id(collection_id)

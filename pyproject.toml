@@ -29,6 +29,9 @@ Documentation = "https://github.com/VitoTAP/stac-catalog-builder#readme"
 Issues = "https://github.com/VitoTAP/stac-catalog-builder/issues"
 Source = "https://github.com/VitoTAP/stac-catalog-builder"
 
+[project.scripts]
+stacbuilder = "stacbuilder.__main__:cli"
+
 [tool.hatch.build.targets.wheel]
 packages = ["stacbuilder"]
 

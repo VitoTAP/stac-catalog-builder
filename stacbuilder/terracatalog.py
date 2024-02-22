@@ -9,6 +9,7 @@ At present, all code in this module is still very experimental (d.d. 2024-01-29)
 
 import datetime as dt
 import inspect
+import itertools
 import logging
 from pathlib import Path
 from pprint import pprint
@@ -16,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
@@ -302,19 +304,24 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             self._log_progress_message(
                 "Downloading products to dataframe. Max products to retrieve: {self.max_products}"
             )
-            self._df_asset_metadata = self.get_products_as_dataframe()
-
-            if self.temp_dir:
-                if not self.temp_dir.exists():
-                    self.temp_dir.mkdir(parents=True)
-
-                self._save_geodataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
-                self._save_geodataframe(self._df_products, f"products-{self.collection_id}")
+            self.get_products_as_dataframe()
+            self._save_dataframes()
 
         _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
         self._metadata_list = self._convert_to_asset_metadata(self._df_asset_metadata)
 
         self._log_progress_message("DONE: collect")
+
+    def _save_dataframes(self) -> None:
+        if self.temp_dir:
+            if not self.temp_dir.exists():
+                self.temp_dir.mkdir(parents=True)
+
+            if self._df_asset_metadata is not None:
+                self._save_geodataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
+
+            if self._df_products is not None:
+                self._save_geodataframe(self._df_products, f"products-{self.collection_id}")
 
     def _save_geodataframe(self, gdf: gpd.GeoDataFrame, table_name: str) -> Path:
         if not self.temp_dir.exists():
@@ -361,6 +368,44 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._cfg_builder = CollectionConfigBuilder(self.get_tcc_collection())
         return self._cfg_builder.get_collection_config()
 
+    def _get_product_query_slots(self, frequency: str = "D") -> tuple[tuple[dt.datetime, dt.datetime], str]:
+        """Get the parameters to retrieve product metadata in a piecemeal fashion,
+        by iterating over the time periods and product types.
+
+        :param frequency:
+            How long each time slot should be, expressed as a frequency alias in Pandas,
+            See: https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
+            defaults to "D"
+        :return: a list of tuples, containing:
+            1) a pair (2-tuple) with the start and end datetime
+            2) the product type (str)
+        """
+        collection = self.get_tcc_collection()
+        # We retrieve the products in chunks per day, and per product type (see below)
+        # So divide the temporal extent into slots per day:
+        dt_start, dt_end = get_coll_temporal_extent(collection)
+        dt_ranges = pd.date_range(dt_start, dt_end, freq=frequency)
+
+        prod_types = self._cfg_builder.get_product_types()
+        time_slots = zip(dt_ranges[:-1], dt_ranges[1:])
+
+        return list(itertools.product(time_slots, prod_types))
+
+    def list_num_prods_per_query_slot(self, collection_id: str, frequency: str = "MS") -> list[dict]:
+        results = []
+        catalogue = self.get_tcc_catalogue()
+        self._cfg_builder = CollectionConfigBuilder(self.get_tcc_collection())
+
+        for (slot_start, slot_end), prod_type in self._get_product_query_slots(frequency=frequency):
+            number = catalogue.get_product_count(collection_id, start=slot_start, end=slot_end, productType=prod_type)
+            record = dict(
+                collection_id=collection_id, start=slot_start, end=slot_end, productType=prod_type, num_product=number
+            )
+            results.append(record)
+            pprint(record)
+
+        return results
+
     def get_products_as_dataframe(self) -> gpd.GeoDataFrame:
         """Collect the products / assets info from the terracatalogueclient, into a GeoDataframe,
         and save the GeoDataframe to disk.
@@ -371,86 +416,102 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         """
         self._log_progress_message("START: get_products_as_dataframe")
 
+        self._df_asset_metadata = None
+        self._df_products = None
+
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
-        num_prods = catalogue.get_product_count(collection.id)
-        pprint(f"product count for coll_id {collection.id}: {num_prods}")
-
-        # We retrieve the products in chunks per day, and per product type (see below)
-        # So divide the temporal extent into slots per day:
-        dt_start, dt_end = get_coll_temporal_extent(collection)
-        dt_ranges = pd.date_range(dt_start, dt_end, freq="D")
-        pprint(dt_ranges)
-
-        df_all_asset_md = None
-        slot_start = dt_ranges[0]
         num_products_processed = 0
-        max_prods_for_progress = self._max_products if self._max_products > 0 else num_prods
+        num_prods = catalogue.get_product_count(collection.id)
+        max_prods_to_process = self._max_products if self._max_products > 0 else num_prods
+        all_products = []
 
-        for i, slot_start in enumerate(dt_ranges[:-1]):
-            slot_end = dt_ranges[i + 1]
-            prod_types = self._cfg_builder.get_product_types()
-            # Sometimes getting the data per data still hits the limit of how many
-            # products you can retrieve in one go.
-            # Therefore, dividing it up into product types as well.
-            for prod_type in prod_types:
-                self._log_progress_message(
-                    f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}"
-                )
-                self._log_progress_message(f"Retrieved {num_products_processed} of {max_prods_for_progress} products")
-                products = list(
-                    catalogue.get_products(collection.id, start=slot_start, end=slot_end, productType=prod_type)
-                )
-                assets_md = []
-                products_as_dicts = []
-                if not products:
-                    # There is no data for this time range.
-                    continue
+        _logger.info(f"product count for coll_id {collection.id}: {num_prods}")
 
-                for product in products:
-                    # Apply our own max_products limit for testing & troubleshooting:
-                    # in the inner-most loop
-                    num_products_processed += 1
-                    if self._max_products > 0 and num_products_processed > self._max_products:
-                        break
+        # If the time slots are to long you will get a terracatalogueclient.exceptions.TooManyResultsException.
+        for (slot_start, slot_end), prod_type in self._get_product_query_slots(frequency="MS"):
+            current_products = {}
+            products_as_dicts = []
 
-                    asset_metadata = self.create_asset_metadata(product)
-                    assets_md.append(asset_metadata)
-                    products_as_dicts.append(self._product_to_dict(product))
+            num_prods_in_slot = catalogue.get_product_count(
+                collection.id, start=slot_start, end=slot_end, productType=prod_type
+            )
+            self._log_progress_message(
+                f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}, number of products in slot: {num_prods_in_slot}"
+            )
+            products = list(
+                catalogue.get_products(collection.id, start=slot_start, end=slot_end, productType=prod_type)
+            )
+            if not products:
+                # There is no data for this time range and product type. => Get next slot.
+                continue
 
-                # The extra break statements are needed so we don't end up with
-                # an empty dataframe here, which is something we cannot process.
-                product_records = [{k: v for k, v in pr.items() if k != "geometry"} for pr in products_as_dicts]
-                product_geoms = [pr["geometry"] for pr in products_as_dicts]
-                gdf_products = gpd.GeoDataFrame(data=product_records, crs=4326, geometry=product_geoms)
-                gdf_products.index = gdf_products["id"]
-                if not self._df_products:
-                    self._df_products = gdf_products
-                else:
-                    self._df_products = pd.concat(self._df_products, gdf_products)
+            for product in products:
+                # We should never find duplicates within the same time slot tjat we query.
+                # If there are duplicates, it should only happen because the time period we ask for is shorted than the
+                # period that the product is for, i.e. the product overlaps several time slots we retrieve.
+                assert product.id not in current_products
+                current_products[product.id] = product
 
-                asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
-                asset_geoms = [md.geometry_lat_lon for md in assets_md]
-                gdf = gpd.GeoDataFrame(data=asset_records, crs=4326, geometry=asset_geoms)
-                gdf.index = gdf["asset_id"]
+                # We may already have the product because we have to query the products in small time slots for
+                # example a day or a month.
+                # The time slice that the product is for may be larger than a day, even as long as a year.
+                if self._df_products is not None:
+                    where_same_prod_and_period = np.logical_and(
+                        self._df_products["id"] == product.id,
+                        self._df_products["beginningDateTime"] == product.beginningDateTime,
+                        self._df_products["endingDateTime"] == product.endingDateTime,
+                    )
+                    duplicates_found = np.any(where_same_prod_and_period)
+                    if duplicates_found > 0:
+                        _logger.debug(
+                            f"Already have product with id {product.id}, beginningDateTime={product.beginningDateTime} "
+                            + f"endingDateTime={product.endingDateTime} in products DataFrame self._df_products"
+                            + f"{slot_start=}, {slot_end=}, {prod_type=}"
+                        )
+                        continue
 
-                if not df_all_asset_md:
-                    df_all_asset_md = gdf
-                else:
-                    df_all_asset_md = pd.concat(df_all_asset_md, gdf)
+                all_products.append(product)
+                products_as_dicts.append(self._product_to_dict(product))
 
-                # Apply our own max_products limit for testing & troubleshooting:
-                #   Break out of the second loop.
-                if self._max_products > 0 and num_products_processed > self._max_products:
-                    break
+            self._log_progress_message(f"Number of new products in current slot {len(products_as_dicts)}.")
+            if not products_as_dicts:
+                continue
 
-            # Apply our own max_products limit for testing & troubleshooting:
-            #   Break out of the outer loop.
-            if self._max_products > 0 and num_products_processed > self._max_products:
+            product_records = [{k: v for k, v in pr.items() if k != "geometry"} for pr in products_as_dicts]
+            product_geoms = [pr["geometry"] for pr in products_as_dicts]
+            gdf_products = gpd.GeoDataFrame(data=product_records, crs=4326, geometry=product_geoms)
+
+            gdf_products.index = gdf_products["id"]
+            gdf_products.sort_index()
+            if self._df_products is None:
+                self._df_products = gdf_products
+            else:
+                self._df_products = pd.concat([self._df_products, gdf_products])
+
+            num_products_processed = len(self._df_products)
+            self._save_dataframes()
+
+            self._log_progress_message(f"Retrieved {num_products_processed} of {max_prods_to_process} products")
+            if num_products_processed > max_prods_to_process:
                 break
 
+        assets_md = [self.create_asset_metadata(p) for p in all_products]
+        asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
+        asset_geoms = [md.geometry_lat_lon for md in assets_md]
+        gdf_asset_md = gpd.GeoDataFrame(data=asset_records, crs=4326, geometry=asset_geoms)
+        gdf_asset_md.index = gdf_asset_md["asset_id"]
+        gdf_asset_md.sort_index()
+        self._df_asset_metadata = gdf_asset_md
+        self._save_dataframes()
+
+        # TODO: these asserts are some temporary checks. Or do we need to keep them after all?
+        product_ids = set(p.id for p in all_products)
+        assert len(product_ids) == len(all_products)
+        assert len(product_ids) == len(assets_md)
+
         self._log_progress_message("DONE: get_products_as_dataframe")
-        return df_all_asset_md
+        return self._df_asset_metadata
 
     def _product_to_dict(self, product: tcc.Product) -> dict[str, Any]:
         return {
