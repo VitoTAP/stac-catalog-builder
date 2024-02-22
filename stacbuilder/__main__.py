@@ -456,6 +456,12 @@ def vpp_count_products():
     pprint.pprint(commandapi.vpp_count_products())
 
 
+@cli.command
+@click.argument("collection_id", type=click.STRING)
+def vpp_count_products_per_query_slot(collection_id):
+    commandapi.vpp_count_products_per_query_slot(collection_id)
+
+
 #
 # Subcommands for working with the collection configuration file.
 # Mostly to validate and troubleshoot the configuration.

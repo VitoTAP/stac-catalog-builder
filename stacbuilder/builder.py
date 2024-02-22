@@ -934,7 +934,9 @@ class AssetMetadataPipeline:
         self._log_progress_message("START: collect_stac_items")
 
         groups = self.group_metadata_by_item_id(self.get_metadata())
-        for assets in groups.values():
+        for item_id, assets in groups.items():
+            self._log_progress_message(f"Creating STAC item for {item_id=}")
+
             stac_item = self._meta_to_stac_item_mapper.create_item(assets)
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
@@ -947,9 +949,8 @@ class AssetMetadataPipeline:
 
         self._log_progress_message("DONE: collect_stac_items")
 
-    # TODO: [simplify] [refactor] Merge this into collect_stac_items once it works well and it has tests.
-    @staticmethod
-    def group_metadata_by_item_id(iter_metadata) -> Dict[int, List[Item]]:
+    def group_metadata_by_item_id(self, iter_metadata) -> Dict[int, List[Item]]:
+        self._log_progress_message("START: group_metadata_by_item_id")
         groups: Dict[int, AssetMetadata] = {}
 
         for metadata in iter_metadata:
@@ -960,6 +961,7 @@ class AssetMetadataPipeline:
 
             groups[item_id].append(metadata)
 
+        self._log_progress_message("DONE: group_metadata_by_item_id")
         return groups
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
