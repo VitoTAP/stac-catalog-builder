@@ -30,6 +30,7 @@ from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.terracatalog import HRLVPPMetadataCollector, CollectionConfigBuilder
 from stacbuilder.stacapi.upload import Uploader
+from stacbuilder.stacapi.config import Settings
 
 
 def build_collection(
@@ -389,7 +390,7 @@ def _check_tcc_collection_id(collection_id: Optional[str]) -> str:
         return collection_id
 
 
-def upload_to_stac_api(collection_path: Path) -> None:
+def upload_to_stac_api(collection_path: Path, settings: Settings) -> None:
     """Upload a collection to the STAC API.
 
     TODO: The STAC API has to be configured via a settings file.
@@ -397,7 +398,8 @@ def upload_to_stac_api(collection_path: Path) -> None:
     if isinstance(collection_path, str):
         collection_path = Path(collection_path)
 
-    uploader = Uploader.from_settings()
+    uploader = Uploader.from_settings(settings)
+    uploader._collections_endpoint.get_all()
     uploader.upload_collection_and_items(collection_path)
 
 

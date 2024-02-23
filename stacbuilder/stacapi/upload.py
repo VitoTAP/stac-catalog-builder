@@ -19,15 +19,15 @@ class Uploader:
         self._collections_endpoint = collections_ep
         self._items_endpoint = items_ep
 
-    @staticmethod
-    def from_settings(settings: Settings) -> "Uploader":
+    @classmethod
+    def from_settings(cls, settings: Settings) -> "Uploader":
         auth = get_auth(settings.auth)
-        return Uploader(
+        return cls.setup(
             stac_api_url=settings.stac_api_url, auth=auth, collection_auth_info=settings.collection_auth_info
         )
 
-    @classmethod
-    def setup(cls, stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None) -> "Uploader":
+    @staticmethod
+    def setup(stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None) -> "Uploader":
         collections_endpoint = CollectionsEndpoint(
             stac_api_url=stac_api_url,
             auth=auth,
