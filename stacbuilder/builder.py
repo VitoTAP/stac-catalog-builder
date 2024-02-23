@@ -200,13 +200,9 @@ class MapMetadataToSTACItem:
             end_datetime=first_asset.end_datetime,
             properties={
                 "product_version": first_asset.version,
-                # TODO: what was product_tile in the original script and do we still need it. Else remove.
-                # "product_tile": metadata.tile,
+                "product_tile": first_asset.tile_id,
             },
         )
-
-        # TODO: support optional parts: store the tile ID if dataset uses that.
-        #   We would need a way to customize extracting that tile ID for the specific dataset.
 
         # TODO: looks like we should get description from a source/config at the item level.
         description = self.item_assets_configs[first_asset.asset_type].description
@@ -214,8 +210,10 @@ class MapMetadataToSTACItem:
 
         item.common_metadata.created = dt.datetime.utcnow()
 
-        # TODO: support optional parts: these fields are recommended but they are also not always relevant or present.
-        #   Originally defined in a module with only constants. Need to add this to the config classes.
+        # TODO: support summaries: these fields are recommended but they are also not always relevant or present.
+        #   Originally defined in a module with only constants but now we work with configuration
+        #   or extracting it from the source.
+        #   This is part of https://github.com/VitoTAP/stac-catalog-builder/issues/18
         # item.common_metadata.mission = constants.MISSION
         # item.common_metadata.platform = constants.PLATFORM
         # item.common_metadata.instruments = constants.INSTRUMENTS
@@ -225,11 +223,30 @@ class MapMetadataToSTACItem:
                 return None
             return tuple(value)
 
-        assert len(set(a.proj_epsg for a in assets)) == 1
-        assert len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1
-        assert len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1
-        assert len(set(to_tuple_or_none(a.transform) for a in assets)) == 1
-        assert len(set(to_tuple_or_none(a.shape) for a in assets)) == 1
+        #
+        # Do some sanity checks on the asset metadata.
+        # There can be multiple assets in a STAC item and we want them to be consistent.
+        # For example:
+        # It is not really possible to say what the CRS of the STAC item is when the assets have a mix of different CRSs.
+        #
+        # All assets should have the same CRS
+        assert len(set(a.proj_epsg for a in assets)) == 1, "All assets should have the same CRS"
+        # To be on the safe side also check the that the corresponding projection transform
+        # is the same for all assets.
+        assert (
+            len(set(to_tuple_or_none(a.transform) for a in assets)) == 1
+        ), "All assets should have the projection transform"
+
+        # All assets should have the same bounding box
+        assert (
+            len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1
+        ), "All assets should have the lat-lon bounding box"
+        assert (
+            len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1
+        ), "All assets should have the projected bounding box"
+
+        # All assets should also have the same shape (width and height in pixels)
+        assert len(set(to_tuple_or_none(a.shape) for a in assets)) == 1, "All assets should have the same shape"
 
         for metadata in assets:
             item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
@@ -246,6 +263,7 @@ class MapMetadataToSTACItem:
         #    that is not always the case.
         #
         # The tile ID is not always the format that GridExtension expects.
+        #   We would need a way to customize extracting that tile ID for the specific dataset.
         # TODO: investigate when/when not to include the GridExtension.
         #
         # if metadata.tile_id:
@@ -507,9 +525,6 @@ class STACCollectionBuilder:
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
             item.save_object(dest_href=item_path)
-
-        # item_collection = ItemCollection(items)
-        # item_collection.save_object(dest_href=stac_item_dir)
 
         self._log_progress_message("updating collection extent")
         self._collection.extent = Extent.from_items(items)
@@ -934,8 +949,9 @@ class AssetMetadataPipeline:
         self._log_progress_message("START: collect_stac_items")
 
         groups = self.group_metadata_by_item_id(self.get_metadata())
-        for item_id, assets in groups.items():
-            self._log_progress_message(f"Creating STAC item for {item_id=}")
+        num_groups = len(groups)
+        for i, (item_id, assets) in enumerate(groups.items()):
+            self._log_progress_message(f"Creating STAC item {i+1} of {num_groups} for {item_id=}")
 
             stac_item = self._meta_to_stac_item_mapper.create_item(assets)
             # Ignore the asset when the file was not a known asset type, for example it is

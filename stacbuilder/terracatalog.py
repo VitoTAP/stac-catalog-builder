@@ -30,11 +30,15 @@ from terracatalogueclient import ProductFile
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
-
 from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
-
+from stacbuilder.projections import reproject_bounding_box
 
 _logger = logging.getLogger(__name__)
+
+
+# EPSG code for "lat-long", or WGS84 to be more precise;
+# Using a constant in order to avoid magic numbers.
+EPSG_4326_LATLON = 4326
 
 
 def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | None, dt.datetime | None]:
@@ -480,7 +484,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
             product_records = [{k: v for k, v in pr.items() if k != "geometry"} for pr in products_as_dicts]
             product_geoms = [pr["geometry"] for pr in products_as_dicts]
-            gdf_products = gpd.GeoDataFrame(data=product_records, crs=4326, geometry=product_geoms)
+            gdf_products = gpd.GeoDataFrame(data=product_records, crs=EPSG_4326_LATLON, geometry=product_geoms)
 
             gdf_products.index = gdf_products["id"]
             gdf_products.sort_index()
@@ -499,16 +503,27 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         assets_md = [self.create_asset_metadata(p) for p in all_products]
         asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
         asset_geoms = [md.geometry_lat_lon for md in assets_md]
-        gdf_asset_md = gpd.GeoDataFrame(data=asset_records, crs=4326, geometry=asset_geoms)
+        gdf_asset_md = gpd.GeoDataFrame(data=asset_records, crs=EPSG_4326_LATLON, geometry=asset_geoms)
         gdf_asset_md.index = gdf_asset_md["asset_id"]
         gdf_asset_md.sort_index()
         self._df_asset_metadata = gdf_asset_md
         self._save_dataframes()
 
         # TODO: these asserts are some temporary checks. Or do we need to keep them after all?
+        # Verify we have no duplicate products,
+        # i.e. the number of unique product IDs must be == to the number of products.
         product_ids = set(p.id for p in all_products)
-        assert len(product_ids) == len(all_products)
-        assert len(product_ids) == len(assets_md)
+        assert len(product_ids) == len(all_products), "The result should not contain products."
+        assert len(product_ids) == len(assets_md), "Each products should correspond to exactly 1 AssetMetadata instance"
+
+        # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
+        if not self.max_products:
+            if len(product_ids) != num_prods:
+                breakpoint()
+
+            assert (
+                len(product_ids) == num_prods
+            ), "Number of products in result must be the product count reported by terracataloguiclient"
 
         self._log_progress_message("DONE: get_products_as_dataframe")
         return self._df_asset_metadata
@@ -617,7 +632,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                         f"Could not get EPSG code for product with ID={product.id}, {epsg_url=}", exc_info=True
                     )
                     raise
-        asset_metadata.proj_epsg = epsg_code
+        asset_metadata.proj_epsg = epsg_code or EPSG_4326_LATLON
 
         # if data_links:
         #     asset_metadata.asset_type = first_link.get("title")
@@ -625,8 +640,13 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         #     asset_metadata.media_type = AssetMetadata.mime_to_media_type(file_type)
         #     asset_metadata.file_size = first_link.get("length")
 
-        asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=4326)
+        asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=EPSG_4326_LATLON)
         asset_metadata.geometry_lat_lon = product.geometry
+        if epsg_code:
+            proj_bbox = reproject_bounding_box(*product.bbox, from_crs=EPSG_4326_LATLON, to_crs=epsg_code)
+            asset_metadata.bbox_projected = BoundingBox.from_list(proj_bbox, epsg_code)
+        else:
+            asset_metadata.bbox_projected = asset_metadata.bbox_lat_lon
 
         asset_metadata.datetime = product.beginningDateTime
         asset_metadata.start_datetime = product.beginningDateTime
