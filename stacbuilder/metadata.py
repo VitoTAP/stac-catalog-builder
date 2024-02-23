@@ -524,7 +524,7 @@ class AssetMetadata:
 
         proj_bbox_dict = data.get("bbox_projected")
         if proj_bbox_dict:
-            proj_bbox = BoundingBox.from_dict(proj_bbox_dict, 4326)
+            proj_bbox = BoundingBox.from_dict(proj_bbox_dict)
             metadata.bbox_projected = proj_bbox
         else:
             metadata.bbox_projected = None
