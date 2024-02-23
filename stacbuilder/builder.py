@@ -235,15 +235,15 @@ class MapMetadataToSTACItem:
         # is the same for all assets.
         assert (
             len(set(to_tuple_or_none(a.transform) for a in assets)) == 1
-        ), "All assets should have the projection transform"
+        ), "All assets should have the same projection transform"
 
         # All assets should have the same bounding box
         assert (
             len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1
-        ), "All assets should have the lat-lon bounding box"
+        ), "All assets should have the same lat-lon bounding box"
         assert (
             len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1
-        ), "All assets should have the projected bounding box"
+        ), "All assets should have the same projected bounding box"
 
         # All assets should also have the same shape (width and height in pixels)
         assert len(set(to_tuple_or_none(a.shape) for a in assets)) == 1, "All assets should have the same shape"
