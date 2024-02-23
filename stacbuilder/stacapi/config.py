@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -17,3 +17,4 @@ class AuthSettings:
 class Settings:
     auth: AuthSettings
     stac_api_url: str
+    collection_auth_info: dict[str, Any]

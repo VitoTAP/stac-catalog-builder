@@ -273,13 +273,14 @@ def validate_collection(
 def vpp_list_metadata(
     collection_id: Optional[str] = None,
     max_products: Optional[int] = -1,
+    query_by_frequency: str = "QS",
 ) -> List[AssetMetadata]:
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
     _check_tcc_collection_id(collection_id)
-    collector = HRLVPPMetadataCollector()
+    collector = HRLVPPMetadataCollector(query_by_frequency=query_by_frequency)
     collector.collection_id = collection_id
     collector.max_products = max_products
 
@@ -296,13 +297,14 @@ def vpp_list_metadata(
 def vpp_list_stac_items(
     collection_id: Optional[str] = None,
     max_products: Optional[int] = -1,
+    query_by_frequency: str = "QS",
 ) -> List[Item]:
     """Show the STAC items that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
     _check_tcc_collection_id(collection_id)
-    collector = HRLVPPMetadataCollector()
+    collector = HRLVPPMetadataCollector(query_by_frequency=query_by_frequency)
     collector.collection_id = collection_id
     collector.max_products = max_products
 
@@ -321,11 +323,12 @@ def vpp_build_collection(
     output_dir: Optional[Path] = None,
     overwrite: Optional[bool] = False,
     max_products: Optional[int] = -1,
+    query_by_frequency: str = "QS",
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
     _check_tcc_collection_id(collection_id)
-    collector = HRLVPPMetadataCollector(temp_dir=output_dir)
+    collector = HRLVPPMetadataCollector(temp_dir=output_dir, query_by_frequency=query_by_frequency)
     collector.collection_id = collection_id
     collector.max_products = max_products
 
@@ -347,11 +350,11 @@ def vpp_build_all_collections(
     output_dir: Path,
     overwrite: bool,
     max_products: Optional[int] = -1,
-    # save_dataframe: Optional[bool] = False,
+    query_by_frequency: str = "QS",
 ) -> None:
     """Build a STAC collection for each of the collections in HRL VPP (OpenSearch)."""
 
-    collector = HRLVPPMetadataCollector()
+    collector = HRLVPPMetadataCollector(query_by_frequency=query_by_frequency)
     collector.max_products = max_products
     tcc_collections = collector.get_tcc_collections()
 

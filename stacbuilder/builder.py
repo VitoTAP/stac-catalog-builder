@@ -950,8 +950,14 @@ class AssetMetadataPipeline:
 
         groups = self.group_metadata_by_item_id(self.get_metadata())
         num_groups = len(groups)
-        for i, (item_id, assets) in enumerate(groups.items()):
-            self._log_progress_message(f"Creating STAC item {i+1} of {num_groups} for {item_id=}")
+
+        progress_chunk_size = 100
+        for i, assets in enumerate(groups.values()):
+            if i % progress_chunk_size == 0:
+                fraction_done = i / num_groups
+                self._log_progress_message(
+                    f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%})"
+                )
 
             stac_item = self._meta_to_stac_item_mapper.create_item(assets)
             # Ignore the asset when the file was not a known asset type, for example it is

@@ -15,11 +15,26 @@ _logger = logging.Logger(__name__)
 
 
 class Uploader:
-    def __init__(self, stac_api_url: URL, auth: AuthBase | None) -> None:
-        self._stac_api_url = URL(stac_api_url)
-        self._auth = auth or None
-        self._collections_endpoint = CollectionsEndpoint(stac_api_url=self._stac_api_url, auth=self._auth)
-        self._items_endpoint = ItemsEndpoint(stac_api_url=self._stac_api_url, auth=self._auth)
+    def __init__(self, collections_ep: CollectionsEndpoint, items_ep: ItemsEndpoint) -> None:
+        self._collections_endpoint = collections_ep
+        self._items_endpoint = items_ep
+
+    @staticmethod
+    def from_settings(settings: Settings) -> "Uploader":
+        auth = get_auth(settings.auth)
+        return Uploader(
+            stac_api_url=settings.stac_api_url, auth=auth, collection_auth_info=settings.collection_auth_info
+        )
+
+    @classmethod
+    def setup(cls, stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None) -> "Uploader":
+        collections_endpoint = CollectionsEndpoint(
+            stac_api_url=stac_api_url,
+            auth=auth,
+            collection_auth_info=collection_auth_info,
+        )
+        items_endpoint = ItemsEndpoint(stac_api_url=stac_api_url, auth=auth)
+        return Uploader(collections_ep=collections_endpoint, items_ep=items_endpoint)
 
     def upload_collection(self, collection: Path | Collection) -> Collection:
         if isinstance(collection, Path):
@@ -43,8 +58,3 @@ class Uploader:
         collection_out = self.upload_collection(collection)
         for item in collection_out.get_all_items():
             self.upload_item(item)
-
-    @staticmethod
-    def from_settings(settings: Settings) -> "Uploader":
-        auth = get_auth(settings.auth)
-        return Uploader(stac_api_url=settings.stac_api_url, auth=auth)
