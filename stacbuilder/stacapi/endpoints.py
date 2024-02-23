@@ -41,12 +41,11 @@ def _check_response_status(response: requests.Response, expected_status_codes: l
 
 
 class CollectionsEndpoint:
-    def __init__(self, stac_api_url: URL, auth: AuthBase | None) -> None:
+    def __init__(self, stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None) -> None:
         self._stac_api_url = URL(stac_api_url)
         self._collections_url = self._stac_api_url / "collections"
         self._auth = auth or None
-
-        self._collection_auth_info: dict | None = None
+        self._collection_auth_info: dict | None = collection_auth_info or None
 
     @property
     def stac_api_url(self) -> URL:

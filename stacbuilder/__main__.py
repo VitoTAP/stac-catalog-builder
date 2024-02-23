@@ -370,14 +370,21 @@ def check_openeo_job(job_id: str):
     required=False,
     type=click.Path(dir_okay=True, file_okay=False),
 )
+@click.option(
+    "-f",
+    "--frequency",
+    type=click.STRING,
+    help="Split collection's temporal extent using this frequency. Allowed values are the Pandas frequency abbreviations",
+)
 @click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
-def vpp_build(collection: str, max_products: int, outputdir: Path, overwrite: bool):
+def vpp_build(collection: str, max_products: int, outputdir: Path, overwrite: bool, frequency: str):
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
     commandapi.vpp_build_collection(
         collection_id=collection,
         max_products=max_products,
         output_dir=outputdir,
         overwrite=overwrite,
+        query_by_frequency=frequency,
     )
 
 
@@ -386,12 +393,20 @@ def vpp_build(collection: str, max_products: int, outputdir: Path, overwrite: bo
 @click.option(
     "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
 )
-def vpp_list_metadata(collection: str, max_products: int):
+@click.option(
+    "-f",
+    "--frequency",
+    type=click.STRING,
+    help="Split collection's temporal extent using this frequency. Allowed values are the Pandas frequency abbreviations",
+)
+def vpp_list_metadata(collection: str, max_products: int, frequency: str):
     """Show the AssetMetadata objects that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
-    md_list = commandapi.vpp_list_metadata(collection_id=collection, max_products=max_products)
+    md_list = commandapi.vpp_list_metadata(
+        collection_id=collection, max_products=max_products, query_by_frequency=frequency
+    )
     for asset_md in md_list:
         pprint.pprint(asset_md.to_dict())
 
@@ -401,13 +416,21 @@ def vpp_list_metadata(collection: str, max_products: int):
 @click.option(
     "-m", "--max-products", type=int, default=-1, help="Stop processing after this maximum number of products."
 )
-def vpp_list_items(collection: str, max_products: int):
+@click.option(
+    "-f",
+    "--frequency",
+    type=click.STRING,
+    help="Split collection's temporal extent using this frequency. Allowed values are the Pandas frequency abbreviations",
+)
+def vpp_list_items(collection: str, max_products: int, frequency: str):
     """Show the STAC items that are generated for each VPP product.
 
     This is used to test the conversion and check the configuration files.
     """
 
-    stac_items = commandapi.vpp_list_stac_items(collection_id=collection, max_products=max_products)
+    stac_items = commandapi.vpp_list_stac_items(
+        collection_id=collection, max_products=max_products, query_by_frequency=frequency
+    )
     for item in stac_items:
         pprint.pprint(item.to_dict())
 

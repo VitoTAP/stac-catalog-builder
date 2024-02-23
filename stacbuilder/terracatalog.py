@@ -248,7 +248,7 @@ class CollectionConfigBuilder:
 class HRLVPPMetadataCollector(IMetadataCollector):
     """Collects AssetMetadata for further processing for the HRL VPP collections from OpenSearch."""
 
-    def __init__(self, temp_dir: Path | None = None):
+    def __init__(self, temp_dir: Path | None = None, query_by_frequency: str | None = "QS"):
         super().__init__()
 
         # components: objects that we delegate work to.
@@ -260,6 +260,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         self._collection_id: Optional[str] = None
         self._max_products = -1
+        self._query_by_frequency: str = query_by_frequency or "QS"
 
         self.temp_dir: Path = Path(temp_dir) if temp_dir else None
 
@@ -433,7 +434,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         _logger.info(f"product count for coll_id {collection.id}: {num_prods}")
 
         # If the time slots are to long you will get a terracatalogueclient.exceptions.TooManyResultsException.
-        for (slot_start, slot_end), prod_type in self._get_product_query_slots(frequency="MS"):
+        for (slot_start, slot_end), prod_type in self._get_product_query_slots(frequency=self._query_by_frequency):
             current_products = {}
             products_as_dicts = []
 
@@ -496,24 +497,31 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             num_products_processed = len(self._df_products)
             self._save_dataframes()
 
-            self._log_progress_message(f"Retrieved {num_products_processed} of {max_prods_to_process} products")
+            percent_processed = num_products_processed / max_prods_to_process
+            self._log_progress_message(
+                f"Retrieved {num_products_processed:_} of {max_prods_to_process:_} products ({percent_processed:.1%})"
+            )
             if num_products_processed > max_prods_to_process:
                 break
 
+        self._log_progress_message("START: creating AssetMetadata GeoDataFrame ...")
         assets_md = [self.create_asset_metadata(p) for p in all_products]
         asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
         asset_geoms = [md.geometry_lat_lon for md in assets_md]
         gdf_asset_md = gpd.GeoDataFrame(data=asset_records, crs=EPSG_4326_LATLON, geometry=asset_geoms)
         gdf_asset_md.index = gdf_asset_md["asset_id"]
         gdf_asset_md.sort_index()
+        self._log_progress_message("DONE: creating AssetMetadata GeoDataFrame")
+
         self._df_asset_metadata = gdf_asset_md
         self._save_dataframes()
 
         # TODO: these asserts are some temporary checks. Or do we need to keep them after all?
         # Verify we have no duplicate products,
         # i.e. the number of unique product IDs must be == to the number of products.
+        self._log_progress_message("START sanity checks: no duplicate products present and received all products ...")
         product_ids = set(p.id for p in all_products)
-        assert len(product_ids) == len(all_products), "The result should not contain products."
+        assert len(product_ids) == len(all_products), "The result should not contain duplicate products."
         assert len(product_ids) == len(assets_md), "Each products should correspond to exactly 1 AssetMetadata instance"
 
         # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
@@ -524,6 +532,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             assert (
                 len(product_ids) == num_prods
             ), "Number of products in result must be the product count reported by terracataloguiclient"
+        self._log_progress_message("DONE sanity checks")
 
         self._log_progress_message("DONE: get_products_as_dataframe")
         return self._df_asset_metadata
@@ -562,7 +571,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         num_products = len(df)
         for i in range(num_products):
             if i % progress_chunk_size == 0:
-                self._log_progress_message(f"Converted {i} of {num_products} to AssetMetadata")
+                fraction_done = i / num_products
+                self._log_progress_message(f"Converted {i} of {num_products} to AssetMetadata ({fraction_done:.1%})")
 
             record = df.iloc[i, :]
             metadata = AssetMetadata.from_geoseries(record)
