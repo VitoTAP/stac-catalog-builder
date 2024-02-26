@@ -391,19 +391,17 @@ def _check_tcc_collection_id(collection_id: Optional[str]) -> str:
         return collection_id
 
 
-def upload_to_stac_api(collection_path: Path, items_dir: Path, settings: Settings) -> None:
+def upload_to_stac_api(collection_path: Path, settings: Settings) -> None:
     """Upload a collection to the STAC API.
 
     TODO: The STAC API has to be configured via a settings file.
     """
     if not isinstance(collection_path, Path):
         collection_path = Path(collection_path)
-
-    if not isinstance(items_dir, Path):
-        items_dir = Path(items_dir)
+    collection_path = collection_path.expanduser().absolute()
 
     uploader = Uploader.from_settings(settings)
-    uploader.upload_collection_and_items(collection_path, items=items_dir)
+    uploader.upload_collection_and_items(collection_path, items=collection_path.parent)
 
 
 def vpp_get_tcc_collections() -> list[tcc.Collection]:

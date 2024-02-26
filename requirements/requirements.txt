@@ -1,6 +1,7 @@
 --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple
 
 click==8.1.*
+dynaconf==3.2.*
 geopandas==0.14.*
 openeo==0.26.*
 pyarrow==14.0.*
