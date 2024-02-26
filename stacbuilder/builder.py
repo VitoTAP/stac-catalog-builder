@@ -402,6 +402,7 @@ class STACCollectionBuilder:
         collection_config: CollectionConfig,
         output_dir: Path,
         overwrite: bool = False,
+        link_items: Optional[bool] = True,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
@@ -413,13 +414,12 @@ class STACCollectionBuilder:
             )
         self._output_dir = Path(output_dir)
 
-        self._overwrite_output = overwrite
-
-        # Internal temporary state
-        self._stac_items: List[Item] = None
+        self._overwrite_output = bool(overwrite)
+        self._link_items = bool(link_items)
 
         # The result
         self._collection: Collection = None
+        self._stac_items: List[Item] = None
 
     def reset(self):
         self._collection = None
@@ -446,6 +446,14 @@ class STACCollectionBuilder:
         self._overwrite_output = bool(value)
 
     @property
+    def link_items(self) -> bool:
+        return self._link_items
+
+    @link_items.setter
+    def link_items(self, value: bool) -> bool:
+        self._link_items = bool(value)
+
+    @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
         return self.collection_config.item_assets or {}
 
@@ -461,16 +469,15 @@ class STACCollectionBuilder:
         self,
         stac_items: Iterable[Item],
         group: Optional[str | int] = None,
-        link_items: bool = True,
     ) -> None:
         """Create and save the STAC collection."""
         self.reset()
         self._stac_items = list(stac_items) or []
         self.create_empty_collection(group=group)
-        if link_items:
+        # TODO: This is not quite the right method to save the items when we don't want to link them to the collection.
+        #   The solution is probably easier if we make link_items an attribute. It is basically a setting as well.
+        if self.link_items:
             self.add_items_to_collection()
-        else:
-            self.save_items_outside_collection()
 
     def add_items_to_collection(
         self,
@@ -508,7 +515,7 @@ class STACCollectionBuilder:
         for item in items:
             item.collection = self._collection
 
-        stac_item_dir = self.output_dir / "temp" / self.collection.id
+        stac_item_dir = self.stac_item_dir()
         if not stac_item_dir.exists():
             stac_item_dir.mkdir(parents=True)
 
@@ -518,10 +525,7 @@ class STACCollectionBuilder:
                 self._log_progress_message(f"Saved {i} of {num_items} STAC items")
 
             item.validate()
-            year = f"{item.datetime.year:04}"
-            month = f"{item.datetime.month:02}"
-            day = f"{item.datetime.day:02}"
-            item_path = stac_item_dir / year / month / day / f"{item.id}.json"
+            item_path = self.get_item_path(item)
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
             item.save_object(dest_href=item_path)
@@ -530,6 +534,15 @@ class STACCollectionBuilder:
         self._collection.extent = Extent.from_items(items)
 
         self._log_progress_message("DONE: save_items_outside_collection")
+
+    def stac_item_dir(self) -> Path:
+        return self.output_dir / self.collection.id
+
+    def get_item_path(self, item: Item) -> Path:
+        year = f"{item.datetime.year:04}"
+        month = f"{item.datetime.month:02}"
+        day = f"{item.datetime.day:02}"
+        return self.stac_item_dir() / year / month / day / f"{item.id}.json"
 
     def normalize_hrefs(self, skip_unresolved: bool = False):
         layout_template = self._collection_config.layout_strategy_item_template
@@ -567,6 +580,8 @@ class STACCollectionBuilder:
         # The href links to asset files also have the be relative (to the location of the STAC item)
         # This needs to be done via the href_modifier
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
+        if not self.link_items:
+            self.save_items_outside_collection()
         self._log_progress_message("DONE: Saving collection.")
 
     @property
@@ -792,18 +807,19 @@ class AssetMetadataPipeline:
         metadata_collector: IMetadataCollector,
         output_dir: Path,
         overwrite: Optional[bool] = False,
+        link_items: Optional[bool] = True,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
         self._collection_dir: Path = None
         self._overwrite: bool = bool(overwrite)
+        self._link_items = bool(link_items)
 
         # Components / dependencies that must be provided
         self._metadata_collector: IMetadataCollector = metadata_collector
 
         # Components / dependencies that we set up internally
         self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
-        # self._metadata_group_creator: IGroupMetadataBy = None
         self._func_find_item_group: Optional[Callable[[Item], str]] = None
 
         self._collection_builder: STACCollectionBuilder = None
@@ -818,6 +834,7 @@ class AssetMetadataPipeline:
         collection_config: CollectionConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
+        link_items: Optional[bool] = True,
     ) -> "AssetMetadataPipeline":
         """Creates a AssetMetadataPipeline from configurations."""
 
@@ -827,6 +844,7 @@ class AssetMetadataPipeline:
             collection_config=collection_config,
             output_dir=output_dir,
             overwrite=overwrite,
+            link_items=link_items,
         )
         return pipeline
 
@@ -836,6 +854,7 @@ class AssetMetadataPipeline:
         collection_config: CollectionConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
+        link_items: Optional[bool] = True,
     ) -> None:
         """Set up an existing instance using the specified dependencies and configuration settings."""
 
@@ -854,6 +873,7 @@ class AssetMetadataPipeline:
         self._collection_config = collection_config
         self._output_base_dir = self._get_output_dir_or_default(output_dir)
         self._overwrite = overwrite
+        self._link_items = bool(link_items)
 
         self._setup_internals()
 
@@ -870,6 +890,7 @@ class AssetMetadataPipeline:
         self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
 
         # The default way we group items into multiple collections is by year
+        # Currently we don't use any other ways to create a group of collections.
         self._func_find_item_group = lambda item: item.datetime.year
 
         if group and not self.uses_collection_groups:
@@ -884,6 +905,7 @@ class AssetMetadataPipeline:
             collection_config=self._collection_config,
             overwrite=self._overwrite,
             output_dir=self._collection_dir,
+            link_items=self._link_items,
         )
 
     @property
@@ -1004,14 +1026,13 @@ class AssetMetadataPipeline:
 
     def build_collection(
         self,
-        link_items: Optional[bool] = True,
     ):
         """Build the entire STAC collection."""
         self._log_progress_message("START: build_collection")
 
         self.reset()
 
-        self._collection_builder.build_collection(self.collect_stac_items(), link_items=link_items)
+        self._collection_builder.build_collection(self.collect_stac_items())
         self._collection_builder.normalize_hrefs()
         self._collection_builder.save_collection()
         self._collection = self._collection_builder.collection

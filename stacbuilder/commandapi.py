@@ -338,13 +338,14 @@ def vpp_build_collection(
         output_dir = output_dir / collection_id
 
     coll_cfg = collector.get_collection_config()
-    pipeline = AssetMetadataPipeline.from_config(
+    pipeline: AssetMetadataPipeline = AssetMetadataPipeline.from_config(
         metadata_collector=collector,
         collection_config=coll_cfg,
         output_dir=output_dir,
         overwrite=overwrite,
+        link_items=False,
     )
-    pipeline.build_collection(link_items=False)
+    pipeline.build_collection()
 
 
 def vpp_build_all_collections(
@@ -390,17 +391,19 @@ def _check_tcc_collection_id(collection_id: Optional[str]) -> str:
         return collection_id
 
 
-def upload_to_stac_api(collection_path: Path, settings: Settings) -> None:
+def upload_to_stac_api(collection_path: Path, items_dir: Path, settings: Settings) -> None:
     """Upload a collection to the STAC API.
 
     TODO: The STAC API has to be configured via a settings file.
     """
-    if isinstance(collection_path, str):
+    if not isinstance(collection_path, Path):
         collection_path = Path(collection_path)
 
+    if not isinstance(items_dir, Path):
+        items_dir = Path(items_dir)
+
     uploader = Uploader.from_settings(settings)
-    uploader._collections_endpoint.get_all()
-    uploader.upload_collection_and_items(collection_path)
+    uploader.upload_collection_and_items(collection_path, items=items_dir)
 
 
 def vpp_get_tcc_collections() -> list[tcc.Collection]:
