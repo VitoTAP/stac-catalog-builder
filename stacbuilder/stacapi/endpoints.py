@@ -86,13 +86,15 @@ class CollectionsEndpoint:
 
     def create(self, collection: Collection) -> dict:
         collection.validate()
-        response = requests.post(str(self.collections_url), json=collection.to_dict(), auth=self._auth)
+        data = self._add_authentication_section(collection)
+        response = requests.post(str(self.collections_url), json=data, auth=self._auth)
         _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
     def update(self, collection: Collection) -> dict:
         collection.validate()
-        response = requests.put(str(self.collections_url), json=collection.to_dict(), auth=self._auth)
+        data = self._add_authentication_section(collection)
+        response = requests.put(str(self.collections_url), json=data, auth=self._auth)
         _check_response_status(response, _EXPECTED_STATUS_PUT)
         return response.json()
 

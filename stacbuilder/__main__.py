@@ -437,9 +437,13 @@ def vpp_list_items(collection: str, max_products: int, frequency: str):
 
 @cli.command
 @click.argument("collection_path")
-def vpp_upload_to_stac_api(collection_path: str):
+@click.argument("items_dir")
+def vpp_upload_to_stac_api(collection_path: str, items_dir: str):
     """Upload a collection to the STAC API."""
-    commandapi.upload_to_stac_api(Path(collection_path))
+
+    # TODO: Load the settings via Dynaconf.
+    settings = None
+    commandapi.upload_to_stac_api(Path(collection_path), Path(items_dir), settings=settings)
 
 
 @cli.command

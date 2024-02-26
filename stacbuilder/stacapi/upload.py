@@ -54,7 +54,21 @@ class Uploader:
         self._items_endpoint.create_or_update(item)
         return item
 
-    def upload_collection_and_items(self, collection: Path | Collection):
-        collection_out = self.upload_collection(collection)
-        for item in collection_out.get_all_items():
+    def upload_items_bulk(self, collection, items) -> None:
+        for item in items:
+            item.validate()
+            item.collection = collection
             self.upload_item(item)
+
+    def upload_collection_and_items(self, collection: Path | Collection, items: Path | list[Item]):
+        collection_out = self.upload_collection(collection)
+
+        if not items:
+            self.upload_items_bulk(collection, collection_out.get_all_items())
+        elif isinstance(items, Path):
+            item_dir: Path = items
+            item_paths = item_dir.glob("*/*/*/*/*.json")
+            items = (Item.from_file(path) for path in item_paths)
+            self.upload_items_bulk(collection, collection_out.get_all_items())
+        else:
+            self.upload_items_bulk(collection, items)

@@ -526,9 +526,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
         if not self.max_products:
-            if len(product_ids) != num_prods:
-                breakpoint()
-
             assert (
                 len(product_ids) == num_prods
             ), "Number of products in result must be the product count reported by terracataloguiclient"
