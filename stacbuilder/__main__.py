@@ -21,8 +21,9 @@ import pydantic.errors
 
 
 from stacbuilder import commandapi
-from stacbuilder.config import CollectionConfig
 from stacbuilder import verify_openeo
+from stacbuilder.config import CollectionConfig
+from stacbuilder.stacapi.config import get_stac_api_settings
 
 
 _logger = logging.getLogger(__name__)
@@ -437,13 +438,10 @@ def vpp_list_items(collection: str, max_products: int, frequency: str):
 
 @cli.command
 @click.argument("collection_path")
-@click.argument("items_dir")
-def vpp_upload_to_stac_api(collection_path: str, items_dir: str):
+def vpp_upload_to_stac_api(collection_path: str):
     """Upload a collection to the STAC API."""
-
-    # TODO: Load the settings via Dynaconf.
-    settings = None
-    commandapi.upload_to_stac_api(Path(collection_path), Path(items_dir), settings=settings)
+    settings = get_stac_api_settings()
+    commandapi.upload_to_stac_api(Path(collection_path), settings=settings)
 
 
 @cli.command

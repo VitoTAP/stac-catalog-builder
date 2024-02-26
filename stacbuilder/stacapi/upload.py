@@ -67,7 +67,7 @@ class Uploader:
             self.upload_items_bulk(collection, collection_out.get_all_items())
         elif isinstance(items, Path):
             item_dir: Path = items
-            item_paths = item_dir.glob("*/*/*/*/*.json")
+            item_paths = list(item_dir.glob("*/*/*/*/*/*.json"))
             items = (Item.from_file(path) for path in item_paths)
             self.upload_items_bulk(collection, collection_out.get_all_items())
         else:
