@@ -4,7 +4,6 @@ channels:
 dependencies:
   - python=3.11.0
   - click=8.1.*
-  - dynaconf=3.2.*
   - geopandas=0.14.*
   - openeo=0.26.*
   - pyarrow=14.0.*
@@ -21,7 +20,9 @@ dependencies:
   - jupyter
   - pytest
   - pip
+  - yarl=1.9.*
   - pip:
     - --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple
     - terracatalogueclient==0.1.14
     - requests_auth==7.0.*
+    - dynaconf==3.2.*
