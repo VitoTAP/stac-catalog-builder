@@ -278,7 +278,7 @@ class CollectionConfig(BaseModel):
     asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
 
-    # TODO: links (urls)
+    # TODO: general links (urls) that are often quite specific to the dataset, such as "about", or a link to a document that describes the dataset, etc.
 
     # A set of specific fields we want to give a fixed value at the end.
     # So this could override values that were generated.

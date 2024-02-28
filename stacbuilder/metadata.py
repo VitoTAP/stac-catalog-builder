@@ -76,7 +76,6 @@ class RasterMetadata:
         }
 
 
-# TODO: convert Metadata to a dataclass, and add method (or class) that fills it in from a GeoTIFF.
 class AssetMetadata:
     """Intermediate metadata that models the properties we actually use."""
 
@@ -141,10 +140,10 @@ class AssetMetadata:
         # The raw dictionary of data extracted from the href
         self._info_from_href: Dict[str, Any] = None
 
+        #
         # Essential asset info: what asset is it and what STAC item does it belong to
         # What bands does it contain or correspond to.
-        # TODO: support multiple bands
-        # TODO: clean up how multiple assets get assigned to one STAC item of the same type.
+        #
 
         self._asset_id: Optional[str] = None
         """The asset ID normally corresponds to the file, unless the InputPathParser provides a value to override it."""

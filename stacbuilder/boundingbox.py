@@ -101,7 +101,6 @@ class BoundingBox:
             "epsg": self.epsg,
         }
 
-    # TODO: method name could be better
     def set_from_dict(self, values: Dict[str, float]) -> None:
         """Take the new coordinate values from a dictionary."""
         self.west = values["west"]
@@ -124,7 +123,6 @@ class BoundingBox:
         """Convert coordinates to the standard W,S,E,N list format."""
         return [self.west, self.south, self.east, self.north]
 
-    # TODO: method name could be better
     def set_from_list(self, bbox_list: List[float], epsg: int) -> None:
         """Take the new coordinate values from a list that has the order W,S,E,N ."""
         self.west, self.south, self.east, self.north = bbox_list[:4]

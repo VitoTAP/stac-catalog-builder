@@ -355,25 +355,6 @@ class MapMetadataToSTACItem:
 
         return asset
 
-        # TODO: Did original script do anything in code below that we still need to re-implement? And remove it after.
-        # asset = Asset(href=make_absolute_href(metadata.href))
-        # asset.title = asset_def.title
-        # asset.description = asset_def.description
-        # asset.roles = asset_def.roles
-        # asset.media_type = asset_def.media_type
-
-        # # asset.roles = ASSET_PROPS[self.band]["roles"]
-        # # asset.title = ASSET_PROPS[self.band]["title"]
-        # # asset.description = ASSET_PROPS[self.band]["description"]
-
-        # # TODO: set the MediaType to use in the Metadata constructor
-        # # asset.media_type = self.collection_config.media_type
-
-        # # extra_fields = {"eo:bands": ASSET_PROPS[self.band]["bands"]}
-        # # asset.extra_fields = extra_fields
-
-        # return asset
-
     def _get_assets_definitions(self) -> List[AssetDefinition]:
         """Create AssetDefinitions, according to the config in self.item_assets_configs"""
         asset_definitions = {}
@@ -393,9 +374,7 @@ class MapMetadataToSTACItem:
 
 
 class STACCollectionBuilder:
-    """Creates a STAC Collection from STAC Items.
-    TODO: reduce this class to functions in the class: AssetMetadataPipeline
-    """
+    """Creates a STAC Collection from STAC Items."""
 
     def __init__(
         self,
@@ -474,8 +453,6 @@ class STACCollectionBuilder:
         self.reset()
         self._stac_items = list(stac_items) or []
         self.create_empty_collection(group=group)
-        # TODO: This is not quite the right method to save the items when we don't want to link them to the collection.
-        #   The solution is probably easier if we make link_items an attribute. It is basically a setting as well.
         if self.link_items:
             self.add_items_to_collection()
 

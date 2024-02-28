@@ -245,9 +245,8 @@ class MapGeoTiffToAssetMetadata:
                 band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
                 bands.append(band_md)
             raster_meta = RasterMetadata(shape=dataset.shape, bands=bands)
-            # TODO: Decide: do we really need the raster tags. If so, where is the best place to store them.
+            # TODO: Decide: do we really need the raster tags.
             asset_meta.tags = dataset.tags()
-            # TODO: currently there are two places to store tags. That is confusing, pick one.
             asset_meta.raster_metadata = raster_meta
 
         asset_meta.process_href_info()
@@ -303,7 +302,6 @@ class GeoTiffMetadataCollector(IMetadataCollector):
         self._setup_internals()
 
     def _setup_internals(self):
-        # TODO: implement href modified that translates file path to a URL with a configurable base URL
         href_modifier = None
         collection_conf = self._collection_config
 

@@ -216,8 +216,6 @@ def list_stac_items(
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-stac-items"
         GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
 
-    # TODO: how to deal with item grouping for the grouped collections in this command?
-    #   Maybe just don't show the groups here and add a separate command to show them with grouping.
     stac_items = list(pipeline.collect_stac_items())
     files = list(pipeline.get_input_files())
     failed_files = [files[i] for i, item in enumerate(stac_items) if item is None]
@@ -392,10 +390,7 @@ def _check_tcc_collection_id(collection_id: Optional[str]) -> str:
 
 
 def upload_to_stac_api(collection_path: Path, settings: Settings) -> None:
-    """Upload a collection to the STAC API.
-
-    TODO: The STAC API has to be configured via a settings file.
-    """
+    """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):
         collection_path = Path(collection_path)
     collection_path = collection_path.expanduser().absolute()
