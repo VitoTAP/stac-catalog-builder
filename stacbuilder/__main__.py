@@ -437,11 +437,29 @@ def vpp_list_items(collection: str, max_products: int, frequency: str):
 
 
 @cli.command
+@click.option("-m", "--max-items", help="Limit number of items to upload to max-items.", default=-1)
 @click.argument("collection_path")
-def vpp_upload_to_stac_api(collection_path: str):
+def vpp_upload(collection_path: str, max_items: int):
     """Upload a collection to the STAC API."""
     settings = get_stac_api_settings()
-    commandapi.upload_to_stac_api(Path(collection_path), settings=settings)
+    commandapi.upload_to_stac_api(Path(collection_path), settings=settings, max_items=max_items)
+
+
+@cli.command
+@click.option("-m", "--max-items", help="Limit number of items to upload to max-items.", default=-1)
+@click.argument("collection_path")
+def vpp_upload_items(collection_path: str, max_items: int):
+    """Upload a collection to the STAC API."""
+    settings = get_stac_api_settings()
+    breakpoint()
+    commandapi.upload_items_to_stac_api(Path(collection_path), settings=settings, max_items=max_items)
+
+
+@cli.command
+def vpp_show_stac_api_config():
+    """Upload a collection to the STAC API."""
+    settings = get_stac_api_settings()
+    pprint.pprint(settings.model_dump())
 
 
 @cli.command

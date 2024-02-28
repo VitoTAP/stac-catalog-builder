@@ -31,13 +31,37 @@ _EXPECTED_STATUS_PUT = [
 _EXPECTED_STATUS_DELETE = _EXPECTED_STATUS_PUT
 
 
-def _check_response_status(response: requests.Response, expected_status_codes: list[int]):
-    response.raise_for_status()
+def _check_response_status(response: requests.Response, expected_status_codes: list[int], raise_exc: bool = False):
     if response.status_code not in expected_status_codes:
-        _logger.warning(
+        message = (
             f"Expecting HTTP status to be any of {expected_status_codes} "
             + f"but received {response.status_code!r}, response body:\n{response.text}"
         )
+        if raise_exc:
+            raise Exception(message)
+        else:
+            _logger.warning(message)
+
+    # Always raise errors on 4xx and 5xx status codes.
+    response.raise_for_status()
+
+
+class RestApi:
+    def __init__(self, base_url: URL | str, auth: AuthBase) -> None:
+        self.base_url = URL(base_url)
+        self.auth = auth or None
+
+    def get(self, url_path: str, *args, **kwargs) -> requests.Response:
+        return requests.get(str(self.base_url / url_path), auth=self.auth, *args, **kwargs)
+
+    def post(self, url_path: str, *args, **kwargs) -> requests.Response:
+        return requests.post(str(self.base_url / url_path), auth=self.auth, *args, **kwargs)
+
+    def put(self, url_path: str, *args, **kwargs) -> requests.Response:
+        return requests.put(str(self.base_url / url_path), auth=self.auth, *args, **kwargs)
+
+    def delete(self, url_path: str, *args, **kwargs) -> requests.Response:
+        return requests.delete(str(self.base_url / url_path), auth=self.auth, *args, **kwargs)
 
 
 class CollectionsEndpoint:
