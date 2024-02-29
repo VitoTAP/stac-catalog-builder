@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Iterable
 
 from pystac import Collection, Item, ItemCollection
 
@@ -91,26 +91,9 @@ class CollectionsEndpoint:
 
     @property
     def stac_api_url(self) -> URL:
-        return self._rest_api.base
+        return self._rest_api.base_url
 
-    @property
-    # def collections_path(self) -> str:
-    #     return self._collections_path
-
-    # def _join_path(self, *url_path: list[str]) -> str:
-    #     return self._rest_api.join_path(*url_path)
-
-    # def get_collections_path(self, collection_id: str | None = None) -> str:
-    #     if not collection_id:
-    #         return self._rest_api.join_path("collections")
-    #     return self._rest_api.join_path("collections",  str(collection_id))
-
-    # def get_collections_url(self, collection_id: str | None) -> URL:
-    #     if not collection_id:
-    #         return self._rest_api.join_url("collections")
-    #     return self._rest_api.join_url("collections",  str(collection_id))
-
-    def get_all(self) -> List[Collection]:
+    def get_all(self) -> list[Collection]:
         response = self._rest_api.get("collections")
 
         _check_response_status(response, _EXPECTED_STATUS_GET)
@@ -178,6 +161,13 @@ class CollectionsEndpoint:
 
         return response.json()
 
+    def create_or_update(self, collection: Collection) -> dict:
+        # TODO: decide: Another strategy could be to handle HTTP 409 conflict and the fall back to a self.update / PUT request
+        if self.exists(collection.id):
+            return self.update(collection)
+        else:
+            return self.create(collection)
+
     def delete(self, collection: Collection) -> dict:
         return self.delete_by_id(collection.id)
 
@@ -193,13 +183,6 @@ class CollectionsEndpoint:
         response = self._rest_api.delete(f"collections/{collection_id}")
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
         return response.json()
-
-    def create_or_update(self, collection: Collection) -> dict:
-        # TODO: decide: Another strategy could be to handle HTTP 409 conflict and the fall back to a self.update / PUT request
-        if self.exists(collection.id):
-            return self.update(collection)
-        else:
-            return self.create(collection)
 
     def _add_authentication_section(self, collection: Collection) -> dict:
         coll_dict = collection.to_dict()
@@ -289,6 +272,17 @@ class ItemsEndpoint:
         item.validate()
         url_str = str(self.get_items_url(item.collection_id))
         response = requests.post(url_str, json=item.to_dict(), auth=self._auth)
+        _check_response_status(response, _EXPECTED_STATUS_POST)
+        return response.json()
+
+    def ingest_bulk(self, items: Iterable[Item]) -> dict:
+        collection_id = items[0].collection_id
+        if not all(i.collection_id == collection_id for i in items):
+            raise Exception("All collection IDs should be identical for bulk ingests")
+
+        url_str = str(self._stac_api_url / "collections" / str(collection_id) / "bulk_items")
+        data = {"items": {item.id: item.to_dict() for item in items}}
+        response = requests.post(url_str, json=data, auth=self._auth)
         _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
