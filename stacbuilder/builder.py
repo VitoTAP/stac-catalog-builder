@@ -609,7 +609,7 @@ class STACCollectionBuilder:
         self._collection = collection
         self._log_progress_message("DONE: create_empty_collection")
 
-    def get_default_extent(self):
+    def get_default_extent(self) -> Extent:
         end_dt = dt.datetime.utcnow()
 
         return Extent(
