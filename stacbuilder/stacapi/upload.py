@@ -11,7 +11,7 @@ from yarl import URL
 
 from stacbuilder.stacapi.auth import get_auth
 from stacbuilder.stacapi.config import Settings
-from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint
+from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 
 
 _logger = logging.Logger(__name__)
@@ -25,15 +25,17 @@ class Uploader:
     @classmethod
     def from_settings(cls, settings: Settings) -> "Uploader":
         auth = get_auth(settings.auth)
-        return cls.setup(
+        return cls.create_uploader(
             stac_api_url=settings.stac_api_url, auth=auth, collection_auth_info=settings.collection_auth_info
         )
 
     @staticmethod
-    def setup(stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None) -> "Uploader":
+    def create_uploader(
+        stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None
+    ) -> "Uploader":
+        rest_api = RestApi(base_url=stac_api_url, auth=auth)
         collections_endpoint = CollectionsEndpoint(
-            stac_api_url=stac_api_url,
-            auth=auth,
+            rest_api=rest_api,
             collection_auth_info=collection_auth_info,
         )
         items_endpoint = ItemsEndpoint(stac_api_url=stac_api_url, auth=auth)
