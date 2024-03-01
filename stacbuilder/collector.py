@@ -195,7 +195,6 @@ class RasterBBoxReader:
 class MapGeoTiffToAssetMetadata:
     """Extracts AssetMetadata from each GeoTIFF file.
 
-    TODO: name could be better
     TODO: VVVV move functionality to GeoTiffMetadataCollector
     """
 
