@@ -445,9 +445,18 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             self._log_progress_message(
                 f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}, number of products in slot: {num_prods_in_slot}"
             )
+
+            limit = None
+            if self._max_products:
+                prods_left = max_prods_to_process - len(all_products)
+                if num_prods_in_slot > prods_left:
+                    limit = num_prods_in_slot > prods_left
             products = list(
-                catalogue.get_products(collection.id, start=slot_start, end=slot_end, productType=prod_type)
+                catalogue.get_products(
+                    collection.id, start=slot_start, end=slot_end, productType=prod_type, limit=limit
+                )
             )
+
             if not products:
                 # There is no data for this time range and product type. => Get next slot.
                 continue
