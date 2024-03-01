@@ -243,6 +243,9 @@ class MapGeoTiffToAssetMetadata:
                 # TODO: if tags contains unit, add the unit
                 band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
                 bands.append(band_md)
+
+            # TODO: RasterMetadata.shape is duplicate info. Eliminate RasterMetadata and use BandMetadata directly
+            #   RasterMetadata.shape is duplicate info and the only other property left in RasterMetadata are the bands.
             raster_meta = RasterMetadata(shape=dataset.shape, bands=bands)
             # TODO: Decide: do we really need the raster tags.
             asset_meta.tags = dataset.tags()
