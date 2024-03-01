@@ -15,7 +15,6 @@ from pathlib import Path
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple
 
-
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -27,11 +26,13 @@ from terracatalogueclient.config import CatalogueConfig
 from terracatalogueclient.config import CatalogueEnvironment
 from terracatalogueclient import ProductFile
 
-from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
+from stacbuilder.exceptions import DataValidationError
+from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
+
 
 _logger = logging.getLogger(__name__)
 
@@ -223,7 +224,7 @@ class CollectionConfigBuilder:
         To be improved
         """
         # TODO: need to add setting so we know if we should assume it is an int type or a a float type
-        #   While float types with less than 32 bits doe exist, they are not common.
+        #   While float types with less than 32 bits do exist, they are not common.
         #   Not sure if EO ever uses those, but they do exist in other industries
         #   (for example it is commonly used in the EXR image format, but I haven't heard of any other examples)
         #   So for 16 bits and less we could assume it must be an int.
@@ -516,19 +517,36 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._df_asset_metadata = gdf_asset_md
         self._save_dataframes()
 
-        # TODO: these asserts are some temporary checks. Or do we need to keep them after all?
         # Verify we have no duplicate products,
         # i.e. the number of unique product IDs must be == to the number of products.
         self._log_progress_message("START sanity checks: no duplicate products present and received all products ...")
         product_ids = set(p.id for p in all_products)
-        assert len(product_ids) == len(all_products), "The result should not contain duplicate products."
-        assert len(product_ids) == len(assets_md), "Each products should correspond to exactly 1 AssetMetadata instance"
+
+        if len(product_ids) != len(all_products):
+            raise DataValidationError(
+                "Sanity check failed in get_products_as_dataframe:"
+                + " The result should not contain duplicate products."
+                + " len(product_ids) != len(all_products)"
+                + f"{len(product_ids)=}  {len(all_products)=}"
+            )
+
+        if len(product_ids) != len(assets_md):
+            raise DataValidationError(
+                "Sanity check failed in get_products_as_dataframe:"
+                + " Each products should correspond to exactly 1 AssetMetadata instance."
+                + " len(product_ids) != len(assets_md)"
+                + f"{len(product_ids)=}  {len(assets_md)=}"
+            )
 
         # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
         if not self.max_products:
-            assert (
-                len(product_ids) == num_prods
-            ), "Number of products in result must be the product count reported by terracataloguiclient"
+            if len(product_ids) != num_prods:
+                raise DataValidationError(
+                    "Sanity check failed in get_products_as_dataframe:"
+                    + "Number of products in result must be the product count reported by terracataloguiclient"
+                    + "len(product_ids) != num_prods"
+                    + f"{len(product_ids)=}  product count: {num_prods=}"
+                )
         self._log_progress_message("DONE sanity checks")
 
         self._log_progress_message("DONE: get_products_as_dataframe")
@@ -640,12 +658,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     )
                     raise
         asset_metadata.proj_epsg = epsg_code or EPSG_4326_LATLON
-
-        # if data_links:
-        #     asset_metadata.asset_type = first_link.get("title")
-        #     file_type = first_link.get("type")
-        #     asset_metadata.media_type = AssetMetadata.mime_to_media_type(file_type)
-        #     asset_metadata.file_size = first_link.get("length")
 
         asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=EPSG_4326_LATLON)
         asset_metadata.geometry_lat_lon = product.geometry

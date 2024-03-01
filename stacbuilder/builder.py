@@ -146,7 +146,6 @@ class AlternateHrefGenerator:
 class MapMetadataToSTACItem:
     """Converts AssetMetadata objects to STAC Items.
 
-    TODO: class name could be better
     TODO: find better name for item_assets_configs, maybe asset_definition_configs.
     """
 

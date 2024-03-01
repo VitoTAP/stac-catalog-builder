@@ -74,6 +74,7 @@ class EOBandConfig(BaseModel):
 
     # TODO: the EO extension calls this common_name, maybe we should use that instead of 'name'
     #   https://github.com/stac-extensions/eo#band-object
+    #   See GH issue: https://github.com/VitoTAP/stac-catalog-builder/issues/29
     name: str = Field(description="common_name of the band.")
 
     description: str = Field(description="Description of the band.")
@@ -249,8 +250,6 @@ class AlternateHrefConfig(BaseModel):
 class CollectionConfig(BaseModel):
     """Model, store configuration of a STAC collection"""
 
-    # TODO: add nested configuration object for how to group collections
-    #   Currently the default class is GroupMetadataByYear and there are no options to choose a grouping.
     model_config = ConfigDict(from_attributes=True)
 
     collection_id: str

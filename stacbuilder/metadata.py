@@ -106,7 +106,6 @@ class AssetMetadata:
     #       for the EO and Raster STAC extensions (eo:bands and raster:bands)
     # TODO: will probably also need the spatial resolution.
 
-    # TODO: more explicit handling of data extracted from path or href, should be a class perhaps.
     PROPS_FROM_HREFS = [
         "item_id",
         "asset_id",
@@ -157,8 +156,7 @@ class AssetMetadata:
         asset_id.
         """
 
-        # TODO: item_type is currently a misnomer, more like an asset type.
-        # We use this to find the corresponding asset definition config in the CollectionConfig
+        # We use asset_type to find the corresponding asset definition config in the CollectionConfig
         self._asset_type: Optional[str] = None
 
         # Temporal extent
@@ -364,7 +362,6 @@ class AssetMetadata:
     @property
     def proj_bbox_as_polygon(self) -> Optional[Polygon]:
         # TODO: [decide] convert this RO property to a method or not?
-        # TODO: method name could be better
         if not self._bbox_projected:
             return None
         return self._bbox_projected.as_polygon()
@@ -629,7 +626,6 @@ class AssetMetadata:
 class GeodataframeExporter:
     """Utility class to export metadata and STAC items as geopandas GeoDataframes.
 
-    TODO: find a better name for GeodataframeExporter
     TODO: This is currently a class with only static methods, perhaps a module would be beter.
     """
 

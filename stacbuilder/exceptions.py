@@ -36,3 +36,7 @@ class InvalidConfiguration(STACBuilderException):
     """
 
     pass
+
+
+class DataValidationError(Exception):
+    """Raised when one of the validations on our data processing fails."""
