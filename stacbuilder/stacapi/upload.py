@@ -56,7 +56,6 @@ class Uploader:
         return self._items_endpoint.create_or_update(item)
 
     def upload_items_bulk(self, collection_id: str, items: Iterable[Item]) -> None:
-        breakpoint()
         for item in items:
             self._prepare_item(item, collection_id)
             item.validate()
@@ -65,17 +64,14 @@ class Uploader:
     def upload_collection_and_items(
         self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1
     ) -> None:
-        breakpoint()
         collection_out = self.upload_collection(collection)
 
-        breakpoint()
         self.upload_items(collection_out, items, max_items)
 
     def upload_items(self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1) -> None:
         if isinstance(collection, Path):
             collection = Collection.from_file(collection)
 
-        breakpoint()
         items_out: list[Item] = items or []
         if not items:
             _logger.info(f"Using STAC items linked to the collection: {collection.id=}")
@@ -87,7 +83,6 @@ class Uploader:
             _logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 
-        breakpoint()
         if max_items >= 0:
             _logger.info(f"User requested to limit the number of items to {max_items=}")
             items_out = islice(items_out, max_items)
@@ -95,7 +90,6 @@ class Uploader:
         self.upload_items_bulk(collection.id, items_out)
 
     def _prepare_item(self, item: Item, collection_id: str):
-        breakpoint()
         item.collection_id = collection_id
 
         if not item.get_links(pystac.RelType.COLLECTION):
