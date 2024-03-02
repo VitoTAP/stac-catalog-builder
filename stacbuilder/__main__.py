@@ -451,7 +451,6 @@ def vpp_upload(collection_path: str, max_items: int):
 def vpp_upload_items(collection_path: str, max_items: int):
     """Upload a collection to the STAC API."""
     settings = get_stac_api_settings()
-    breakpoint()
     commandapi.upload_items_to_stac_api(Path(collection_path), settings=settings, max_items=max_items)
 
 
