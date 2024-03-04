@@ -53,9 +53,6 @@ class RestApi:
 
     def join_path(self, *url_path: list[str]) -> str:
         return "/".join(url_path)
-        # if isinstance(url_path, list):
-        #     return "/".join(url_path)
-        # return url_path
 
     def join_url(self, url_path: str | list[str]) -> str:
         return str(self.base_url / self.join_path(url_path))
@@ -76,7 +73,6 @@ class RestApi:
 class CollectionsEndpoint:
     def __init__(self, rest_api: RestApi, collection_auth_info: dict | None = None) -> None:
         self._rest_api = rest_api
-        # self._collections_path = "collections"
         self._collection_auth_info: dict | None = collection_auth_info or None
 
     @staticmethod
@@ -193,25 +189,38 @@ class CollectionsEndpoint:
 
 
 class ItemsEndpoint:
-    def __init__(self, stac_api_url: URL, auth: AuthBase | None) -> None:
-        self._stac_api_url = URL(stac_api_url)
-        self._auth = auth or None
+    def __init__(self, rest_api: RestApi) -> None:
+        self._rest_api: RestApi = rest_api
+        # self._stac_api_url = URL(stac_api_url)
+        # self._auth = auth or None
+
+    @staticmethod
+    def create_endpoint(stac_api_url: URL, auth: AuthBase | None) -> "ItemsEndpoint":
+        return ItemsEndpoint(rest_api=RestApi(base_url=stac_api_url, auth=auth))
+
+    # @property
+    # def stac_api_url(self) -> URL:
+    #     return self._stac_api_url
+
+    # @property
+    # def rest_api(self) -> RestApi:
+    #     return self._rest_api
 
     @property
     def stac_api_url(self) -> URL:
-        return self._stac_api_url
+        return self._rest_api.base_url
 
     def get_items_url(self, collection_id) -> URL:
         if not collection_id:
             raise ValueError(f'Argument "collection_id" must have a value of type str. {collection_id=!r}')
-        return self._stac_api_url / "collections" / str(collection_id) / "items"
+        return f"collections/{collection_id}/items"
 
-    def get_items_url_for_id(self, collection_id, item_id) -> URL:
+    def get_items_url_for_id(self, collection_id: str, item_id: str) -> URL:
         if not collection_id:
-            raise ValueError(f'Argument "collection_id" must have a value of type str. {collection_id=!r}')
+            raise ValueError(f'Argument "collection_id" miust have a value of type str. {collection_id=!r}')
         if not item_id:
             raise ValueError(f'Argument "item_id" must have a value of type str. {item_id=!r}')
-        return self._stac_api_url / "collections" / str(collection_id) / "items" / str(item_id)
+        return f"collections/{collection_id}/items/{item_id}"
 
     def get_items_url_for_item(self, item: Item) -> URL:
         if not item:
@@ -219,9 +228,8 @@ class ItemsEndpoint:
         return self.get_items_url_for_id(item.collection_id, item.id)
 
     def get_all(self, collection_id) -> ItemCollection:
-        url_str = str(self.get_items_url(collection_id))
-        response = requests.get(url_str, auth=self._auth)
-        response.raise_for_status()
+        response = self._rest_api.get(self.get_items_url(collection_id))
+
         _check_response_status(response, _EXPECTED_STATUS_GET)
         data = response.json()
         if not isinstance(data, dict):
@@ -230,10 +238,14 @@ class ItemsEndpoint:
         return ItemCollection.from_dict(data)
 
     def get(self, collection_id: str, item_id: str) -> Item:
-        url_str = str(self.get_items_url_for_id(collection_id, item_id))
-        response = requests.get(url_str, auth=self._auth)
+        response = self._rest_api.get(self.get_items_url_for_id(collection_id, item_id))
+
         _check_response_status(response, _EXPECTED_STATUS_GET)
-        return Item.from_dict(response.json())
+        data = response.json()
+        if not isinstance(data, dict):
+            raise Exception(f"Expected a dict in the JSON body but received type {type(data)}, value={data!r}")
+
+        return Item.from_dict(data)
 
     def exists_by_id(self, collection_id: str, item_id: str) -> bool:
         if not collection_id:
@@ -245,8 +257,7 @@ class ItemsEndpoint:
             raise InvalidOperation(
                 f"item_id must have a non-empty str value. Actual type and value: {type(item_id)=}, {item_id=!r}"
             )
-        url_str = str(self.get_items_url_for_id(collection_id, item_id))
-        response = requests.get(url_str, auth=self._auth)
+        response = self._rest_api.get(self.get_items_url_for_id(collection_id, item_id))
 
         # We do expect HTTP 404 when it doesn't exist.
         # Any other error status means there is an actual problem.
@@ -270,8 +281,7 @@ class ItemsEndpoint:
 
     def create(self, item: Item) -> dict:
         item.validate()
-        url_str = str(self.get_items_url(item.collection_id))
-        response = requests.post(url_str, json=item.to_dict(), auth=self._auth)
+        response = self._rest_api.post(self.get_items_url(item.collection_id), json=item.to_dict())
         _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
@@ -280,16 +290,15 @@ class ItemsEndpoint:
         if not all(i.collection_id == collection_id for i in items):
             raise Exception("All collection IDs should be identical for bulk ingests")
 
-        url_str = str(self._stac_api_url / "collections" / str(collection_id) / "bulk_items")
+        url_path = str(self._stac_api_url / "collections" / str(collection_id) / "bulk_items")
         data = {"items": {item.id: item.to_dict() for item in items}}
-        response = requests.post(url_str, json=data, auth=self._auth)
+        response = self._rest_api.post(url_path, json=data)
         _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
     def update(self, item: Item) -> dict:
         item.validate()
-        url_str = str(self.get_items_url_for_id(item.collection_id, item.id))
-        response = requests.put(url_str, json=item.to_dict(), auth=self._auth)
+        response = self._rest_api.put(self.get_items_url_for_id(item.collection_id, item.id), json=item.to_dict())
         _check_response_status(response, _EXPECTED_STATUS_PUT)
         return response.json()
 
@@ -309,8 +318,7 @@ class ItemsEndpoint:
             raise InvalidOperation(
                 f"item_id must have a non-empty str value. Actual type and value: {type(item_id)=}, {item_id=!r}"
             )
-        url_str = str(self.get_items_url_for_id(collection_id, item_id))
-        response = requests.delete(url_str, auth=self._auth)
+        response = self._rest_api.delete(self.get_items_url_for_id(collection_id, item_id))
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
         return response.json()
 
