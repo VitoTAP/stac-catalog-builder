@@ -48,31 +48,107 @@ def _check_response_status(response: requests.Response, expected_status_codes: l
 
 
 class RestApi:
+    """Helper class to execute the typical HTTP requests for a REST API
+
+    Delegates the authentication in a consistent way with less code duplication.
+    """
+
     def __init__(self, base_url: URL | str, auth: AuthBase | None = None) -> None:
+        """Constructor
+
+        :param base_url: the base URL of the API
+            i.e. the part to which we concatentate URL paths.
+            For example https//stac-api.my-organisation.com/api/
+
+        :param auth: if present (= not None), this object takes care of authentication
+            this is the same as the auth parameter in ` requests.request(method, url, **kwargs)`
+            from the requests library.
+
+            See also: https://requests.readthedocs.io/en/latest/api/#requests.request
+        """
         self.base_url = URL(base_url)
         self.auth = auth or None
 
     def join_path(self, *url_path: list[str]) -> str:
+        """Create a full URL path out of a list of strings.
+
+        :param url_path:
+            A string or a list of strings to join into a URL path.
+
+        :return:
+            The URL path, i.e. joining individual path parts joined with '/'
+            To get the full URL (as a URL object) use join_url instead.
+        """
         return "/".join(url_path)
 
     def join_url(self, url_path: str | list[str]) -> str:
+        """Create a URL from the base_url and the url_path.
+
+        :param url_path: same as in join_path
+        :return: a URL object that represents the full URL.
+        """
         return str(self.base_url / self.join_path(url_path))
 
     def get(self, url_path: str | list[str], *args, **kwargs) -> requests.Response:
+        """Execute an HTTP GET request.
+
+        Authentication will be delegated to the AuthBase object self.auth, if it has a value,
+        as per the requests library.
+        If self.auth is None then no authentication done.
+
+        :param url_path: path or path parts to build the full URL.
+        :return: the HTTP response.
+        """
         return requests.get(self.join_url(url_path), auth=self.auth, *args, **kwargs)
 
     def post(self, url_path: str | list[str], *args, **kwargs) -> requests.Response:
+        """Execute an HTTP POST request.
+
+        Authentication will be delegated to the AuthBase object self.auth, if it has a value,
+        as per the requests library.
+        If self.auth is None then no authentication done.
+
+        :param url_path: path or path parts to build the full URL.
+        :return: the HTTP response.
+        """
         return requests.post(self.join_url(url_path), auth=self.auth, *args, **kwargs)
 
     def put(self, url_path: str | list[str], *args, **kwargs) -> requests.Response:
+        """Execute an HTTP PUT request.
+
+        Authentication will be delegated to the AuthBase object self.auth, if it has a value,
+        as per the requests library.
+        If self.auth is None then no authentication done.
+
+        :param url_path: path or path parts to build the full URL.
+        :return: the HTTP response.
+        """
         return requests.put(self.join_url(url_path), auth=self.auth, *args, **kwargs)
 
     def delete(self, url_path: str | list[str], *args, **kwargs) -> requests.Response:
+        """Execute an HTTP DELETE request.
+
+        Authentication will be delegated to the AuthBase object self.auth, if it has a value,
+        as per the requests library.
+        If self.auth is None then no authentication done.
+
+        :param url_path: path or path parts to build the full URL.
+        :return: the HTTP response.
+        """
         return requests.delete(self.join_url(url_path), auth=self.auth, *args, **kwargs)
 
 
 class CollectionsEndpoint:
     def __init__(self, rest_api: RestApi, collection_auth_info: dict | None = None) -> None:
+        """Constructor.
+
+        Follows dependency injection so you have to provide the objects it needs
+        (or mock implementation in a test) See parameters below.
+
+        :param rest_api: the RestApi to delegate HTTP requests to.
+        :param collection_auth_info: a dictionary that describe who can read or write the collection after creation.
+            This dictionary is added to the collection's dictionary in the POST/POT request's body.
+        """
         self._rest_api = rest_api
         self._collection_auth_info: dict | None = collection_auth_info or None
 
@@ -80,6 +156,11 @@ class CollectionsEndpoint:
     def create_endpoint(
         stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None
     ) -> "CollectionsEndpoint":
+        """Convenience method to create a CollectionsEndpoint object from basic information.
+
+        This creates the dependencies for you, but that also means you can't pick another implementation here.
+        If you need that (in a test) you should construct those objects yourself, and pass them directly to the constructor.
+        """
         rest_api = RestApi(base_url=stac_api_url, auth=auth)
         return CollectionsEndpoint(
             rest_api=rest_api,
@@ -88,9 +169,14 @@ class CollectionsEndpoint:
 
     @property
     def stac_api_url(self) -> URL:
+        """The base URL for the STAC API."""
         return self._rest_api.base_url
 
     def get_all(self) -> list[Collection]:
+        """Get all collections.
+
+        TODO: Implement paging: If there are many collections then the API will likely limit the number or collections returns, via paging.
+        """
         response = self._rest_api.get("collections")
 
         _check_response_status(response, _EXPECTED_STATUS_GET)
@@ -101,6 +187,14 @@ class CollectionsEndpoint:
         return [Collection.from_dict(j) for j in data.get("collections", [])]
 
     def get(self, collection_id: str) -> Collection:
+        """Get the collection with ID collection_id.
+
+        :param collection_id: the collection ID to look for.
+        :raises TypeError: when collection_id is not type str (string).
+        :raises ValueError: when collection_id is an empty string.
+        :raises HTTP: when the HTTP response status is 404 or any other error status.
+        :return: a Collection object if it was found
+        """
         if not isinstance(collection_id, str):
             raise TypeError(f'Argument "collection_id" must be of type str, but its type is {type(collection_id)=}')
 
@@ -115,6 +209,14 @@ class CollectionsEndpoint:
         return Collection.from_dict(response.json())
 
     def exists(self, collection_id: str) -> bool:
+        """Query if a collection with ID collection_id exists.
+
+        :param collection_id: the collection ID to look for.
+        :raises TypeError: when collection_id is not type str (string).
+        :raises ValueError: when collection_id is an empty string.
+        :raises HTTP: when the HTTP response status any error status other than "404 Not found".
+        :return: True if found, false if not fount.
+        """
         if not isinstance(collection_id, str):
             raise TypeError(f'Argument "collection_id" must be of type str, but its type is {type(collection_id)=}')
 
@@ -133,6 +235,13 @@ class CollectionsEndpoint:
         return True
 
     def create(self, collection: Collection) -> dict:
+        """Create a new collection.
+
+        :param collection: pystac.Collection object to create in the STAC API backend (or upload if you will)
+        :raises TypeError: if collection is not a pystac.Collection.
+        :return: dict that contains the JSON body of the HTTP response.
+        """
+
         if not isinstance(collection, Collection):
             raise TypeError(
                 f'Argument "collection" must be of type pystac.Collection, but its type is {type(collection)=}'
@@ -146,6 +255,13 @@ class CollectionsEndpoint:
         return response.json()
 
     def update(self, collection: Collection) -> dict:
+        """Update an existing collection.
+
+        :param collection: pystac.Collection object to update in the STAC API backend.
+        :raises TypeError: if collection is not a pystac.Collection.
+        :return: dict that contains the JSON body of the HTTP response.
+        """
+
         if not isinstance(collection, Collection):
             raise TypeError(
                 f'Argument "collection" must be of type pystac.Collection, but its type is {type(collection)=}'
@@ -159,6 +275,12 @@ class CollectionsEndpoint:
         return response.json()
 
     def create_or_update(self, collection: Collection) -> dict:
+        """'Upsert': Create the collection if it does not exist, or update it if it exists.
+
+        :param collection: the collection to create/update
+        :return: dict that contains the JSON body of the HTTP response.
+        """
+
         # TODO: decide: Another strategy could be to handle HTTP 409 conflict and the fall back to a self.update / PUT request
         if self.exists(collection.id):
             return self.update(collection)
@@ -166,9 +288,22 @@ class CollectionsEndpoint:
             return self.create(collection)
 
     def delete(self, collection: Collection) -> dict:
+        """Delete this collection.
+
+        :param collection: pystac.Collection object to delete from the STAC API backend.
+        :raises TypeError: if collection is not a pystac.Collection.
+        :return: dict that contains the JSON body of the HTTP response.
+        """
         return self.delete_by_id(collection.id)
 
     def delete_by_id(self, collection_id: str) -> dict:
+        """Delete the collection that has the specified ID.
+
+        :param collection_id: the collection ID to look for.
+        :raises TypeError: when collection_id is not a string.
+        :raises ValueError: when collection_id is an empty string.
+        :return: dict that contains the JSON body of the HTTP response.
+        """
         if not isinstance(collection_id, str):
             raise TypeError(f'Argument "collection_id" must be of type str, but its type is {type(collection_id)=}')
 

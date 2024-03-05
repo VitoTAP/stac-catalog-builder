@@ -99,14 +99,20 @@ class Uploader:
             self._items_endpoint.ingest_bulk(chunk)
 
     def upload_collection_and_items(
-        self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1
+        self,
+        collection: Path | Collection,
+        items: Path | list[Item],
+        limit: int = -1,
+        offset: int = -1,
     ) -> None:
         collection_out = self.upload_collection(collection)
         _logger.info(f"Uploaded collections, result={collection_out}")
 
-        self.upload_items(collection, items, max_items)
+        self.upload_items(collection, items, limit=limit, offset=offset)
 
-    def upload_items(self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1) -> None:
+    def upload_items(
+        self, collection: Path | Collection, items: Path | list[Item], limit: int = -1, offset: int = -1
+    ) -> None:
         if isinstance(collection, Path):
             collection = Collection.from_file(collection)
 
@@ -121,11 +127,25 @@ class Uploader:
             _logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 
-        if max_items >= 0:
-            _logger.info(f"User requested to limit the number of items to {max_items=}")
-            items_out = itertools.islice(items_out, max_items)
+        start = None
+        stop = None
+        if offset > 0:
+            start = offset
+            _logger.info(f"User requested to start item upload at offset {offset=}")
 
+        if limit > 0:
+            _logger.info(f"User requested to limit the number of items to {limit=}")
+            if offset > 0:
+                stop = offset + limit
+            else:
+                stop = limit
+
+        self._log_progress_message(f"START upload of items from {start=} to {stop=}. ({offset=}, {limit=})")
+
+        items_out = itertools.islice(items_out, start, stop)
         self.upload_items_bulk(collection.id, items_out)
+
+        self._log_progress_message(f"DONE upload of items from {start=} to {stop=}. ({offset=}, {limit=})")
 
     def _prepare_item(self, item: Item, collection_id: str):
         item.collection_id = collection_id

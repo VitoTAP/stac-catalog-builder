@@ -389,24 +389,24 @@ def _check_tcc_collection_id(collection_id: Optional[str]) -> str:
         return collection_id
 
 
-def upload_to_stac_api(collection_path: Path, settings: Settings, max_items: int = -1) -> None:
+def upload_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):
         collection_path = Path(collection_path)
     collection_path = collection_path.expanduser().absolute()
 
     uploader = Uploader.from_settings(settings)
-    uploader.upload_collection_and_items(collection_path, items=collection_path.parent, max_items=max_items)
+    uploader.upload_collection_and_items(collection_path, items=collection_path.parent, limit=limit, offset=offset)
 
 
-def upload_items_to_stac_api(collection_path: Path, settings: Settings, max_items: int = -1) -> None:
+def upload_items_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):
         collection_path = Path(collection_path)
     collection_path = collection_path.expanduser().absolute()
 
     uploader = Uploader.from_settings(settings)
-    uploader.upload_items(collection_path, items=collection_path.parent, max_items=max_items)
+    uploader.upload_items(collection_path, items=collection_path.parent, limit=limit, offset=offset)
 
 
 def vpp_get_tcc_collections() -> list[tcc.Collection]:
