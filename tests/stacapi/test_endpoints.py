@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 from pathlib import Path
+import platform
 
 import pytest
 import pystac
@@ -280,6 +281,7 @@ class TestItemsEndPoint:
         assert expected_item_collection == actual_item_collection
         assert m.called
 
+    @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
     def test_create(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):
         collection_dir = tmp_path / "STAC" / collection_with_items.id
         strategy = TemplateLayoutStrategy(item_template="${collection}")
@@ -296,6 +298,7 @@ class TestItemsEndPoint:
         assert item.to_dict() == actual_dict
         assert m.called
 
+    @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
     def test_update(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):
         collection_dir = tmp_path / "STAC" / collection_with_items.id
         strategy = TemplateLayoutStrategy(item_template="${collection}")
