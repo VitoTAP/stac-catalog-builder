@@ -62,10 +62,10 @@ def create_asset(asset_path: Path) -> Asset:
 
 
 @pytest.fixture
-def asset_paths() -> dict[str, Path]:
+def asset_paths(data_dir) -> dict[str, Path]:
     return {
-        "t2m": Path("2000/observations_2m-temp-monthly_2000-01-01.tif"),
-        "pr_tot": Path("2000/observations_tot-precip-monthly_2000-01-01.tif"),
+        "t2m": data_dir / "2000/observations_2m-temp-monthly_2000-01-01.tif",
+        "pr_tot": data_dir / "2000/observations_tot-precip-monthly_2000-01-01.tif",
     }
 
 
@@ -281,7 +281,7 @@ class TestItemsEndPoint:
         assert expected_item_collection == actual_item_collection
         assert m.called
 
-    @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
+    # @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
     def test_create(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):
         collection_dir = tmp_path / "STAC" / collection_with_items.id
         strategy = TemplateLayoutStrategy(item_template="${collection}")
@@ -298,7 +298,7 @@ class TestItemsEndPoint:
         assert item.to_dict() == actual_dict
         assert m.called
 
-    @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
+    # @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
     def test_update(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):
         collection_dir = tmp_path / "STAC" / collection_with_items.id
         strategy = TemplateLayoutStrategy(item_template="${collection}")
