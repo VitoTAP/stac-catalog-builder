@@ -1,15 +1,11 @@
 import datetime as dt
 import json
 from pathlib import Path
-import platform
 
 import pytest
 import pystac
-import requests
 import shapely
 from pystac import Asset, Collection, Item, ItemCollection, Extent, SpatialExtent, TemporalExtent
-from pystac.layout import TemplateLayoutStrategy
-from requests.auth import AuthBase
 from yarl import URL
 
 
@@ -89,7 +85,7 @@ def create_item(item_id: str, fake_assets) -> Item:
         geometry=geo_dict,
         datetime=dt.datetime(2024, 1, 1),
         properties={},
-        href=f"./{item_id}",
+        href=f"./{item_id}.json",
     )
 
     item.validate()
@@ -122,42 +118,6 @@ def collection_with_items(empty_collection, multiple_items) -> Collection:
     empty_collection.make_all_asset_hrefs_relative()
 
     return empty_collection
-
-
-class FauxAuth(AuthBase):
-    def __call__(self, r):
-        r.headers["Authorization"] = "magic-token"
-        return r
-
-
-class MockRestApi(RestApi):
-    def __init__(self, base_url: URL | str, auth: AuthBase) -> None:
-        super().__init__(base_url, auth)
-        self.collections = {}
-        self.items = {}
-
-    def add_collection(self, collection: Collection) -> None:
-        self.collections[collection.id] = collection
-
-    def add_item(self, collection_id: str, item: Item) -> None:
-        if collection_id not in self.collections:
-            raise Exception("You have to add the collection with id={collection_id} before the item can be added")
-        self.items[(collection_id, item.id)] = item
-
-    def create(collection: Collection, items: list[Item]):
-        api = MockRestApi()
-        api.add_collection(collection)
-        for item in items:
-            api.add_item(collection.id, item)
-
-        return api
-
-    def get(self, url_path: str, *args, **kwargs) -> requests.Response:
-        path_parts = url_path.split("/")
-        coll_id = path_parts[-1]
-        if coll_id not in self.collections:
-            # How to return HTTP 404 here?
-            return requests.Response("???", status_code=404)
 
 
 class TestRestApi:
@@ -281,11 +241,9 @@ class TestItemsEndPoint:
         assert expected_item_collection == actual_item_collection
         assert m.called
 
-    # @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
     def test_create(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):
         collection_dir = tmp_path / "STAC" / collection_with_items.id
-        strategy = TemplateLayoutStrategy(item_template="${collection}")
-        collection_with_items.normalize_hrefs(root_href=str(collection_dir), strategy=strategy, skip_unresolved=True)
+        collection_with_items.set_self_href(str(collection_dir))
 
         items = list(collection_with_items.get_all_items())
         item = items[0]
@@ -298,11 +256,9 @@ class TestItemsEndPoint:
         assert item.to_dict() == actual_dict
         assert m.called
 
-    # @pytest.mark.skipif(condition=platform.system() == "Windows", reason="Test does not work on Windows yet")
     def test_update(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):
         collection_dir = tmp_path / "STAC" / collection_with_items.id
-        strategy = TemplateLayoutStrategy(item_template="${collection}")
-        collection_with_items.normalize_hrefs(root_href=str(collection_dir), strategy=strategy, skip_unresolved=True)
+        collection_with_items.set_self_href(str(collection_dir))
 
         item = list(collection_with_items.get_all_items())[0]
         m = requests_mock.put(
