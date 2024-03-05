@@ -18,7 +18,11 @@ _logger = logging.Logger(__name__)
 
 
 class Uploader:
-    def __init__(self, collections_ep: CollectionsEndpoint, items_ep: ItemsEndpoint, bulk_size: int = 20) -> None:
+    DEFAULT_BULK_SIZE = 20
+
+    def __init__(
+        self, collections_ep: CollectionsEndpoint, items_ep: ItemsEndpoint, bulk_size: int = DEFAULT_BULK_SIZE
+    ) -> None:
         self._collections_endpoint = collections_ep
         self._items_endpoint = items_ep
         self._bulk_size = bulk_size
@@ -27,12 +31,18 @@ class Uploader:
     def from_settings(cls, settings: Settings) -> "Uploader":
         auth = get_auth(settings.auth)
         return cls.create_uploader(
-            stac_api_url=settings.stac_api_url, auth=auth, collection_auth_info=settings.collection_auth_info
+            stac_api_url=settings.stac_api_url,
+            auth=auth,
+            collection_auth_info=settings.collection_auth_info,
+            bulk_size=settings.bulk_size,
         )
 
     @staticmethod
     def create_uploader(
-        stac_api_url: URL, auth: AuthBase | None, collection_auth_info: dict | None = None
+        stac_api_url: URL,
+        auth: AuthBase | None,
+        collection_auth_info: dict | None = None,
+        bulk_size: int = DEFAULT_BULK_SIZE,
     ) -> "Uploader":
         rest_api = RestApi(base_url=stac_api_url, auth=auth)
         collections_endpoint = CollectionsEndpoint(
@@ -40,7 +50,7 @@ class Uploader:
             collection_auth_info=collection_auth_info,
         )
         items_endpoint = ItemsEndpoint(rest_api)
-        return Uploader(collections_ep=collections_endpoint, items_ep=items_endpoint)
+        return Uploader(collections_ep=collections_endpoint, items_ep=items_endpoint, bulk_size=bulk_size)
 
     @property
     def bulk_size(self) -> int:
