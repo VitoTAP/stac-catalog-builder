@@ -12,6 +12,7 @@ dependencies:
   - pystac[validation]=1.8.*
   - rasterio=1.3.*
   - requests==2.31.*
+  - requests-mock==1.11.*
   - rio-stac=0.8.*
   - shapely=2.0.*
   - stac-validator=3.3.*
