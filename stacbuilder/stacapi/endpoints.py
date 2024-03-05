@@ -191,20 +191,10 @@ class CollectionsEndpoint:
 class ItemsEndpoint:
     def __init__(self, rest_api: RestApi) -> None:
         self._rest_api: RestApi = rest_api
-        # self._stac_api_url = URL(stac_api_url)
-        # self._auth = auth or None
 
     @staticmethod
     def create_endpoint(stac_api_url: URL, auth: AuthBase | None) -> "ItemsEndpoint":
         return ItemsEndpoint(rest_api=RestApi(base_url=stac_api_url, auth=auth))
-
-    # @property
-    # def stac_api_url(self) -> URL:
-    #     return self._stac_api_url
-
-    # @property
-    # def rest_api(self) -> RestApi:
-    #     return self._rest_api
 
     @property
     def stac_api_url(self) -> URL:
@@ -281,8 +271,22 @@ class ItemsEndpoint:
 
     def create(self, item: Item) -> dict:
         item.validate()
+
         response = self._rest_api.post(self.get_items_url(item.collection_id), json=item.to_dict())
+        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        print(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+
         _check_response_status(response, _EXPECTED_STATUS_POST)
+        return response.json()
+
+    def update(self, item: Item) -> dict:
+        item.validate()
+
+        response = self._rest_api.put(self.get_items_url_for_id(item.collection_id, item.id), json=item.to_dict())
+        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        print(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+
+        _check_response_status(response, _EXPECTED_STATUS_PUT)
         return response.json()
 
     def ingest_bulk(self, items: Iterable[Item]) -> dict:
@@ -290,16 +294,13 @@ class ItemsEndpoint:
         if not all(i.collection_id == collection_id for i in items):
             raise Exception("All collection IDs should be identical for bulk ingests")
 
-        url_path = str(self._stac_api_url / "collections" / str(collection_id) / "bulk_items")
-        data = {"items": {item.id: item.to_dict() for item in items}}
+        url_path = f"collections/{collection_id}/bulk_items"
+        data = {"method": "upsert", "items": {item.id: item.to_dict() for item in items}}
         response = self._rest_api.post(url_path, json=data)
-        _check_response_status(response, _EXPECTED_STATUS_POST)
-        return response.json()
+        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        print(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
 
-    def update(self, item: Item) -> dict:
-        item.validate()
-        response = self._rest_api.put(self.get_items_url_for_id(item.collection_id, item.id), json=item.to_dict())
-        _check_response_status(response, _EXPECTED_STATUS_PUT)
+        _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
 
     def create_or_update(self, item: Item) -> dict:
@@ -318,7 +319,11 @@ class ItemsEndpoint:
             raise InvalidOperation(
                 f"item_id must have a non-empty str value. Actual type and value: {type(item_id)=}, {item_id=!r}"
             )
+
         response = self._rest_api.delete(self.get_items_url_for_id(collection_id, item_id))
+        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        print(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
         return response.json()
 
