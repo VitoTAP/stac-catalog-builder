@@ -35,7 +35,8 @@ def _check_response_status(response: requests.Response, expected_status_codes: l
     if response.status_code not in expected_status_codes:
         message = (
             f"Expecting HTTP status to be any of {expected_status_codes} "
-            + f"but received {response.status_code!r}, response body:\n{response.text}"
+            + f"but received {response.status_code} - {response.reason}, request method={response.request.method}\n"
+            + f"response body:\n{response.text}"
         )
         if raise_exc:
             raise Exception(message)
@@ -152,7 +153,7 @@ class CollectionsEndpoint:
 
         collection.validate()
         data = self._add_authentication_section(collection)
-        response = self._rest_api.put(f"collections/{collection.id}", json=data)
+        response = self._rest_api.put("collections", json=data)
         _check_response_status(response, _EXPECTED_STATUS_PUT)
 
         return response.json()

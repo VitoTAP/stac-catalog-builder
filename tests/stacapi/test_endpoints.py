@@ -214,9 +214,7 @@ class TestCollectionsEndPoint:
         assert m.called
 
     def test_update(self, requests_mock, empty_collection: Collection, collection_endpt: CollectionsEndpoint):
-        m = requests_mock.put(
-            str(self.BASE_URL / "collections" / empty_collection.id), json=empty_collection.to_dict(), status_code=200
-        )
+        m = requests_mock.put(str(self.BASE_URL / "collections"), json=empty_collection.to_dict(), status_code=200)
         response_json = collection_endpt.update(empty_collection)
         assert empty_collection.to_dict() == response_json
         assert m.called

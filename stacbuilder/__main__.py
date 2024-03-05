@@ -495,7 +495,8 @@ def vpp_list_tcc_collections(properties):
 
 @cli.command
 def vpp_count_products():
-    pprint.pprint(commandapi.vpp_count_products())
+    for collection_id, num_prods in commandapi.vpp_count_products().items():
+        print(f"{collection_id}: {num_prods:_}")
 
 
 @cli.command
