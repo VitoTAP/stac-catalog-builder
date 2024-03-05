@@ -437,21 +437,23 @@ def vpp_list_items(collection: str, max_products: int, frequency: str):
 
 
 @cli.command
-@click.option("-m", "--max-items", help="Limit number of items to upload to max-items.", default=-1)
+@click.option("-l", "--limit", help="Limit number of items to upload to max-items.", default=-1)
+@click.option("-o", "--offset", help="Start at items number 'offset' (count starting from 1).", default=-1)
 @click.argument("collection_path")
-def vpp_upload(collection_path: str, max_items: int):
+def vpp_upload(collection_path: str, limit: int, offset: int):
     """Upload a collection to the STAC API."""
     settings = get_stac_api_settings()
-    commandapi.upload_to_stac_api(Path(collection_path), settings=settings, max_items=max_items)
+    commandapi.upload_to_stac_api(Path(collection_path), settings=settings, limit=limit, offset=offset)
 
 
 @cli.command
-@click.option("-m", "--max-items", help="Limit number of items to upload to max-items.", default=-1)
+@click.option("-l", "--limit", help="Limit number of items to upload to max-items.", default=-1)
+@click.option("-o", "--offset", help="Start at items number 'offset' (count starting from 1).", default=-1)
 @click.argument("collection_path")
-def vpp_upload_items(collection_path: str, max_items: int):
+def vpp_upload_items(collection_path: str, limit: int, offset: int):
     """Upload a collection to the STAC API."""
     settings = get_stac_api_settings()
-    commandapi.upload_items_to_stac_api(Path(collection_path), settings=settings, max_items=max_items)
+    commandapi.upload_items_to_stac_api(Path(collection_path), settings=settings, limit=limit, offset=offset)
 
 
 @cli.command
