@@ -1,5 +1,6 @@
 import logging
-from itertools import islice
+import inspect
+import itertools
 from pathlib import Path
 from typing import Iterable
 
@@ -76,25 +77,34 @@ class Uploader:
 
     def upload_items_bulk(self, collection_id: str, items: Iterable[Item]) -> None:
         chunk = []
-        for item in items:
+        chunk_start = 0
+        chunk_end = 0
+
+        for index, item in enumerate(items):
             self._prepare_item(item, collection_id)
             item.validate()
-
             chunk.append(item)
 
             if len(chunk) == self.bulk_size:
+                chunk_end = index + 1
+                chunk_start = chunk_end - len(chunk) + 1
+                self._log_progress_message(f"Uploading items {chunk_start} to {chunk_end}")
                 self._items_endpoint.ingest_bulk(chunk)
                 chunk = []
 
         if chunk:
+            chunk_end = index + 1
+            chunk_start = chunk_end - len(chunk) + 1
+            self._log_progress_message(f"Uploading items {chunk_start} to {chunk_end}")
             self._items_endpoint.ingest_bulk(chunk)
 
     def upload_collection_and_items(
         self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1
     ) -> None:
         collection_out = self.upload_collection(collection)
+        _logger.info(f"Uploaded collections, result={collection_out}")
 
-        self.upload_items(collection_out, items, max_items)
+        self.upload_items(collection, items, max_items)
 
     def upload_items(self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1) -> None:
         if isinstance(collection, Path):
@@ -113,7 +123,7 @@ class Uploader:
 
         if max_items >= 0:
             _logger.info(f"User requested to limit the number of items to {max_items=}")
-            items_out = islice(items_out, max_items)
+            items_out = itertools.islice(items_out, max_items)
 
         self.upload_items_bulk(collection.id, items_out)
 
@@ -122,3 +132,8 @@ class Uploader:
 
         if not item.get_links(pystac.RelType.COLLECTION):
             item.add_link(pystac.Link(rel=pystac.RelType.COLLECTION, target=item.collection_id))
+
+    def _log_progress_message(self, message: str) -> None:
+        calling_method_name = inspect.stack()[1][3]
+        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+        print(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
