@@ -18,6 +18,7 @@ class AuthSettings(BaseModel):
 class Settings(BaseModel):
     auth: AuthSettings | None
     stac_api_url: str | None
+    bulk_size: int | None
     collection_auth_info: dict[str, Any] | None
 
 
@@ -48,7 +49,11 @@ def get_stac_api_settings() -> Settings:
         auth_out.username = auth_in.get("username")
         auth_out.password = auth_in.get("password")
 
-    stac_api_url = _settings.get("stac", {}).get("api")
+    stac_settings = _settings.get("stac", {})
+    stac_api_url = stac_settings.get("api")
     collection_auth_info = _settings.get("collection_auth_info")
+    bulk_size = stac_settings.get("bulk_size")
 
-    return Settings(stac_api_url=stac_api_url, auth=auth_out, collection_auth_info=collection_auth_info)
+    return Settings(
+        stac_api_url=stac_api_url, auth=auth_out, collection_auth_info=collection_auth_info, bulk_size=bulk_size
+    )
