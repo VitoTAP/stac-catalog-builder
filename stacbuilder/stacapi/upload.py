@@ -18,9 +18,10 @@ _logger = logging.Logger(__name__)
 
 
 class Uploader:
-    def __init__(self, collections_ep: CollectionsEndpoint, items_ep: ItemsEndpoint) -> None:
+    def __init__(self, collections_ep: CollectionsEndpoint, items_ep: ItemsEndpoint, bulk_size: int = 20) -> None:
         self._collections_endpoint = collections_ep
         self._items_endpoint = items_ep
+        self._bulk_size = bulk_size
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Uploader":
@@ -38,8 +39,16 @@ class Uploader:
             rest_api=rest_api,
             collection_auth_info=collection_auth_info,
         )
-        items_endpoint = ItemsEndpoint(stac_api_url=stac_api_url, auth=auth)
+        items_endpoint = ItemsEndpoint(rest_api)
         return Uploader(collections_ep=collections_endpoint, items_ep=items_endpoint)
+
+    @property
+    def bulk_size(self) -> int:
+        return self._bulk_size
+
+    @bulk_size.setter
+    def bulk_size(self, value: int) -> int:
+        self._bulk_size = int(value)
 
     def upload_collection(self, collection: Path | Collection) -> dict:
         if isinstance(collection, Path):
@@ -56,10 +65,19 @@ class Uploader:
         return self._items_endpoint.create_or_update(item)
 
     def upload_items_bulk(self, collection_id: str, items: Iterable[Item]) -> None:
+        chunk = []
         for item in items:
             self._prepare_item(item, collection_id)
             item.validate()
-            self.upload_item(item)
+
+            chunk.append(item)
+
+            if len(chunk) == self.bulk_size:
+                self._items_endpoint.ingest_bulk(chunk)
+                chunk = []
+
+        if chunk:
+            self._items_endpoint.ingest_bulk(chunk)
 
     def upload_collection_and_items(
         self, collection: Path | Collection, items: Path | list[Item], max_items: int = -1
