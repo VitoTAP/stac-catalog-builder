@@ -1,17 +1,15 @@
 
 # Setup - Installation
-- [Setup - Installation](#setup---installation)
-  - [Python version, in a virtualenv or in a conda environment.](#python-version-in-a-virtualenv-or-in-a-conda-environment)
-    - [Create Conda Environment with `conda-environment.yaml`](#create-conda-environment-with-conda-environmentyaml)
-      - [Notes regarding conda environments](#notes-regarding-conda-environments)
-    - [How to Manually Create the Conda Environment](#how-to-manually-create-the-conda-environment)
-      - [Create the Conda Environment:](#create-the-conda-environment)
-      - [Activate the Environment:](#activate-the-environment)
-      - [Install Dependencies](#install-dependencies)
-        - [Installation for Using the STAC Builder Tool Only, no Development](#installation-for-using-the-stac-builder-tool-only-no-development)
-        - [Install for Developing the Tool: `requirements-dev.txt`](#install-for-developing-the-tool-requirements-devtxt)
-  - [For developers: Updates to do when dependencies have changed:](#for-developers-updates-to-do-when-dependencies-have-changed)
-  - [Export Conda Environment as `environment.yaml`](#export-conda-environment-as-environmentyaml)
+- [Python version, in a virtualenv or in a conda environment.](#python-version-in-a-virtualenv-or-in-a-conda-environment)
+  - [Create Conda Environment with `conda-environment.yaml`](#create-conda-environment-with-conda-environmentyaml)
+    - [Notes regarding conda environments](#notes-regarding-conda-environments)
+  - [How to Manually Create the Conda Environment](#how-to-manually-create-the-conda-environment)
+    - [Create the Conda Environment:](#create-the-conda-environment)
+    - [Activate the Environment:](#activate-the-environment)
+    - [Install Dependencies](#install-dependencies)
+- [For developers: Updates to do when dependencies have changed:](#for-developers-updates-to-do-when-dependencies-have-changed)
+- [For developers: Dockerfiles to test the installation](#for-developers-dockerfiles-to-test-the-installation)
+- [Export Conda Environment as `environment.yaml`](#export-conda-environment-as-environmentyaml)
 
 ## Python version, in a virtualenv or in a conda environment.
 
@@ -33,7 +31,7 @@ For Terrascope, using conda is the easiest way. Otherwise you will need to deal 
 TL;DR
 
 ```bash
-conda env create -f conda-environment.yaml python=3.11
+conda env create -f conda-environment.yaml
 ```
 
 #### Notes regarding conda environments
@@ -75,35 +73,16 @@ If you prefer to use pip, the requirements files to pip-install them are these f
 - [`./requirements/requirements.txt`](./requirements/requirements.txt): to install only the application, without development support.
 - [`./requirements/requirements-dev.txt`](./requirements/requirements-dev.txt): to install everthing for developing the application.
 
-This method is essentially installing the same dependencies as listed in requirement.txt. This command just uses the corresponding conda command and lists the dependencies explicitly.
-See [`./requirements/requirements.txt`](./requirements/requirements.txt) for the most up to date list of libraries you need to install.
+This method is essentially installing the same dependencies as listed in requirement.txt or conda-environment.yaml. This command just uses the corresponding conda command and lists the dependencies explicitly.
+
+See [`conda-environment.yaml](conda-environment.yaml)
+See [`./requirements/requirements.txt`](./requirements/requirements.txt)
+
 
 ```bash
-# TODO: still issues installing some of the dependencies via conda, find out why
+# Look at conda-environment.yaml for the most up to date list of dependencies to fill into this command.
 conda install stactools=0.5.* openeo=0.26 stac-validator=3.3 pystac[validation]=1.8 rasterio=1.3 shapely=2.0 pyproj=3.6 click=8.1
 ```
-
-- [ ] TODO: **Verify updated documentation**: I found out that some of the dependencies are only available in pip, not in conda. So there are always a few left we need to pip-install. Are there other packages that only are available via pip/pypi?
-
-> ### NOTE
->
-> The reason why the above command did not work is that I was using the conda-forge channel (via Miniforge) and those versions are not yet available on that channel.
-> Also openeo is not available on conda-forge, only on the regular conda channel.
-> I will have to test this in a regular conda install.
->
-> Highest versions available in conda-forge (d.d. 2024-01-09):
->
-> package | version on conda-forge | desired version
-> --- | --- | ---
-> pystac | 1.6.1 | 1.8
-> stac-validator | 3.2.0 | 3.3
-> stactools | 0.4.2 | 0.5
-> shapely | 1.8.5 | 2.0
-> pyproj | 3.4.0 | 3.6
-> click  | 8.1.3 | 8.1
-> openeo | N/A on conda-forge | 0.26
-
-
 
 ##### Installation for Using the STAC Builder Tool Only, no Development
 
@@ -139,6 +118,14 @@ There are three requirements files, a main one for the application itself and tw
 - [requirements/requirements-dev.txt](../requirements/requirements-dev.txt)
   - Contains additional requirements needed for developing the application.
   - It imports `requirements-test.txt`
+
+## For developers: Dockerfiles to test the installation
+
+There are some dockerfiles to run the installation process and then the unit tests.
+This should be enough to verify that your dependencies work on the systems we support;
+If the unit tests pass after the install you should be good to go.
+
+See: [../docker/README.md](../docker/README.md)
 
 
 ## Export Conda Environment as `environment.yaml`

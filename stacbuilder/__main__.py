@@ -451,14 +451,14 @@ def vpp_upload(collection_path: str, limit: int, offset: int):
 @click.option("-o", "--offset", help="Start at items number 'offset' (count starting from 1).", default=-1)
 @click.argument("collection_path")
 def vpp_upload_items(collection_path: str, limit: int, offset: int):
-    """Upload a collection to the STAC API."""
+    """Upload a STAC Items to the STAC API."""
     settings = get_stac_api_settings()
     commandapi.upload_items_to_stac_api(Path(collection_path), settings=settings, limit=limit, offset=offset)
 
 
 @cli.command
 def vpp_show_stac_api_config():
-    """Upload a collection to the STAC API."""
+    """Show the configuration to upload to the STAC API."""
     settings = get_stac_api_settings()
     pprint.pprint(settings.model_dump())
 
