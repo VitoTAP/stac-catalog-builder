@@ -44,23 +44,31 @@ python3 -m stacbuilder --help
 ### Usage
 
 ```
-$ python3 -m  stacbuilder
+$ python3 -m stacbuilder
 Usage: python -m stacbuilder [OPTIONS] COMMAND [ARGS]...
+
+  Main CLI group. This is the base command.
 
 Options:
   -v, --verbose  show debug output
   --help         Show this message and exit.
 
 Commands:
-  build            Build a STAC collection from a directory of geotiff...
-  list-items       List generated STAC items.
-  list-metadata    List intermediary metadata per GeoTIFFs.
-  list-tiffs       List which geotiff files will be selected with this...
-  post-process     Run only the postprocessing.
-  show-collection  Read the STAC collection file and display its contents.
-  test-openeo      Test STAC collection via load_stac in openEO.
-  validate         Run STAC validation on the collection file.
-
+  build                      Build collection from GeoTIFF files.
+  build-grouped-collections  Build group of collections from GeoTIFF files.
+  check-openeo-job           Get openeo job status + result files.
+  config                     Subcommands for collection configuration.
+  extract-item-bboxes        Extract and save the bounding boxes of the...
+  list-items                 Display generated STAC items for GeoTIFFS.
+  list-metadata              Display generated AssetMetadata, one per...
+  list-tiffs                 List which GeoTIFF files will be selected...
+  post-process               Run only the postprocessing.
+  show-collection            Display parsed contents of collection file.
+  test-openeo                Test STAC collection via load_stac in openEO.
+  validate                   Run STAC validation on collection file.
+  vpp-build                  Build STAC collection for HRL VPP collection...
+  vpp-list-items             Show STAC items generated per VPP product.
+  vpp-list-metadata          Show AssetMetadata generated per VPP product.
 ```
 
 The main command is off course `build`.
