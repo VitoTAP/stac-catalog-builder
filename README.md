@@ -13,14 +13,18 @@ Support for uploading to a STAC API is in the making.
 
 See also: [Goals and User Stories](docs/goals-and-user-stories.md): A longer explanation of the goals or use case for the STAC catalog builder.
 
-## Setup - Installation
+## Documentation
 
-See: [docs/installation.md](docs/installation.md)
+Documentation can be found in here [docs/index.md](./docs/index.md)
 
-## Running the Stacbuilder Tool
+Below, als the links to the important topics, for convenience:
 
-See: [docs/how-to-run-stacbuilder.md](docs/how-to-run-stacbuilder.md)
+Getting Started:
 
-## Software Development Guidelines
+- [Installation](docs/installation.md)
+- [Running the Stacbuilder Tool](docs/how-to-run-stacbuilder.md)
+- [How to Configure a New Dataset](docs/how-to-configure-new-dataset.md)
 
-See [docs/developer-guidelines.md](docs/developer-guidelines.md)
+Development:
+
+- [Software Development Guidelines](docs/developer-guidelines.md)
