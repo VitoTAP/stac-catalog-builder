@@ -109,14 +109,14 @@ graph LR
 Saving a STAC collection to a file is called a static STAC collection, but there is also a dynamic version of STAC collections, called a [STAC API](https://github.com/radiantearth/stac-api-spec).
 
 With the stac-catalog-builder we can also upload a collection to a STAC API.
-For the time being we have chosen not to upload directly to a STAC API during the generation (or conversion) of the STAC collection.
 
-The cases we want to solve are quite large collections and the process to generate a STAC collection can take a while.
-For the time being, it is easier to let the generation process run to completion, which saves the entire set of files on disk first, and then run the upload as a new process.
+For the time being we have chosen not to upload directly to a STAC API while the tool is generating (or converting) a STAC collection.
+The reason being, for thge cases we want to solve we have quite large collections, so the process to generate a STAC collection can take a while.
 
-In this case we don't make the collection.json file refer to all of its STAC items because there are too many and this becomes too slow.
-In the API we don't actually need the collection to link to each item anymore. Only the STAC items need to have a link to the collection they belong too.
-It is the API who takes care of finding the right STAC items for us, so the collection file doesn't have to link to each item.
+Therefor, for the time being, it is easier to let the generation process run to completion, saving the entire set of files on disk, and then run the upload as a second step.
+
+Because the large amount of STAC items would make the collection.json file large, slowing down the tool, we don't include links to the STAC items in the STAC collection for these collections.
+Since a STAC API uses other means to keep track which items belong to the collection, we don't actually need those links for collections we publish via a STAC API. Only the STAC items need to have a link to the collection they belong to.
 
 
 ```mermaid
