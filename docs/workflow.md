@@ -111,12 +111,12 @@ Saving a STAC collection to a file is called a static STAC collection, but there
 With the stac-catalog-builder we can also upload a collection to a STAC API.
 
 For the time being we have chosen not to upload directly to a STAC API while the tool is generating (or converting) a STAC collection.
-The reason being, for thge cases we want to solve we have quite large collections, so the process to generate a STAC collection can take a while.
+The reason being, for those cases we want to solve the collections are quite large with many STAC items, so the process to generate a STAC collection can take a while.
 
-Therefor, for the time being, it is easier to let the generation process run to completion, saving the entire set of files on disk, and then run the upload as a second step.
+Therefor, at least for the time being, it is easier to let the generation process run to completion, saving the entire set of files on disk, and then run the upload as a second step.
 
 Because the large amount of STAC items would make the collection.json file large, slowing down the tool, we don't include links to the STAC items in the STAC collection for these collections.
-Since a STAC API uses other means to keep track which items belong to the collection, we don't actually need those links for collections we publish via a STAC API. Only the STAC items need to have a link to the collection they belong to.
+Since a STAC API uses other means to keep track which items belong to the collection, we don't actually need those links for collections that we publish via a STAC API. Only the STAC items need to have a link to the collection they belong to.
 
 
 ```mermaid
