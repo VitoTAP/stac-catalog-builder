@@ -73,10 +73,57 @@ graph TD
     STACCollection -- "AssetMetadataPipeline saves collection" --> collection_on_disk[("STAC collection & items on disk\ncollection.json")];
 ```
 
-
-
 ## Grouped collections
 
-TODO: describe what a grouped collection is. Maybe we need a better name.
+In some cases the collection has very many STAC items and it becomes unwieldly to put all the items in one collection.json file. There are too many links to all the items in the collection file, which slows things down.
 
-How to translate this to a diagram that shows what is different?
+So what we do for these large collections is to create several collections, one for each year, and group them into a root collection. That way each subcollection has less links to the STAC items to manage.
+
+Now a STAC collection is also a STAC catalog (i.e. it is a subclass). A collection just has some extra information that a catalog does not contain. So what happens here is that the root collection functions as a catalog. But it is useful to make it a collection anyway because that lets us have the extra information at the top level, for example spatial and temporal extent. Also, it keeps the top level more uniform.
+
+## Converting HR VPP (OpenSearch / OSCARS) Collections to STAC Collections
+
+This solves a specific need we had at VITO.
+
+We have some collections for HR VPP in OpenSearch that can be accessed via the terracatalogueclient.
+We wanted to have those as STAC collections with a structure that is more suitable to STAC.
+
+This is what the VPP commands in the CLI and the commandapi.py module are for.
+
+Essentially we replace the input side that plugs into the `AssetMetadataPipeline` with a different  implementation of `IMetadataCollector`, namely the `HRLVPPMetadataCollector`.
+
+
+```mermaid
+---
+title: "Converting HR VPP"
+---
+graph LR
+    OpenSearch[(VPP in OpenSearch)] --> HRLVPPMetadataCollector[HRLVPPMetadataCollector]
+    HRLVPPMetadataCollector-->AssetMetadata(("AssetMetadata\n(in memory)"))
+    AssetMetadata --> AssetMetadataPipeline[AssetMetadataPipeline]
+    AssetMetadataPipeline --> collection_on_disk[("STAC collection & items on disk\ncollection.json")];
+```
+
+## Uploading Collections to a STAC API
+
+Saving a STAC collection to a file is called a static STAC collection, but there is also a dynamic version of STAC collections, called a [STAC API](https://github.com/radiantearth/stac-api-spec).
+
+With the stac-catalog-builder we can also upload a collection to a STAC API.
+For the time being we have chosen not to upload directly to a STAC API during the generation (or conversion) of the STAC collection.
+
+The cases we want to solve are quite large collections and the process to generate a STAC collection can take a while.
+For the time being, it is easier to let the generation process run to completion, which saves the entire set of files on disk first, and then run the upload as a new process.
+
+In this case we don't make the collection.json file refer to all of its STAC items because there are too many and this becomes too slow.
+In the API we don't actually need the collection to link to each item anymore. Only the STAC items need to have a link to the collection they belong too.
+It is the API who takes care of finding the right STAC items for us, so the collection file doesn't have to link to each item.
+
+
+```mermaid
+---
+title: "Uploading to a STAC API"
+---
+graph LR
+    collection_on_disk[("STAC collection & items on disk\ncollection.json")] --> uploader[stacbuilder.stacapi.upload.Uploader];
+    uploader --> STACAPI[(STAC-API)]
+```
