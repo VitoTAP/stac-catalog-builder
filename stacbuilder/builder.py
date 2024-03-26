@@ -800,9 +800,13 @@ class AssetMetadataPipeline:
 
         self._collection_builder: STACCollectionBuilder = None
 
+        self._item_postprocessor: Optional[Callable] = None
+
         # results
         self._collection: Optional[Collection] = None
         self._collection_groups: Dict[Hashable, Collection] = {}
+
+
 
     @staticmethod
     def from_config(
@@ -915,6 +919,14 @@ class AssetMetadataPipeline:
     def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
         return self._meta_to_stac_item_mapper
 
+    @property
+    def item_postprocessor(self) -> Optional[Callable]:
+        return self._item_postprocessor
+
+    @item_postprocessor.setter
+    def item_postprocessor(self, callable: Callable) -> None:
+        self._item_postprocessor = callable
+
     def reset(self) -> None:
         self._collection = None
         self._collection_groups = {}
@@ -961,6 +973,8 @@ class AssetMetadataPipeline:
             # Ignore the asset when the file was not a known asset type, for example it is
             # not a GeoTIFF or it is not one of the assets or bands we want to include.
             if stac_item:
+                if self._item_postprocessor is not None:
+                    stac_item = self._item_postprocessor(stac_item)
                 try:
                     stac_item.validate()
                 except RemoteDisconnected:
