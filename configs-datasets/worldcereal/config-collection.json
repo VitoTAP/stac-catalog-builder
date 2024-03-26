@@ -1,0 +1,59 @@
+{
+    "collection_id": "WORLDCEREAL_MAIZE",
+    "title": "Worldcereal Maize",
+    "description": "WorldCereal maize, globally, at 10m resolution in specific seasons throughout the year.\n\n",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/${year}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<asset_type>classification|confidence)/(?P<year>\\d{4}).*_(?P<item_id>.{5}).tif$",
+            "period": "yearly",
+            "fixed_values": {
+            }
+        }
+    },
+    "item_assets": {
+        "classification": {
+            "title": "classification",
+            "description": "classification band",
+            "eo_bands": [
+                {
+                    "name": "CLASSIFICATION",
+                    "description": "REPLACE_THIS--BAND_DESCRIPTION",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "confidence": {
+            "title": "confidence",
+            "description": "confidence band",
+            "eo_bands": [
+                {
+                    "name": "CONFIDENCE",
+                    "description": "REPLACE_THIS--BAND_DESCRIPTION",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
