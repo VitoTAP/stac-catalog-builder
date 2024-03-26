@@ -1,0 +1,44 @@
+{
+    "collection_id": "GLASS_FAPAR_months_sd",
+    "title": "GLASS FAPAR months standard deviation",
+    "description": "GLASS FAPAR standard deviation for every month. This can be repeated yearly to get bigger temporal coverage",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<asset_type>sd)_.*(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})Z\\.tif$",
+            "period": "monthly"
+        }
+    },
+    "item_assets": {
+        "sd": {
+            "title": "GLASS FAPAR months standard deviation",
+            "description": "GLASS FAPAR standard deviation for every month. This can be repeated yearly to get bigger temporal coverage",
+            "eo_bands": [
+                {
+                    "name": "GLASS_FAPAR_months_sd",
+                    "description": "GLASS FAPAR standard deviation for every month. This can be repeated yearly to get bigger temporal coverage",
+                    "data_type": "float32",
+                    "sampling": "area",
+                    "spatial_resolution": 300
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
