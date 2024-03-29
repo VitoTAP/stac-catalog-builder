@@ -22,6 +22,7 @@ dependencies:
   - pytest
   - pip
   - yarl=1.9.*
+  - fastparquet
   - pip:
     - --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple
     - terracatalogueclient==0.1.14
