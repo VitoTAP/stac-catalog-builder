@@ -11,7 +11,6 @@ The main advantage is that this style allows for unit tests on core
 functionality of the CLI, and that is harder to do directly on the CLI.
 """
 
-import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -32,15 +31,6 @@ from stacbuilder.metadata import AssetMetadata
 from stacbuilder.terracatalog import HRLVPPMetadataCollector, CollectionConfigBuilder
 from stacbuilder.stacapi.upload import Uploader
 from stacbuilder.stacapi.config import Settings
-
-log_level = logging.INFO
-# create console handler with a higher log level
-console_handler = logging.StreamHandler()
-console_handler.setLevel(log_level)
-# create formatter and add it to the handlers
-formatter = logging.Formatter("%(levelname)-7s | %(asctime)s | %(message)s")
-console_handler.setFormatter(formatter)
-logging.basicConfig(handlers=[console_handler], level=log_level)
 
 
 def build_collection(
@@ -333,7 +323,6 @@ def vpp_build_collection(
     overwrite: Optional[bool] = False,
     max_products: Optional[int] = -1,
     query_by_frequency: str = "QS",
-    item_postprocessor=None,
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
@@ -354,8 +343,6 @@ def vpp_build_collection(
         overwrite=overwrite,
         link_items=False,
     )
-    if item_postprocessor:
-        pipeline.item_postprocessor = item_postprocessor
     pipeline.build_collection()
 
 

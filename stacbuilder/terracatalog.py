@@ -340,44 +340,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         return geodataframe_path
 
-    def _append_dataframes(self) -> None:
-        if self._df_asset_metadata is not None:
-            if not (self.temp_dir / f"asset_metadata-{self.collection_id}.parquet").exists():
-                self._save_geodataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
-            else:
-                self._append_dataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
-
-        if self._df_products is not None:
-            if not (self.temp_dir / f"products-{self.collection_id}.parquet").exists():
-                self._save_geodataframe(self._df_products, f"products-{self.collection_id}")
-            else:
-                self._append_dataframe(self._df_products, f"products-{self.collection_id}")
-
-    def _append_dataframe(self, gdf: gpd.GeoDataFrame, table_name: str) -> None:
-        if not self.temp_dir.exists():
-            self.temp_dir.mkdir(parents=True)
-
-        geodataframe_path = self.temp_dir / f"{table_name}.parquet"
-        self._log_progress_message(f"Appended {table_name} as GeoDataFrame (geoparquet), path={geodataframe_path}")
-        gdf.to_parquet(path=geodataframe_path, index=True, engine="fastparquet", append=True)
-        self._log_progress_message(f"DONE appended download products to {geodataframe_path}")
-
-        return geodataframe_path
-
-    def _clear_memory(self) -> None:
-        self._df_asset_metadata = None
-        self._df_products = None
-        self._log_progress_message("Cleared memory of GeoDataFrames")
-
-    def _load_from_parquet(self) -> None:
-        if self.temp_dir:
-            if (self.temp_dir / f"asset_metadata-{self.collection_id}.parquet").exists():
-                self._df_asset_metadata = gpd.read_parquet(
-                    self.temp_dir / f"asset_metadata-{self.collection_id}.parquet"
-                )
-            if (self.temp_dir / f"products-{self.collection_id}.parquet").exists():
-                self._df_products = gpd.read_parquet(self.temp_dir / f"products-{self.collection_id}.parquet")
-
     def get_tcc_catalogue(self) -> tcc.Catalogue:
         """Get the terracatalogueclient's Catalogue to query data from."""
         config = CatalogueConfig.from_environment(CatalogueEnvironment.HRVPP)
@@ -493,12 +455,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
             products = list(
                 catalogue.get_products(
-                    collection.id,
-                    start=slot_start,
-                    end=slot_end,
-                    productType=prod_type,
-                    limit=limit,
-                    accessedFrom="S3",
+                    collection.id, start=slot_start, end=slot_end, productType=prod_type, limit=limit
                 )
             )
 
@@ -506,7 +463,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 # There is no data for this time range and product type. => Get next slot.
                 continue
 
-            num_products_processed = 0
             for product in products:
                 # We should never find duplicates within the same time slot that we query.
                 # If there are duplicates, it should only happen because the time period we ask for is shorted than the
@@ -544,16 +500,13 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
             self._save_intermediate_geodata(new_products)
 
-            num_products_processed += len(new_products)
+            num_products_processed = len(self._df_products)
             percent_processed = num_products_processed / max_prods_to_process
             self._log_progress_message(
                 f"Retrieved {num_products_processed:_} of {max_prods_to_process:_} products ({percent_processed:.1%})"
             )
             if num_products_processed > max_prods_to_process:
                 break
-
-        # load all dataframes
-        self._load_from_parquet()
 
         # Verify we have no duplicate products,
         # i.e. the number of unique product IDs must be == to the number of products.
@@ -620,9 +573,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         self._log_progress_message("DONE: adding new assets to AssetMetadata GeoDataFrame")
 
-        # self._save_dataframes()
-        self._append_dataframes()
-        self._clear_memory()
+        self._save_dataframes()
         self._log_progress_message("DONE: saving intermediate GeoData ...")
 
     def _product_to_dict(self, product: tcc.Product) -> dict[str, Any]:
