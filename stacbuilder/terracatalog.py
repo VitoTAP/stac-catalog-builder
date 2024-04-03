@@ -45,7 +45,7 @@ EPSG_4326_LATLON = 4326
 
 def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | None, dt.datetime | None]:
     acquisitionInformation = collection.properties["acquisitionInformation"]
-    pprint(acquisitionInformation)
+    # pprint(acquisitionInformation)
 
     # acquisitionInformation contains one or more acquisitionParameters, and each has a start + end datetime.
     # It looks like this is mainly used to describe the period for each platform,
@@ -67,14 +67,14 @@ def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | 
     dt_start = None
     dt_end = None
     for info in acquisitionInformation:
-        print(info.get("acquisitionParameters", {}))
+        # print(info.get("acquisitionParameters", {}))
 
         new_dt_start = info.get("acquisitionParameters", {}).get("beginningDateTime")
         new_dt_end = info.get("acquisitionParameters", {}).get("endingDateTime")
 
-        print(new_dt_start, new_dt_start)
-        print(dt.datetime.fromisoformat(new_dt_start))
-        print(dt.datetime.fromisoformat(new_dt_start))
+        # print(new_dt_start, new_dt_start)
+        # print(dt.datetime.fromisoformat(new_dt_start))
+        # print(dt.datetime.fromisoformat(new_dt_start))
 
         new_dt_start = dt.datetime.fromisoformat(new_dt_start)
         new_dt_end = dt.datetime.fromisoformat(new_dt_end)
@@ -456,7 +456,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     f"Progress: {num_products_processed} of {max_prods_to_process} ({percent_processed:.1%})"
                 )
                 if num_products_processed > max_prods_to_process:
-                    executor.shutdown(wait=False)
+                    executor.shutdown(wait=True, cancel_futures=True)
                     break
                         
         # load all dataframes
@@ -516,6 +516,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 end=slot_end,
                 productType=prod_type,
                 accessedFrom="S3",
+                limit=self.max_products if self.max_products > 0 else None,
             )
         )
         self._log_progress_message(f"# Retrieved {len(products)} products for time slot {slot_start} to {slot_end}, {prod_type=}")
