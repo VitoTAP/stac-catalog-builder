@@ -437,11 +437,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         # If the time slots are to long you will get a terracatalogueclient.exceptions.TooManyResultsException.
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             query_slots =  self._get_product_query_slots(frequency=self._query_by_frequency)
-            futures = [executor.submit(self._process_timeslot, slot_start, slot_end, prod_type) for (slot_start, slot_end), prod_type in query_slots]
+            futures = [executor.submit(self._fetch_timeslot, slot_start, slot_end, prod_type) for (slot_start, slot_end), prod_type in query_slots]
 
             for future in concurrent.futures.as_completed(futures):
                 new_products = future.result()
-                self._log_progress_message(f"Number of new products in current slot {len(new_products)}.")
                 if not new_products:
                     # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
                     continue
@@ -449,10 +448,12 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 self._save_intermediate_geodata(new_products)
 
                 # num_products_processed += len(new_products)
+                self._log_progress_message(f"Number of new products {len(self._df_asset_metadata)-num_products_processed}.")
+
                 num_products_processed = len(self._df_asset_metadata)
                 percent_processed = num_products_processed / max_prods_to_process
                 self._log_progress_message(
-                    f"Progress: {percent_processed:.1%}"
+                    f"Progress: {num_products_processed} of {max_prods_to_process} ({percent_processed:.1%})"
                 )
                 # if num_products_processed > max_prods_to_process:
                 #     break
@@ -462,8 +463,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # Verify we have no duplicate products,
         # i.e. the number of unique product IDs must be == to the number of products.
-        # self._log_progress_message("START sanity checks: no duplicate products present and received all products ...")
-        # product_ids = set(self._df_products.index)
+        self._log_progress_message("START sanity checks: no duplicate products present and received all products ...")
+        product_ids = set(self._df_asset_metadata.index)
 
         # if len(product_ids) != len(self._df_products):
         #     raise DataValidationError(
@@ -473,29 +474,29 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         #         + f" {len(product_ids)=} {len(self._df_products)=}"
         #     )
 
-        # if len(product_ids) != len(self._df_asset_metadata.index):
-        #     raise DataValidationError(
-        #         "Sanity check failed in get_products_as_dataframe:"
-        #         + " Each products should correspond to exactly 1 AssetMetadata instance."
-        #         + " len(product_ids) != len(self._df_asset_metadata.index)"
-        #         + f" {len(product_ids)=} {len(self._df_asset_metadata.index)=}"
-        #     )
+        if len(product_ids) != len(self._df_asset_metadata):
+            raise DataValidationError(
+                "Sanity check failed in get_products_as_dataframe:"
+                + " Each products should correspond to exactly 1 AssetMetadata instance."
+                + " len(product_ids) != len(self._df_asset_metadata)"
+                + f" {len(product_ids)=} {len(self._df_asset_metadata)=}"
+            )
 
-        # # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
-        # if not self.max_products:
-        #     if len(product_ids) != num_prods:
-        #         raise DataValidationError(
-        #             "Sanity check failed in get_products_as_dataframe:"
-        #             + "Number of products in result must be the product count reported by terracataloguiclient"
-        #             + " len(product_ids) != num_prods"
-        #             + f" {len(product_ids)=} product count: {num_prods=}"
-        #         )
-        # self._log_progress_message("DONE sanity checks")
+        # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
+        if not self.max_products:
+            if len(product_ids) != num_prods:
+                raise DataValidationError(
+                    "Sanity check failed in get_products_as_dataframe:"
+                    + "Number of products in result must be the product count reported by terracataloguiclient"
+                    + " len(product_ids) != num_prods"
+                    + f" {len(product_ids)=} product count: {num_prods=}"
+                )
+        self._log_progress_message("DONE sanity checks")
 
         self._log_progress_message("DONE: get_products_as_dataframe")
         return self._df_asset_metadata
     
-    def _process_timeslot(self, slot_start: dt.datetime, slot_end: dt.datetime, prod_type: str) -> List[tcc.Product]:
+    def _fetch_timeslot(self, slot_start: dt.datetime, slot_end: dt.datetime, prod_type: str) -> List[tcc.Product]:
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
         # current_products_ids = set()
@@ -555,7 +556,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         
 
     def _save_intermediate_geodata(self, new_products):
-        self._log_progress_message("START: saving intermediate GeoData ...")
+        # self._log_progress_message("START: saving intermediate GeoData ...")
         # product_records = [
         #     {k: v for k, v in self._product_to_dict(pr).items() if k != "geometry"} for pr in new_products
         # ]
@@ -580,7 +581,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         if self._df_asset_metadata is None:
             self._df_asset_metadata = gdf_asset_md
         else:
-            self._df_asset_metadata = pd.concat([self._df_asset_metadata, gdf_asset_md]).drop_duplicates(["asset_id"])
+            self._df_asset_metadata = pd.concat([self._df_asset_metadata, gdf_asset_md])
+            self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
 
         self._log_progress_message("DONE: adding new assets to AssetMetadata GeoDataFrame")
 

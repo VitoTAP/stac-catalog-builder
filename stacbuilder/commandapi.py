@@ -31,7 +31,7 @@ from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.terracatalog import HRLVPPMetadataCollector, CollectionConfigBuilder
 from stacbuilder.stacapi.upload import Uploader
-from stacbuilder.stacapi.config import Settings
+from stacbuilder.stacapi.config import Settings, AuthSettings
 
 log_level = logging.INFO
 # create console handler with a higher log level

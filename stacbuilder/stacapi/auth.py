@@ -25,8 +25,7 @@ def get_auth(auth_settings: AuthSettings) -> requests.auth.AuthBase | None:
             )
         elif auth_settings.username and auth_settings.password:
             logger.info(
-                "Using login with username {} via resource owner password credentials flow",
-                auth_settings.username,
+                f"Using login with username {auth_settings.username} via resource owner password credentials flow",
             )
             return OAuth2ResourceOwnerPasswordCredentials(
                 token_url=auth_settings.token_url,
