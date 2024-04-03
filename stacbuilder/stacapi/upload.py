@@ -63,7 +63,7 @@ class Uploader:
 
     def upload_collection(self, collection: Path | Collection) -> dict:
         if isinstance(collection, Path):
-            collection = Collection.from_file(str(collection))
+            collection = Collection.from_file(collection)
         elif not isinstance(collection, Collection):
             raise TypeError('Type of argument "collection" must either pathlib.Path or pystac.Collection')
         collection.validate()
