@@ -504,7 +504,7 @@ class STACCollectionBuilder:
             item_path = self.get_item_path(item)
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
-            item.save_object(dest_href=item_path)
+            item.save_object(dest_href=item_path.as_posix(), include_self_link=False)
 
         self._log_progress_message("updating collection extent")
         self._collection.extent = Extent.from_items(items)
@@ -596,6 +596,8 @@ class STACCollectionBuilder:
 
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
+        # TODO add the eo:bands extension:
+
 
         # TODO: Add support for custom links in the collection, like there was in the early scripts.
         ## collection.add_links(

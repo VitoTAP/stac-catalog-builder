@@ -455,9 +455,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 self._log_progress_message(
                     f"Progress: {num_products_processed} of {max_prods_to_process} ({percent_processed:.1%})"
                 )
-                # if num_products_processed > max_prods_to_process:
-                #     break
-
+                if num_products_processed > max_prods_to_process:
+                    executor.shutdown(wait=False)
+                    break
+                        
         # load all dataframes
         # self._load_from_parquet()
 
