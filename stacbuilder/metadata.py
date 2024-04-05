@@ -25,7 +25,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pystac import Collection, Item
-from shapely.geometry import Polygon, shape
+from shapely.geometry import Polygon, shape, MultiPolygon
 from pystac.media_type import MediaType
 
 from stacbuilder.boundingbox import BoundingBox
@@ -331,9 +331,9 @@ class AssetMetadata:
 
     @geometry_lat_lon.setter
     def geometry_lat_lon(self, geometry: Polygon):
-        if not isinstance(geometry, (Polygon, NoneType)):
+        if not isinstance(geometry, (Polygon, MultiPolygon, NoneType)):
             raise TypeError(
-                "geometry must be of type shapely.geometry.Polygon or else be None "
+                "geometry must be of type shapely.geometry.Polygon, shapely.geometry.MultiPolygon or else be None "
                 + f"but the type is {type(geometry)}, {geometry=}"
             )
         self._geometry_lat_lon = geometry

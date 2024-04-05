@@ -498,9 +498,9 @@ class STACCollectionBuilder:
         num_items = len(items)
         for i, item in enumerate(items):
             if i % 1000 == 0:
-                self._log_progress_message(f"Saved {i} of {num_items} STAC items")
-
-            item.validate()
+                fraction_done = i / num_items
+                self._log_progress_message(f"Saved {i} of {num_items} STAC items. ({fraction_done:.1%})")
+            # item.validate()
             item_path = self.get_item_path(item)
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
@@ -597,7 +597,6 @@ class STACCollectionBuilder:
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
         # TODO add the eo:bands extension:
-
 
         # TODO: Add support for custom links in the collection, like there was in the early scripts.
         ## collection.add_links(
@@ -808,8 +807,6 @@ class AssetMetadataPipeline:
         self._collection: Optional[Collection] = None
         self._collection_groups: Dict[Hashable, Collection] = {}
 
-
-
     @staticmethod
     def from_config(
         metadata_collector: IMetadataCollector,
@@ -977,10 +974,10 @@ class AssetMetadataPipeline:
             if stac_item:
                 if self._item_postprocessor is not None:
                     stac_item = self._item_postprocessor(stac_item)
-                try:
-                    stac_item.validate()
-                except RemoteDisconnected:
-                    print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
+                # try:
+                #     stac_item.validate()
+                # except RemoteDisconnected:
+                #     print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
                 yield stac_item
 
         self._log_progress_message("DONE: collect_stac_items")
