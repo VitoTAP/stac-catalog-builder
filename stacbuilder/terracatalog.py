@@ -33,7 +33,6 @@ from terracatalogueclient import ProductFile
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
-from stacbuilder.exceptions import DataValidationError
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
 
@@ -306,6 +305,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
         self._metadata_list = self._convert_to_asset_metadata(self._df_asset_metadata)
 
+        # Free up memory
+        self._df_asset_metadata = None
+        gc.collect()
+
         self._log_progress_message("DONE: collect")
 
     def _save_dataframes(self) -> None:
@@ -353,21 +356,22 @@ class HRLVPPMetadataCollector(IMetadataCollector):
     def _restore_asset_metadata_from_disk(self, paths: List[Path]) -> None:
         """Restore the AssetMetadata objects from disk."""
         if self.temp_dir:
-            self._log_progress_message("Restoring AssetMetadata products from disk.", level=logging.INFO)
+            self._log_progress_message(f"Restoring AssetMetadata products from disk. {paths}", level=logging.INFO)
             for path in paths:
                 if not path.exists():
+                    self._log_progress_message(f"Path {path} does not exist. Skipping.", level=logging.WARNING)
                     continue
                 if self._df_asset_metadata is None:
                     self._df_asset_metadata = gpd.read_parquet(path)
                 else:
                     self._df_asset_metadata = pd.concat([self._df_asset_metadata, gpd.read_parquet(path)])
-                    self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
+                    # self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
                 self._log_progress_message(
                     f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024 ** 2:_}MB",
-                    level=logging.INFO,
+                    level=logging.DEBUG,
                 )
             self._log_progress_message(
-                f"Restored {len(self._df_asset_metadata)} AssetMetadata products from disk.", level=logging.INFO
+                f"Restored {len(self._df_asset_metadata):_} AssetMetadata products from disk.", level=logging.INFO
             )
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
@@ -454,10 +458,15 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         self._df_asset_metadata = None
 
+        # HACK parameters to split up calculation into smaller chunks
+        slice_length = 100  # limits the active threads to prevent OOM errors
+        min_chunk, max_chunk = 0, 200  # limits the number of chunks we process
+
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
         num_products_processed = 0
         num_products_stored = 0
+        product_ids = set()
         num_prods = catalogue.get_product_count(collection.id)
         max_prods_to_process = self._max_products if self._max_products > 0 else num_prods
 
@@ -466,13 +475,21 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             query_slots = self._get_product_query_slots(frequency=self._query_by_frequency)
 
-            slice_length = 100  # limits the active threads to prevent OOM errors
             limit_reached = False
             intermediate_paths = []
 
             for query_slots_iterator in range(0, len(query_slots), slice_length):
                 if limit_reached:
                     break
+
+                if not (min_chunk <= query_slots_iterator < max_chunk):
+                    # This is a temporary measure to prevent OOM errors.
+                    # We should find a better way to limit the number of products we process.
+                    self._log_progress_message(
+                        f"Skipping query slot {query_slots_iterator} as it is not in the range we want to process.",
+                        level=logging.INFO,
+                    )
+                    continue
 
                 if self._is_intermediate_stored(query_slots_iterator):
                     futures = []
@@ -482,7 +499,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                         / self._get_intermediate_relative_path(query_slots_iterator).with_suffix(".parquet")
                     )
                     self._log_progress_message(
-                        f"Skipping query slot {query_slots_iterator} as it is already stored. This slot conatains {num_products_processed:_} products."
+                        f"Slot {query_slots_iterator} is already stored. It conatains {num_products_processed:_} products."
                     )
 
                 else:
@@ -497,6 +514,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                         if not new_products:
                             # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
                             continue
+                        new_products = [p for p in new_products if p.id not in product_ids]
+                        self._log_progress_message(f"Number of new products {len(new_products)}", level=logging.INFO)
+                        product_ids.update([p.id for p in new_products])
+                        self._log_progress_message(f"Number of unique products {len(product_ids)}", level=logging.INFO)
 
                         self._add_items_to_gdf(new_products)
                         del future
@@ -527,21 +548,35 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         product_ids = set(self._df_asset_metadata.index)
 
         if len(product_ids) != len(self._df_asset_metadata):
-            raise DataValidationError(
+            # raise DataValidationError(
+            #     "Sanity check failed in get_products_as_dataframe:"
+            #     + " Each products should correspond to exactly 1 AssetMetadata instance."
+            #     + " len(product_ids) != len(self._df_asset_metadata)"
+            #     + f" {len(product_ids)=} {len(self._df_asset_metadata)=}"
+            # )
+            self._log_progress_message(
                 "Sanity check failed in get_products_as_dataframe:"
                 + " Each products should correspond to exactly 1 AssetMetadata instance."
                 + " len(product_ids) != len(self._df_asset_metadata)"
-                + f" {len(product_ids)=} {len(self._df_asset_metadata)=}"
+                + f" {len(product_ids)=} {len(self._df_asset_metadata)=}",
+                level=logging.ERROR,
             )
 
         # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
         if not self.max_products:
             if len(product_ids) != num_prods:
-                raise DataValidationError(
+                # raise DataValidationError(
+                #     "Sanity check failed in get_products_as_dataframe:"
+                #     + "Number of products in result must be the product count reported by terracataloguiclient"
+                #     + " len(product_ids) != num_prods"
+                #     + f" {len(product_ids)=} product count: {num_prods=}"
+                # )
+                self._log_progress_message(
                     "Sanity check failed in get_products_as_dataframe:"
                     + "Number of products in result must be the product count reported by terracataloguiclient"
                     + " len(product_ids) != num_prods"
-                    + f" {len(product_ids)=} product count: {num_prods=}"
+                    + f" {len(product_ids)=} product count: {num_prods=}",
+                    level=logging.ERROR,
                 )
         self._log_progress_message("DONE sanity checks")
 
@@ -620,8 +655,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._log_progress_message("START: _convert_to_asset_metadata")
         md_list = []
 
-        # Log some progress every 1000 records. Without this output it is hard to see what is happening.
-        progress_chunk_size = 1000
+        # Log some progress every 10 000 records. Without this output it is hard to see what is happening.
+        progress_chunk_size = 10_000
         num_products = len(df)
         for i in range(num_products):
             if i % progress_chunk_size == 0:

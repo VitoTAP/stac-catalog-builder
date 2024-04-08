@@ -5,6 +5,7 @@ This contains the classes that generate the STAC catalogs, collections and items
 
 # Standard libraries
 import datetime as dt
+import gc
 from http.client import RemoteDisconnected
 import inspect
 import json
@@ -960,7 +961,7 @@ class AssetMetadataPipeline:
         groups = self.group_metadata_by_item_id(self.get_metadata())
         num_groups = len(groups)
 
-        progress_chunk_size = 100
+        progress_chunk_size = 10_000
         for i, assets in enumerate(groups.values()):
             if i % progress_chunk_size == 0:
                 fraction_done = i / num_groups
@@ -979,7 +980,9 @@ class AssetMetadataPipeline:
                 # except RemoteDisconnected:
                 #     print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
                 yield stac_item
-
+        del groups
+        self._metadata_collector.reset()
+        gc.collect()
         self._log_progress_message("DONE: collect_stac_items")
 
     def group_metadata_by_item_id(self, iter_metadata) -> Dict[int, List[Item]]:
@@ -1015,6 +1018,7 @@ class AssetMetadataPipeline:
 
     def build_collection(
         self,
+        chunks: Optional[int] = None,
     ):
         """Build the entire STAC collection."""
         self._log_progress_message("START: build_collection")
