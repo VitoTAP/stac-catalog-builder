@@ -786,6 +786,7 @@ class AssetMetadataPipeline:
         output_dir: Path,
         overwrite: Optional[bool] = False,
         link_items: Optional[bool] = True,
+        chunked: bool = False,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
@@ -1035,6 +1036,7 @@ class AssetMetadataPipeline:
         post_processor.process_collection(coll_file)
 
         self._log_progress_message("DONE: build_collection")
+        self._collection = None
 
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)

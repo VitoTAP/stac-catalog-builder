@@ -236,7 +236,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # state / collected information
         self._df_asset_metadata: Optional[gpd.GeoDataFrame] = None
-        # self._df_products: Optional[gpd.GeoDataFrame] = None
 
         self._collection_id: Optional[str] = None
         self._max_products = -1
@@ -287,7 +286,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             case _:
                 _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
-    def collect(self):
+    def collect(self) -> None:
         """Collect and store the AssetMetadata objects."""
         self._log_progress_message("START: collect")
 
@@ -460,7 +459,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # HACK parameters to split up calculation into smaller chunks
         slice_length = 100  # limits the active threads to prevent OOM errors
-        min_chunk, max_chunk = 0, 200  # limits the number of chunks we process
+        min_chunk, max_chunk = 200, 400
 
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
