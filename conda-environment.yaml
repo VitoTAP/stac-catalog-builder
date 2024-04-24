@@ -17,7 +17,7 @@ dependencies:
   - shapely=2.0.*
   - stac-validator=3.3.*
   - stactools=0.5.*
-  - psutils
+  - psutil
   - ipykernel
   - jupyter
   - pytest
