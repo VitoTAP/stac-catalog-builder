@@ -4,6 +4,7 @@ click==8.1.*
 dynaconf==3.2.*
 geopandas==0.14.*
 openeo==0.26.*
+psutil
 pyarrow==14.0.*
 pydantic==2.5.*
 pyproj==3.6.*
@@ -17,3 +18,4 @@ stac-validator==3.3.*
 stactools==0.5.*
 terracatalogueclient==0.1.14
 yarl==1.9.*
+psutil
