@@ -514,9 +514,9 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                             # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
                             continue
                         new_products = [p for p in new_products if p.id not in product_ids]
-                        self._log_progress_message(f"Number of new products {len(new_products)}", level=logging.INFO)
+                        self._log_progress_message(f"Number of new products {len(new_products)}", level=logging.DEBUG)
                         product_ids.update([p.id for p in new_products])
-                        self._log_progress_message(f"Number of unique products {len(product_ids)}", level=logging.INFO)
+                        self._log_progress_message(f"Number of unique products {len(product_ids)}", level=logging.DEBUG)
 
                         self._add_items_to_gdf(new_products)
                         del future
