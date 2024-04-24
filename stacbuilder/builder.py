@@ -969,18 +969,13 @@ class AssetMetadataPipeline:
                 self._log_progress_message(
                     f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%})"
                 )
-
-            stac_item = self._meta_to_stac_item_mapper.create_item(assets)
-            # Ignore the asset when the file was not a known asset type, for example it is
-            # not a GeoTIFF or it is not one of the assets or bands we want to include.
-            if stac_item:
-                if self._item_postprocessor is not None:
-                    stac_item = self._item_postprocessor(stac_item)
-                # try:
-                #     stac_item.validate()
-                # except RemoteDisconnected:
-                #     print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
-                yield stac_item
+            sub_groups = self.split_group_by_latlon(assets) # Check that all the assets have the same lat-lon bounding box
+            for sub_group_assets in sub_groups.values():
+                stac_item = self._meta_to_stac_item_mapper.create_item(sub_group_assets)
+                if stac_item:
+                    if self._item_postprocessor is not None:
+                        stac_item = self._item_postprocessor(stac_item)
+                    yield stac_item
         del groups
         self._metadata_collector.reset()
         gc.collect()
@@ -999,6 +994,21 @@ class AssetMetadataPipeline:
             groups[item_id].append(metadata)
 
         self._log_progress_message("DONE: group_metadata_by_item_id")
+        return groups
+    
+    def split_group_by_latlon(self, metadata_list: List[AssetMetadata]) -> Dict[Tuple[int, int], List[AssetMetadata]]:
+        """Split the metadata into groups, based on the lat-lon bounding box."""
+        groups: Dict[Tuple[int, int], List[AssetMetadata]] = {}
+
+        for metadata in metadata_list:
+            latlon = metadata.bbox_as_list
+            if latlon is None:
+                continue
+            latlon = tuple(latlon)
+            if latlon not in groups:
+                groups[latlon] = []
+            groups[latlon].append(metadata)
+
         return groups
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
@@ -1036,7 +1046,7 @@ class AssetMetadataPipeline:
         post_processor.process_collection(coll_file)
 
         self._log_progress_message("DONE: build_collection")
-        self._collection = None
+        # self._collection = None
 
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)

@@ -459,7 +459,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # HACK parameters to split up calculation into smaller chunks
         slice_length = 100  # limits the active threads to prevent OOM errors
-        min_chunk, max_chunk = 200, 400
+        min_chunk, max_chunk = 0, 1000  # limits the number of chunks we process
 
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
