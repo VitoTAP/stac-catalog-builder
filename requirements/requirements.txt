@@ -4,7 +4,7 @@ click==8.1.*
 dynaconf==3.2.*
 geopandas==0.14.*
 openeo==0.26.*
-psutils
+psutil
 pyarrow==14.0.*
 pydantic==2.5.*
 pyproj==3.6.*
