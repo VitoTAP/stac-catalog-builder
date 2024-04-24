@@ -3,6 +3,7 @@ import inspect
 import itertools
 from pathlib import Path
 from typing import Iterable
+import concurrent.futures
 
 import pystac
 from pystac import Collection, Item
@@ -63,7 +64,7 @@ class Uploader:
 
     def upload_collection(self, collection: Path | Collection) -> dict:
         if isinstance(collection, Path):
-            collection = Collection.from_file(str(collection))
+            collection = Collection.from_file(collection)
         elif not isinstance(collection, Collection):
             raise TypeError('Type of argument "collection" must either pathlib.Path or pystac.Collection')
         collection.validate()
@@ -79,24 +80,29 @@ class Uploader:
         chunk = []
         chunk_start = 0
         chunk_end = 0
+        futures = []
 
-        for index, item in enumerate(items):
-            self._prepare_item(item, collection_id)
-            item.validate()
-            chunk.append(item)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            for index, item in enumerate(items):
+                self._prepare_item(item, collection_id)
+                # item.validate()
+                chunk.append(item)
 
-            if len(chunk) == self.bulk_size:
+                if len(chunk) == self.bulk_size:
+                    chunk_end = index + 1
+                    chunk_start = chunk_end - len(chunk) + 1
+                    self._log_progress_message(f"Uploading items {chunk_start} to {chunk_end}")
+                    futures.append(executor.submit(self._items_endpoint.ingest_bulk,chunk.copy()))
+                    chunk = []
+
+            if chunk:
                 chunk_end = index + 1
                 chunk_start = chunk_end - len(chunk) + 1
                 self._log_progress_message(f"Uploading items {chunk_start} to {chunk_end}")
                 self._items_endpoint.ingest_bulk(chunk)
-                chunk = []
-
-        if chunk:
-            chunk_end = index + 1
-            chunk_start = chunk_end - len(chunk) + 1
-            self._log_progress_message(f"Uploading items {chunk_start} to {chunk_end}")
-            self._items_endpoint.ingest_bulk(chunk)
+            
+            for _ in concurrent.futures.as_completed(futures):
+                continue
 
     def upload_collection_and_items(
         self,

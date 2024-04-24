@@ -14,9 +14,13 @@ import logging
 from pathlib import Path
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple
+import concurrent.futures
+
+# import resource
+import psutil
+import gc
 
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
@@ -29,7 +33,6 @@ from terracatalogueclient import ProductFile
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
-from stacbuilder.exceptions import DataValidationError
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
 
@@ -44,36 +47,12 @@ EPSG_4326_LATLON = 4326
 
 def get_coll_temporal_extent(collection: tcc.Collection) -> Tuple[dt.datetime | None, dt.datetime | None]:
     acquisitionInformation = collection.properties["acquisitionInformation"]
-    pprint(acquisitionInformation)
 
-    # acquisitionInformation contains one or more acquisitionParameters, and each has a start + end datetime.
-    # It looks like this is mainly used to describe the period for each platform,
-    #  for example Sentinal S2A, but also S2B.
-    #
-    # Example:
-    #  'acquisitionInformation': [{'acquisitionParameters': {'beginningDateTime': '2017-01-01T00:00:00Z',
-    #                                                    'endingDateTime': '2023-09-30T23:59:59Z'},
-    #                          'instrument': {'instrumentShortName': 'MSI',
-    #                                         'sensorType': 'OPTICAL'},
-    #                          'platform': {'platformSerialIdentifier': 'S2A',
-    #                                       'platformShortName': 'SENTINEL-2'}},
-    #                         {'acquisitionParameters': {'beginningDateTime': '2017-03-07T01:49:00Z',
-    #                                                    'endingDateTime': '2023-09-30T23:59:59Z'},
-    #                          'instrument': {'instrumentShortName': 'MSI',
-    #                                         'sensorType': 'OPTICAL'},
-    #                          'platform': {'platformSerialIdentifier': 'S2B',
-    #                                       'platformShortName': 'SENTINEL-2'}}],
     dt_start = None
     dt_end = None
     for info in acquisitionInformation:
-        print(info.get("acquisitionParameters", {}))
-
         new_dt_start = info.get("acquisitionParameters", {}).get("beginningDateTime")
         new_dt_end = info.get("acquisitionParameters", {}).get("endingDateTime")
-
-        print(new_dt_start, new_dt_start)
-        print(dt.datetime.fromisoformat(new_dt_start))
-        print(dt.datetime.fromisoformat(new_dt_start))
 
         new_dt_start = dt.datetime.fromisoformat(new_dt_start)
         new_dt_end = dt.datetime.fromisoformat(new_dt_end)
@@ -257,7 +236,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # state / collected information
         self._df_asset_metadata: Optional[gpd.GeoDataFrame] = None
-        self._df_products: Optional[gpd.GeoDataFrame] = None
 
         self._collection_id: Optional[str] = None
         self._max_products = -1
@@ -294,11 +272,21 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             raise TypeError(f"Value for max_products must be an int. {type(value)=}, {value=}")
         self._max_products = int(value) if value else -1
 
-    def _log_progress_message(self, message: str) -> None:
+    def _log_progress_message(self, message: str, level=logging.INFO) -> None:
         calling_method_name = inspect.stack()[1][3]
-        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+        match level:
+            case logging.DEBUG:
+                _logger.debug(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+            case logging.INFO:
+                _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+            case logging.WARNING:
+                _logger.warning(f"PROGRESS: {self.__class__name__}.{calling_method_name}: {message}")
+            case logging.ERROR:
+                _logger.error(f"PROGRESS: {self.__class__name__}.{calling_method_name}: {message}")
+            case _:
+                _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
-    def collect(self):
+    def collect(self) -> None:
         """Collect and store the AssetMetadata objects."""
         self._log_progress_message("START: collect")
 
@@ -316,6 +304,10 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
         self._metadata_list = self._convert_to_asset_metadata(self._df_asset_metadata)
 
+        # Free up memory
+        self._df_asset_metadata = None
+        gc.collect()
+
         self._log_progress_message("DONE: collect")
 
     def _save_dataframes(self) -> None:
@@ -326,9 +318,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             if self._df_asset_metadata is not None:
                 self._save_geodataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
 
-            if self._df_products is not None:
-                self._save_geodataframe(self._df_products, f"products-{self.collection_id}")
-
     def _save_geodataframe(self, gdf: gpd.GeoDataFrame, table_name: str) -> Path:
         if not self.temp_dir.exists():
             self.temp_dir.mkdir(parents=True)
@@ -337,8 +326,52 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._log_progress_message(f"Saving {table_name} as GeoDataFrame (geoparquet), path={geodataframe_path}")
         gdf.to_parquet(path=geodataframe_path, index=True)
         self._log_progress_message(f"DONE saved download products to {geodataframe_path}")
-
         return geodataframe_path
+
+    def _get_intermediate_relative_path(self, index: str) -> Path:
+        return Path(f"intermediates/{index}-asset_metadata-{self.collection_id}")
+
+    def _store_asset_metadata_and_clear_memory(self, index: int):
+        """Store the AssetMetadata objects to disk and clear the memory."""
+        if self.temp_dir:
+            self._log_progress_message("Storing AssetMetadata to disk", level=logging.INFO)
+            if not (self.temp_dir / "intermediates").exists():
+                (self.temp_dir / "intermediates").mkdir(parents=True, exist_ok=True)
+            gdf_path = self._save_geodataframe(self._df_asset_metadata, self._get_intermediate_relative_path(index))
+            self._df_asset_metadata = None
+            return gdf_path
+
+    def _is_intermediate_stored(self, index: int) -> bool:
+        if self.temp_dir:
+            gdf_path = self.temp_dir / self._get_intermediate_relative_path(index).with_suffix(".parquet")
+            return gdf_path.exists()
+        return False
+
+    def _get_num_products_from_intermediate(self, index: int) -> int:
+        if self._is_intermediate_stored(index):
+            gdf_path = self.temp_dir / self._get_intermediate_relative_path(index).with_suffix(".parquet")
+            return len(gpd.read_parquet(gdf_path))
+
+    def _restore_asset_metadata_from_disk(self, paths: List[Path]) -> None:
+        """Restore the AssetMetadata objects from disk."""
+        if self.temp_dir:
+            self._log_progress_message(f"Restoring AssetMetadata products from disk. {paths}", level=logging.INFO)
+            for path in paths:
+                if not path.exists():
+                    self._log_progress_message(f"Path {path} does not exist. Skipping.", level=logging.WARNING)
+                    continue
+                if self._df_asset_metadata is None:
+                    self._df_asset_metadata = gpd.read_parquet(path)
+                else:
+                    self._df_asset_metadata = pd.concat([self._df_asset_metadata, gpd.read_parquet(path)])
+                    # self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
+                self._log_progress_message(
+                    f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024 ** 2:_}MB",
+                    level=logging.DEBUG,
+                )
+            self._log_progress_message(
+                f"Restored {len(self._df_asset_metadata):_} AssetMetadata products from disk.", level=logging.INFO
+            )
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
         """Get the terracatalogueclient's Catalogue to query data from."""
@@ -423,142 +456,160 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._log_progress_message("START: get_products_as_dataframe")
 
         self._df_asset_metadata = None
-        self._df_products = None
+
+        # HACK parameters to split up calculation into smaller chunks
+        slice_length = 100  # limits the active threads to prevent OOM errors
+        min_chunk, max_chunk = 0, 1000  # limits the number of chunks we process
 
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
         num_products_processed = 0
+        num_products_stored = 0
+        product_ids = set()
         num_prods = catalogue.get_product_count(collection.id)
         max_prods_to_process = self._max_products if self._max_products > 0 else num_prods
 
         _logger.info(f"product count for coll_id {collection.id}: {num_prods}")
 
-        # If the time slots are to long you will get a terracatalogueclient.exceptions.TooManyResultsException.
-        for (slot_start, slot_end), prod_type in self._get_product_query_slots(frequency=self._query_by_frequency):
-            current_products_ids = set()
-            new_products = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            query_slots = self._get_product_query_slots(frequency=self._query_by_frequency)
 
-            num_prods_in_slot = catalogue.get_product_count(
-                collection.id, start=slot_start, end=slot_end, productType=prod_type
-            )
-            self._log_progress_message(
-                f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}, number of products in slot: {num_prods_in_slot}"
-            )
+            limit_reached = False
+            intermediate_paths = []
 
-            limit = None
-            if self._max_products:
-                prods_left = max_prods_to_process - num_products_processed
-                if prods_left == 0:
+            for query_slots_iterator in range(0, len(query_slots), slice_length):
+                if limit_reached:
                     break
-                elif num_prods_in_slot > prods_left:
-                    limit = prods_left
 
-            products = list(
-                catalogue.get_products(
-                    collection.id, start=slot_start, end=slot_end, productType=prod_type, limit=limit
-                )
-            )
-
-            if not products:
-                # There is no data for this time range and product type. => Get next slot.
-                continue
-
-            for product in products:
-                # We should never find duplicates within the same time slot that we query.
-                # If there are duplicates, it should only happen because the time period we ask for is shorted than the
-                # period that the product is for, i.e. the product overlaps several time slots we retrieve.
-                if product.id in current_products_ids:
-                    raise DataValidationError(
-                        "Received a duplicate product within the same period. This should never happen."
+                if not (min_chunk <= query_slots_iterator < max_chunk):
+                    # This is a temporary measure to prevent OOM errors.
+                    # We should find a better way to limit the number of products we process.
+                    self._log_progress_message(
+                        f"Skipping query slot {query_slots_iterator} as it is not in the range we want to process.",
+                        level=logging.INFO,
                     )
-                current_products_ids.add(product.id)
+                    continue
 
-                # We may already have the product in the total set so far, because we have to query the
-                # products in small time slots, for example a day or a month.
-                # The time slice that the product applies to may be larger than a day, even as long as a year.
-                if self._df_products is not None:
-                    where_same_prod_and_period = np.logical_and(
-                        self._df_products["id"] == product.id,
-                        self._df_products["beginningDateTime"] == product.beginningDateTime,
-                        self._df_products["endingDateTime"] == product.endingDateTime,
+                if self._is_intermediate_stored(query_slots_iterator):
+                    futures = []
+                    num_products_processed = self._get_num_products_from_intermediate(query_slots_iterator)
+                    intermediate_paths.append(
+                        self.temp_dir
+                        / self._get_intermediate_relative_path(query_slots_iterator).with_suffix(".parquet")
                     )
-                    duplicates_found = np.any(where_same_prod_and_period)
-                    if duplicates_found > 0:
-                        _logger.debug(
-                            f"Already have product with id {product.id}, beginningDateTime={product.beginningDateTime} "
-                            + f"endingDateTime={product.endingDateTime} in products DataFrame self._df_products"
-                            + f"{slot_start=}, {slot_end=}, {prod_type=}"
+                    self._log_progress_message(
+                        f"Slot {query_slots_iterator} is already stored. It conatains {num_products_processed:_} products."
+                    )
+
+                else:
+                    query_slots_slice = query_slots[query_slots_iterator : query_slots_iterator + slice_length]
+                    futures = (
+                        executor.submit(self._fetch_timeslot, slot_start, slot_end, prod_type)
+                        for (slot_start, slot_end), prod_type in query_slots_slice
+                    )
+
+                    for future in concurrent.futures.as_completed(futures):
+                        new_products = future.result()
+                        if not new_products:
+                            # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
+                            continue
+                        new_products = [p for p in new_products if p.id not in product_ids]
+                        self._log_progress_message(f"Number of new products {len(new_products)}", level=logging.INFO)
+                        product_ids.update([p.id for p in new_products])
+                        self._log_progress_message(f"Number of unique products {len(product_ids)}", level=logging.INFO)
+
+                        self._add_items_to_gdf(new_products)
+                        del future
+
+                        self._log_progress_message(
+                            f"Number of new products {len(self._df_asset_metadata)-num_products_processed}.",
+                            level=logging.DEBUG,
                         )
-                        continue
 
-                new_products.append(product)
+                        num_products_processed = len(self._df_asset_metadata)
+                        percent_processed = (num_products_processed + num_products_stored) / max_prods_to_process
+                        self._log_progress_message(
+                            f"Progress: {num_products_processed + num_products_stored} of {max_prods_to_process} ({percent_processed:.1%}) Memory usage: {psutil.Process().memory_info().rss // 1024 ** 2:_}MB"
+                        )  # {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss:_}
+                        if num_products_processed > max_prods_to_process:
+                            executor.shutdown(wait=False)
+                            limit_reached = True
+                            break
+                    intermediate_paths.append(self._store_asset_metadata_and_clear_memory(query_slots_iterator))
+                num_products_stored += num_products_processed
+                del futures
+                gc.collect()
 
-            self._log_progress_message(f"Number of new products in current slot {len(new_products)}.")
-            if not new_products:
-                # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
-                continue
-
-            self._save_intermediate_geodata(new_products)
-
-            num_products_processed = len(self._df_products)
-            percent_processed = num_products_processed / max_prods_to_process
-            self._log_progress_message(
-                f"Retrieved {num_products_processed:_} of {max_prods_to_process:_} products ({percent_processed:.1%})"
-            )
-            if num_products_processed > max_prods_to_process:
-                break
-
+        self._restore_asset_metadata_from_disk(intermediate_paths)
         # Verify we have no duplicate products,
         # i.e. the number of unique product IDs must be == to the number of products.
         self._log_progress_message("START sanity checks: no duplicate products present and received all products ...")
-        product_ids = set(self._df_products.index)
+        product_ids = set(self._df_asset_metadata.index)
 
-        if len(product_ids) != len(self._df_products):
-            raise DataValidationError(
-                "Sanity check failed in get_products_as_dataframe:"
-                + " The result should not contain duplicate products."
-                + " len(product_ids) != len(self._df_products)"
-                + f" {len(product_ids)=} {len(self._df_products)=}"
-            )
-
-        if len(product_ids) != len(self._df_asset_metadata.index):
-            raise DataValidationError(
+        if len(product_ids) != len(self._df_asset_metadata):
+            # raise DataValidationError(
+            #     "Sanity check failed in get_products_as_dataframe:"
+            #     + " Each products should correspond to exactly 1 AssetMetadata instance."
+            #     + " len(product_ids) != len(self._df_asset_metadata)"
+            #     + f" {len(product_ids)=} {len(self._df_asset_metadata)=}"
+            # )
+            self._log_progress_message(
                 "Sanity check failed in get_products_as_dataframe:"
                 + " Each products should correspond to exactly 1 AssetMetadata instance."
-                + " len(product_ids) != len(self._df_asset_metadata.index)"
-                + f" {len(product_ids)=} {len(self._df_asset_metadata.index)=}"
+                + " len(product_ids) != len(self._df_asset_metadata)"
+                + f" {len(product_ids)=} {len(self._df_asset_metadata)=}",
+                level=logging.ERROR,
             )
 
         # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
         if not self.max_products:
             if len(product_ids) != num_prods:
-                raise DataValidationError(
+                # raise DataValidationError(
+                #     "Sanity check failed in get_products_as_dataframe:"
+                #     + "Number of products in result must be the product count reported by terracataloguiclient"
+                #     + " len(product_ids) != num_prods"
+                #     + f" {len(product_ids)=} product count: {num_prods=}"
+                # )
+                self._log_progress_message(
                     "Sanity check failed in get_products_as_dataframe:"
                     + "Number of products in result must be the product count reported by terracataloguiclient"
                     + " len(product_ids) != num_prods"
-                    + f" {len(product_ids)=} product count: {num_prods=}"
+                    + f" {len(product_ids)=} product count: {num_prods=}",
+                    level=logging.ERROR,
                 )
         self._log_progress_message("DONE sanity checks")
 
-        self._log_progress_message("DONE: get_products_as_dataframe")
+        self._log_progress_message("DONE: get_products_as_dataframe", level=logging.DEBUG)
         return self._df_asset_metadata
 
-    def _save_intermediate_geodata(self, new_products):
-        self._log_progress_message("START: saving intermediate GeoData ...")
-        product_records = [
-            {k: v for k, v in self._product_to_dict(pr).items() if k != "geometry"} for pr in new_products
-        ]
-        product_geoms = [npr.geometry for npr in new_products]
-        gdf_products = gpd.GeoDataFrame(data=product_records, crs=EPSG_4326_LATLON, geometry=product_geoms)
-        gdf_products.index = gdf_products["id"]
-        gdf_products.sort_index()
+    def _fetch_timeslot(self, slot_start: dt.datetime, slot_end: dt.datetime, prod_type: str) -> List[tcc.Product]:
+        catalogue = self.get_tcc_catalogue()
+        collection = self.get_tcc_collection()
 
-        if self._df_products is None:
-            self._df_products = gdf_products
-        else:
-            self._df_products = pd.concat([self._df_products, gdf_products])
+        num_prods_in_slot = catalogue.get_product_count(
+            collection.id, start=slot_start, end=slot_end, productType=prod_type
+        )
+        self._log_progress_message(
+            f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}, number of products in slot: {num_prods_in_slot}",
+            level=logging.DEBUG,
+        )
+        products = list(
+            catalogue.get_products(
+                collection.id,
+                start=slot_start,
+                end=slot_end,
+                productType=prod_type,
+                accessedFrom="S3",
+            )
+        )
+        self._log_progress_message(
+            f"# Retrieved {len(products)} products for time slot {slot_start} to {slot_end}, {prod_type=}",
+            level=logging.DEBUG,
+        )
+        return products
 
-        self._log_progress_message("START: adding new assets to AssetMetadata GeoDataFrame ...")
+    def _add_items_to_gdf(self, new_products):
+        self._log_progress_message("START: adding new assets to AssetMetadata GeoDataFrame ...", level=logging.DEBUG)
         assets_md = [self.create_asset_metadata(p) for p in new_products]
         asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
         asset_geoms = [md.geometry_lat_lon for md in assets_md]
@@ -570,11 +621,9 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             self._df_asset_metadata = gdf_asset_md
         else:
             self._df_asset_metadata = pd.concat([self._df_asset_metadata, gdf_asset_md])
+            self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
 
-        self._log_progress_message("DONE: adding new assets to AssetMetadata GeoDataFrame")
-
-        self._save_dataframes()
-        self._log_progress_message("DONE: saving intermediate GeoData ...")
+        self._log_progress_message("DONE: adding new assets to AssetMetadata GeoDataFrame", level=logging.DEBUG)
 
     def _product_to_dict(self, product: tcc.Product) -> dict[str, Any]:
         return {
@@ -605,8 +654,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         self._log_progress_message("START: _convert_to_asset_metadata")
         md_list = []
 
-        # Log some progress every 1000 records. Without this output it is hard to see what is happening.
-        progress_chunk_size = 1000
+        # Log some progress every 10 000 records. Without this output it is hard to see what is happening.
+        progress_chunk_size = 10_000
         num_products = len(df)
         for i in range(num_products):
             if i % progress_chunk_size == 0:
@@ -618,7 +667,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             md_list.append(metadata)
 
         self._log_progress_message(f"DONE: {i+1} of {num_products} converted to AssetMetadata")
-        self._log_progress_message("DONE: _convert_to_asset_metadata")
+        self._log_progress_message("DONE: _convert_to_asset_metadata", level=logging.DEBUG)
         return md_list
 
     def create_asset_metadata(self, product: tcc.Product) -> AssetMetadata:

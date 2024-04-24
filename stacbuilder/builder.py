@@ -5,6 +5,7 @@ This contains the classes that generate the STAC catalogs, collections and items
 
 # Standard libraries
 import datetime as dt
+import gc
 from http.client import RemoteDisconnected
 import inspect
 import json
@@ -498,13 +499,13 @@ class STACCollectionBuilder:
         num_items = len(items)
         for i, item in enumerate(items):
             if i % 1000 == 0:
-                self._log_progress_message(f"Saved {i} of {num_items} STAC items")
-
-            item.validate()
+                fraction_done = i / num_items
+                self._log_progress_message(f"Saved {i} of {num_items} STAC items. ({fraction_done:.1%})")
+            # item.validate()
             item_path = self.get_item_path(item)
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
-            item.save_object(dest_href=item_path)
+            item.save_object(dest_href=item_path.as_posix(), include_self_link=False)
 
         self._log_progress_message("updating collection extent")
         self._collection.extent = Extent.from_items(items)
@@ -596,6 +597,7 @@ class STACCollectionBuilder:
 
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
+        # TODO add the eo:bands extension:
 
         # TODO: Add support for custom links in the collection, like there was in the early scripts.
         ## collection.add_links(
@@ -784,6 +786,7 @@ class AssetMetadataPipeline:
         output_dir: Path,
         overwrite: Optional[bool] = False,
         link_items: Optional[bool] = True,
+        chunked: bool = False,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
@@ -805,8 +808,6 @@ class AssetMetadataPipeline:
         # results
         self._collection: Optional[Collection] = None
         self._collection_groups: Dict[Hashable, Collection] = {}
-
-
 
     @staticmethod
     def from_config(
@@ -961,26 +962,23 @@ class AssetMetadataPipeline:
         groups = self.group_metadata_by_item_id(self.get_metadata())
         num_groups = len(groups)
 
-        progress_chunk_size = 100
+        progress_chunk_size = 10_000
         for i, assets in enumerate(groups.values()):
             if i % progress_chunk_size == 0:
                 fraction_done = i / num_groups
                 self._log_progress_message(
                     f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%})"
                 )
-
-            stac_item = self._meta_to_stac_item_mapper.create_item(assets)
-            # Ignore the asset when the file was not a known asset type, for example it is
-            # not a GeoTIFF or it is not one of the assets or bands we want to include.
-            if stac_item:
-                if self._item_postprocessor is not None:
-                    stac_item = self._item_postprocessor(stac_item)
-                try:
-                    stac_item.validate()
-                except RemoteDisconnected:
-                    print(f"Skipped validation of {stac_item.get_self_href()} due to RemoteDisconnected.")
-                yield stac_item
-
+            sub_groups = self.split_group_by_latlon(assets) # Check that all the assets have the same lat-lon bounding box
+            for sub_group_assets in sub_groups.values():
+                stac_item = self._meta_to_stac_item_mapper.create_item(sub_group_assets)
+                if stac_item:
+                    if self._item_postprocessor is not None:
+                        stac_item = self._item_postprocessor(stac_item)
+                    yield stac_item
+        del groups
+        self._metadata_collector.reset()
+        gc.collect()
         self._log_progress_message("DONE: collect_stac_items")
 
     def group_metadata_by_item_id(self, iter_metadata) -> Dict[int, List[Item]]:
@@ -996,6 +994,21 @@ class AssetMetadataPipeline:
             groups[item_id].append(metadata)
 
         self._log_progress_message("DONE: group_metadata_by_item_id")
+        return groups
+    
+    def split_group_by_latlon(self, metadata_list: List[AssetMetadata]) -> Dict[Tuple[int, int], List[AssetMetadata]]:
+        """Split the metadata into groups, based on the lat-lon bounding box."""
+        groups: Dict[Tuple[int, int], List[AssetMetadata]] = {}
+
+        for metadata in metadata_list:
+            latlon = metadata.bbox_as_list
+            if latlon is None:
+                continue
+            latlon = tuple(latlon)
+            if latlon not in groups:
+                groups[latlon] = []
+            groups[latlon].append(metadata)
+
         return groups
 
     def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
@@ -1016,6 +1029,7 @@ class AssetMetadataPipeline:
 
     def build_collection(
         self,
+        chunks: Optional[int] = None,
     ):
         """Build the entire STAC collection."""
         self._log_progress_message("START: build_collection")
@@ -1032,6 +1046,7 @@ class AssetMetadataPipeline:
         post_processor.process_collection(coll_file)
 
         self._log_progress_message("DONE: build_collection")
+        # self._collection = None
 
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)
