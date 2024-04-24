@@ -17,3 +17,4 @@ stac-validator==3.3.*
 stactools==0.5.*
 terracatalogueclient==0.1.14
 yarl==1.9.*
+psutil
