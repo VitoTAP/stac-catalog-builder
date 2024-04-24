@@ -1,3 +1,19 @@
+"""
+This script depends on environment variables to be set. The following environment variables are required:
+AWS_ACCESS_KEY_ID=XXX
+AWS_ENDPOINT_URL=https://eodata.dataspace.copernicus.eu
+AWS_S3_ENDPOINT=eodata.dataspace.copernicus.eu
+AWS_SECRET_ACCESS_KEY=XXX
+AWS_VIRTUAL_HOSTING=FALSE
+AWS_DEFAULT_REGION=default
+CPL_VSIL_CURL_CHUNK_SIZE=10485760
+
+This script needs additional packages, required to fetch data from S3 via a standard pathlib interface:
+s3fs
+universal-pathlib
+fsspec
+
+"""
 
 from upath import UPath
 from pathlib import Path
