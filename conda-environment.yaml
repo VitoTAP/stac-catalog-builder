@@ -6,6 +6,7 @@ dependencies:
   - click=8.1.*
   - geopandas=0.14.*
   - openeo=0.26.*
+  - psutil
   - pyarrow=14.0.*
   - pydantic=2.5.*
   - pyproj=3.6.*
@@ -17,12 +18,11 @@ dependencies:
   - shapely=2.0.*
   - stac-validator=3.3.*
   - stactools=0.5.*
-  - psutil
   - ipykernel
   - jupyter
   - pytest
-  - pip
   - yarl=1.9.*
+  - pip
   - pip:
     - --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple
     - terracatalogueclient==0.1.14

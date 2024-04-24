@@ -459,6 +459,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
 
         # HACK parameters to split up calculation into smaller chunks
         slice_length = 100  # limits the active threads to prevent OOM errors
+        limit_chunks = False
         min_chunk, max_chunk = 0, 1000  # limits the number of chunks we process
 
         catalogue = self.get_tcc_catalogue()
@@ -481,7 +482,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 if limit_reached:
                     break
 
-                if not (min_chunk <= query_slots_iterator < max_chunk):
+                if limit_chunks and (not (min_chunk <= query_slots_iterator < max_chunk)):
                     # This is a temporary measure to prevent OOM errors.
                     # We should find a better way to limit the number of products we process.
                     self._log_progress_message(
@@ -509,11 +510,12 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     )
 
                     for future in concurrent.futures.as_completed(futures):
-                        new_products = future.result()
+                        future_result = future.result()
+                        new_products = [p for p in future_result if p.id not in product_ids]
+
                         if not new_products:
                             # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
                             continue
-                        new_products = [p for p in new_products if p.id not in product_ids]
                         self._log_progress_message(f"Number of new products {len(new_products)}", level=logging.DEBUG)
                         product_ids.update([p.id for p in new_products])
                         self._log_progress_message(f"Number of unique products {len(product_ids)}", level=logging.DEBUG)

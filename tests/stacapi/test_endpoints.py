@@ -164,10 +164,6 @@ class TestCollectionsEndPoint:
         assert empty_collection.to_dict() == actual_collection.to_dict()
         assert m.called
 
-    @pytest.mark.xfail(reason="Test not implemented yet")
-    def test_get_all(self, requests_mock, empty_collection: Collection, collection_endpt: CollectionsEndpoint):
-        assert False, "Test not implemented yet"
-
     def test_create(self, requests_mock, empty_collection: Collection, collection_endpt: CollectionsEndpoint):
         m = requests_mock.post(str(self.BASE_URL / "collections"), json=empty_collection.to_dict(), status_code=201)
         response_json = collection_endpt.create(empty_collection)
