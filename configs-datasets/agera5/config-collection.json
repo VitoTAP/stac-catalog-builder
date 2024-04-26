@@ -1,0 +1,169 @@
+{
+    "collection_id": "agera5_daily",
+    "title": "agERA5 data",
+    "description": "ERA5 is the fifth generation ECMWF atmospheric reanalysis of the global climate covering the period from January 1940 to present1. It is produced by the Copernicus Climate Change Service (C3S) at ECMWF and provides hourly estimates of a large number of atmospheric, land and oceanic climate variables. The data cover the Earth on a 31km grid and resolve the atmosphere using 137 levels from the surface up to a height of 80km. ERA5 includes an ensemble component at half the resolution to provide information on synoptic uncertainty of its products.\nERA5.1 is a dedicated product with the same horizontal and vertical resolution that was produced for the years 2000 to 2006 inclusive to significantly improve a discontinuity in global-mean temperature in the stratosphere and uppermost troposphere that ERA5 suffers from during that period. Users that are interested in this part of the atmosphere in this era are advised to access ERA5.1 rather than ERA5.\nERA5 and ERA5.1 use a state-of-the-art numerical weather prediction model to assimilate a variety of observations, including satellite and ground-based measurements, and produces a comprehensive and consistent view of the Earth's atmosphere. These products are widely used by researchers and practitioners in various fields, including climate science, weather forecasting, energy production and machine learning among others, to understand and analyse past and current weather and climate conditions. See also: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land",
+    "instruments": [],
+    "keywords": [
+        "ERA5", "climate", "atmosphere", "reanalysis", "Copernicus", "Copernicus Climate Change Service (C3S)", "ECMW"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Copernicus Climate Data Store (CDS)",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://cds.climate.copernicus.eu/"
+        },
+        {
+            "name": "VITO",
+            "roles": [
+                "processor"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/${year}/${month}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<item_id>.*)/AgERA5_(?P<asset_type>.*)_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2}).tif$",
+            "period": "daily",
+            "fixed_values": {
+            }
+        }
+    },
+    "item_assets": {
+        "2m_temperature_min": {
+            "title": "2m temperature min 24h",
+            "description": "Daily minimum of temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temperature_min",
+                    "description": "temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temperature_min",
+                    "unit": "K"
+                }
+            ]
+        },
+        "2m_temperature_max": {
+            "title": "2m temperature max 24h",
+            "description": "Daily maximum of temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temperature_max",
+                    "description": "temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temperature_max",
+                    "unit": "K"
+                }
+            ]
+        },
+        "2m_temperature_mean": {
+            "title": "2m temperature mean 24h",
+            "description": "Daily mean of temperature 2m above ground (Kelvin)",
+            "eo_bands": [
+                {
+                    "name": "2m_temperature_mean",
+                    "description": "temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "2m_temperature_mean",
+                    "unit": "K"
+                }
+            ]
+        },
+        "dewpoint_temperature_mean": {
+            "title": "2m dewpoint temperature",
+            "description": "Mean dewpoint temperature at a height of 2 metres above the surface over the period 00h-24h local time. The dew point is the temperature to which air must be cooled to become saturated with water vapor. In combination with the air temperature it is used to assess relative humidity.",
+            "eo_bands": [
+                {
+                    "name": "dewpoint_temperature_mean",
+                    "description": "dewpoint temperature 2m above ground (Kelvin)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "dewpoint_temperature_mean",
+                    "unit": "K"
+                }
+            ]
+        },
+        "vapour_pressure": {
+            "title": "vapour pressure",
+            "description": "Contribution to the total atmospheric pressure provided by the water vapour over the period 00-24h local time per unit of time.",
+            "eo_bands": [
+                {
+                    "name": "vapour_pressure",
+                    "description": "Contribution to the total atmospheric pressure provided by the water vapour over the period 00-24h local time per unit of time."
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "vapour_pressure",
+                    "unit": "hPa"
+                }
+            ]
+        },
+        "wind_speed": {
+            "title": "10m wind speed",
+            "description": "Mean wind speed at a height of 10 metres above the surface over the period 00h-24h local time.",
+            "eo_bands": [
+                {
+                    "name": "wind_speed",
+                    "description": "Mean wind speed at a height of 10 metres above the surface over the period 00h-24h local time."
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "wind_speed",
+                    "unit": "m/s"
+                }
+            ]
+        },
+         "solar_radiation_flux": {
+            "title": "solar radiation flux",
+            "description": "Total amount of energy provided by solar radiation at the surface over the period 00-24h local time per unit area and time.",
+            "eo_bands": [
+                {
+                    "name": "solar_radiation_flux",
+                    "description": "Total amount of energy provided by solar radiation at the surface over the period 00-24h local time per unit area and time."
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "solar_radiation_flux",
+                    "unit": "J/(m²day)"
+                }
+            ]
+        },
+        "total_precipitation": {
+            "title": "total precipitation min 24h",
+            "description": "total precipitation per day (m)",
+            "eo_bands": [
+                {
+                    "name": "total_precipitation",
+                    "description": "total precipitation per month (m)"
+                }
+            ],
+            "raster_bands": [
+                {
+                    "name": "total_precipitation",
+                    "unit": "m"
+                }
+            ]
+        }
+    }
+}
