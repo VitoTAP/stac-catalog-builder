@@ -49,7 +49,9 @@
             "raster_bands": [
                 {
                     "name": "2m_temperature_min",
-                    "unit": "K"
+                    "unit": "K",
+                    "offset": 0.0,
+                    "scale": 0.01
                 }
             ]
         },
@@ -65,7 +67,9 @@
             "raster_bands": [
                 {
                     "name": "2m_temperature_max",
-                    "unit": "K"
+                    "unit": "K",
+                    "offset": 0.0,
+                    "scale": 0.01
                 }
             ]
         },
@@ -81,7 +85,9 @@
             "raster_bands": [
                 {
                     "name": "2m_temperature_mean",
-                    "unit": "K"
+                    "unit": "K",
+                    "offset": 0.0,
+                    "scale": 0.01
                 }
             ]
         },
@@ -97,7 +103,9 @@
             "raster_bands": [
                 {
                     "name": "dewpoint_temperature_mean",
-                    "unit": "K"
+                    "unit": "K",
+                    "offset": 0.0,
+                    "scale": 0.01
                 }
             ]
         },
@@ -113,7 +121,9 @@
             "raster_bands": [
                 {
                     "name": "vapour_pressure",
-                    "unit": "hPa"
+                    "unit": "hPa",
+                    "offset": 0.0,
+                    "scale": 0.001
                 }
             ]
         },
@@ -129,7 +139,9 @@
             "raster_bands": [
                 {
                     "name": "wind_speed",
-                    "unit": "m/s"
+                    "unit": "m/s",
+                    "offset": 0.0,
+                    "scale": 0.01
                 }
             ]
         },
@@ -161,7 +173,9 @@
             "raster_bands": [
                 {
                     "name": "total_precipitation",
-                    "unit": "m"
+                    "unit": "m",
+                    "offset": 0.0,
+                    "scale": 0.01
                 }
             ]
         }

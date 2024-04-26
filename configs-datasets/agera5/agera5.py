@@ -69,6 +69,7 @@ def build_collection(
             def update_metadata(metadata: AssetMetadata) -> AssetMetadata:
                 metadata.asset_type = type_mapping.get(metadata.asset_type,metadata.asset_type)
                 metadata.item_id = "agera5"  + metadata.item_id
+                metadata.href = metadata.href.replace("/data/MTDA","https://services.terrascope.be/download")
                 return metadata
             return [update_metadata(m) for m in metadata_list ]
 
