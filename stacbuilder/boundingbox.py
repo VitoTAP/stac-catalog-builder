@@ -4,7 +4,7 @@ import dataclasses as dc
 from typing import Dict, List, Optional
 
 from shapely import to_wkt
-from shapely.geometry import mapping, Polygon
+from shapely.geometry import mapping, Polygon, box
 
 
 def bbox_list_to_dict(bbox: List[float]) -> Dict[str, float]:
@@ -139,7 +139,7 @@ class BoundingBox:
         """Returns a rectangular polygon representing the bounding box."""
         # Note: shapely basically ignores the CRS in its geometries, so we leave it out.
         # TODD: is there still a way can we include the CRS in the shapely geometry? And is worth the trouble?
-        return Polygon.from_bounds(self.west, self.south, self.east, self.north)
+        return box(self.west, self.south, self.east, self.north)
 
     def as_wkt(self):
         return to_wkt(self.as_polygon())
