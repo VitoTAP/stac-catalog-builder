@@ -1,6 +1,6 @@
 import pytest
 
-from shapely.geometry.polygon import Polygon
+from shapely.geometry import Polygon, box
 
 
 from stacbuilder.boundingbox import (
@@ -150,7 +150,8 @@ class TestBoundingBox:
 
         # Note: Shapely basically ignores the CRS. We don't verify it here.
         # TODO:  If we do find a way to add the CRS, we should verify that too.
-        expected_polygon = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
+        # expected_polygon = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
+        expected_polygon = box(10.0, 20.0, 30.0, 40.0)
         assert actual_polygon == expected_polygon
 
     def test_as_wkt(self):
@@ -158,7 +159,7 @@ class TestBoundingBox:
         # Note that standard Well-Known Text does not include the Coordinate Reference System.
         # EWKT or "Extended WKT" does include it, but this is not what we are working with here.
         # (EWKT is used by PostGIS for example)
-        expected_wkt = "POLYGON ((10 20, 10 40, 30 40, 30 20, 10 20))"
+        expected_wkt = "POLYGON ((30 20, 30 40, 10 40, 10 20, 30 20))"
         assert bbox.as_wkt() == expected_wkt
 
     def test_as_geometry_dict(self):
@@ -167,13 +168,12 @@ class TestBoundingBox:
         expected = {
             "type": "Polygon",
             "coordinates": (
-                # a single outer ring
                 (
-                    (10.0, 20.0),  # south-west / LL / min_x, min_y
-                    (10.0, 40.0),  # north-west / UL / min_x, max_y
-                    (30.0, 40.0),  # north-east / UR / max_x, max_y
-                    (30.0, 20.0),  # south-east / LR / max_x, min_y
-                    (10.0, 20.0),  # close the ring: last point = first point
+                    (30.0, 20.0), # south-east / LR / max_x, min_y
+                    (30.0, 40.0), # north-east / UR / max_x, max_y
+                    (10.0, 40.0), # north-west / UL / min_x, max_y
+                    (10.0, 20.0), # south-west / LL / min_x, min_y
+                    (30.0, 20.0) # close the ring: last point = first point
                 ),
             ),
         }

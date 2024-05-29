@@ -13,7 +13,7 @@ functionality of the CLI, and that is harder to do directly on the CLI.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 
 from pystac import Collection, Item
@@ -41,6 +41,8 @@ console_handler.setLevel(log_level)
 formatter = logging.Formatter("%(levelname)-7s | %(asctime)s | %(message)s")
 console_handler.setFormatter(formatter)
 logging.basicConfig(handlers=[console_handler], level=log_level)
+logging.getLogger("botocore").setLevel(logging.WARNING)
+logging.getLogger("boto3").setLevel(logging.WARNING)
 
 
 def build_collection(
@@ -51,6 +53,8 @@ def build_collection(
     overwrite: bool,
     max_files: Optional[int] = -1,
     save_dataframe: Optional[bool] = False,
+    link_items: bool = True,
+    item_postprocessor: Optional[Callable] = None,
 ) -> None:
     """
     Build a STAC collection from a directory of files.
@@ -75,6 +79,8 @@ def build_collection(
         file_coll_cfg=file_coll_cfg,
         output_dir=output_dir,
         overwrite=overwrite,
+        link_items=link_items,
+        item_postprocessor=item_postprocessor,
     )
 
     pipeline.build_collection()
@@ -149,9 +155,10 @@ def list_input_files(
     :param max_files: Maximum number of files to process.
     :return: List containing paths of all the found files.
     """
-
+    if isinstance(input_dir, str):
+        input_dir = Path(input_dir)
     collector = FileCollector(
-        input_dir=Path(input_dir),
+        input_dir=input_dir,
         glob=glob,
         max_files=max_files,
     )
@@ -199,6 +206,7 @@ def list_stac_items(
     input_dir: Path,
     max_files: Optional[int] = -1,
     save_dataframe: bool = False,
+    item_postprocessor: Optional[Callable] = None,
 ) -> Tuple[List[Collection], List[Path]]:
     """
     Return the STAC items that are generated for each file and the files for which no stac item could be generated.
@@ -217,7 +225,11 @@ def list_stac_items(
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
     pipeline = GeoTiffPipeline.from_config(
-        collection_config=coll_cfg, file_coll_cfg=file_coll_cfg, output_dir=None, overwrite=False
+        collection_config=coll_cfg,
+        file_coll_cfg=file_coll_cfg,
+        output_dir=None,
+        overwrite=False,
+        item_postprocessor=item_postprocessor,
     )
 
     if save_dataframe:

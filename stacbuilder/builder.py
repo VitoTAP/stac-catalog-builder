@@ -787,6 +787,7 @@ class AssetMetadataPipeline:
         overwrite: Optional[bool] = False,
         link_items: Optional[bool] = True,
         chunked: bool = False,
+        item_postprocessor: Optional[Callable] = None,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
@@ -803,7 +804,7 @@ class AssetMetadataPipeline:
 
         self._collection_builder: STACCollectionBuilder = None
 
-        self._item_postprocessor: Optional[Callable] = None
+        self._item_postprocessor: Optional[Callable] = item_postprocessor
 
         # results
         self._collection: Optional[Collection] = None
@@ -816,10 +817,15 @@ class AssetMetadataPipeline:
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
         link_items: Optional[bool] = True,
+        item_postprocessor: Optional[Callable] = None,
     ) -> "AssetMetadataPipeline":
         """Creates a AssetMetadataPipeline from configurations."""
 
-        pipeline = AssetMetadataPipeline(metadata_collector=None, output_dir=None, overwrite=False)
+        pipeline = AssetMetadataPipeline(
+            metadata_collector=None,
+            output_dir=None,
+            overwrite=False,
+            item_postprocessor=item_postprocessor)
         pipeline._setup(
             metadata_collector=metadata_collector,
             collection_config=collection_config,
@@ -1141,6 +1147,8 @@ class GeoTiffPipeline:
         file_coll_cfg: FileCollectorConfig,
         output_dir: Optional[Path] = None,
         overwrite: Optional[bool] = False,
+        link_items: bool = True,
+        item_postprocessor: Optional[Callable] = None,
     ) -> "GeoTiffPipeline":
         """Creates a GeoTiffPipeline from configurations.
 
@@ -1178,6 +1186,8 @@ class GeoTiffPipeline:
             collection_config=collection_config,
             output_dir=output_dir,
             overwrite=overwrite,
+            link_items=link_items,
+            item_postprocessor=item_postprocessor,
         )
         return GeoTiffPipeline(
             metadata_collector=metadata_collector,

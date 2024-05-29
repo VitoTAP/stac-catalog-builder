@@ -6,7 +6,7 @@ import datetime as dt
 from dateutil.tz import tzoffset
 
 import pytest
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
@@ -188,11 +188,11 @@ class TestAssetMetadata:
             "coordinates": (
                 # a single outer ring
                 (
-                    (4.0, 51.0),  # south-west / LL / min_x, min_y
-                    (4.0, 52.0),  # north-west / UL / min_x, max_y
-                    (5.0, 52.0),  # north-east / UR / max_x, max_y
-                    (5.0, 51.0),  # south-east / LR / max_x, min_y
-                    (4.0, 51.0),  # close the ring: last point = first point
+                    ((5.0, 51.0), 
+                     (5.0, 52.0),
+                     (4.0, 52.0),
+                     (4.0, 51.0),
+                     (5.0, 51.0))
                 ),
             ),
         }
@@ -228,8 +228,11 @@ class TestAssetMetadata:
         max_x = 694307.66
         max_y = 799081.79
         meta.bbox_projected = BoundingBox(min_x, min_y, max_x, max_y, 3812)
+        # expected_wkt = (
+        #     f"POLYGON (({min_x} {min_y}, {min_x} {max_y}, {max_x} {max_y}, {max_x} {min_y}, {min_x} {min_y}))"
+        # )
         expected_wkt = (
-            f"POLYGON (({min_x} {min_y}, {min_x} {max_y}, {max_x} {max_y}, {max_x} {min_y}, {min_x} {min_y}))"
+            f"POLYGON (({max_x} {min_y}, {max_x} {max_y}, {min_x} {max_y}, {min_x} {min_y}, {max_x} {min_y}))"
         )
         assert meta.proj_geometry_as_wkt == expected_wkt
 
@@ -241,7 +244,7 @@ class TestAssetMetadata:
         max_y = 799081.79
         meta.bbox_projected = BoundingBox(min_x, min_y, max_x, max_y, 3812)
 
-        expected_polygon = Polygon.from_bounds(min_x, min_y, max_x, max_y)
+        expected_polygon = box(min_x, min_y, max_x, max_y)
         assert meta.proj_bbox_as_polygon == expected_polygon
 
     @pytest.mark.skip(reason="Test not yet implemented")

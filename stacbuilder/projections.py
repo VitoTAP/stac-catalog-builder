@@ -2,6 +2,7 @@
 For converting bounding boxes to a different Coordinate Reference System.
 """
 
+from functools import lru_cache
 import logging
 from typing import Any, Callable, List, Tuple
 
@@ -14,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 XYCoordinate = Tuple[float, float]
 XYTransform = Callable[[float, float, bool], XYCoordinate]
-
 
 def reproject_bounding_box(
     west: float, south: float, east: float, north: float, from_crs: Any, to_crs: Any
@@ -88,7 +88,7 @@ def get_transform(from_crs: Any, to_crs: Any) -> XYTransform:
     transformer = _get_transformer(from_crs=from_crs, to_crs=to_crs)
     return transformer.transform
 
-
+# @lru_cache(maxsize=6)
 def _get_transformer(from_crs: Any, to_crs: Any) -> Any:
     """Get a transformer to reproject from "from_crs" to "to_crs".
 
