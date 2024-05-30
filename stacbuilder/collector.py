@@ -11,7 +11,7 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
 from stacbuilder.pathparsers import InputPathParser, InputPathParserFactory
-from stacbuilder.projections import reproject_bounding_box
+from stacbuilder.projections import reproject_bounding_box, project_polygon
 
 
 class IDataCollector(Protocol):
@@ -152,46 +152,6 @@ class IMetadataCollector(IDataCollector):
         return self._metadata_list
 
 
-class RasterBBoxReader:
-    """Reads bounding box info from a raster file format.
-
-    # TODO: Move functionality to GeoTiffMetadataCollector along with MapGeoTiffToAssetMetadata
-    """
-
-    @classmethod
-    def from_raster_path(cls, path: Path) -> Tuple[BoundingBox, BoundingBox, List[float]]:
-        with rasterio.open(path) as dataset:
-            return cls.from_rasterio_dataset(dataset)
-
-    @staticmethod
-    def from_rasterio_dataset(dataset) -> Tuple[BoundingBox, BoundingBox, List[float]]:
-        bbox_lat_lon = None
-        bbox_projected = None
-        proj_epsg = None
-
-        normalized_epsg = normalize_crs(dataset.crs)
-        if normalized_epsg is not None:
-            proj_epsg = normalized_epsg
-        elif hasattr(dataset.crs, "to_epsg"):
-            proj_epsg = dataset.crs.to_epsg()
-
-        if not proj_epsg:
-            proj_epsg = 4326
-
-        bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
-
-        if proj_epsg in [4326, "EPSG:4326", "epsg:4326"]:
-            bbox_lat_lon = bbox_projected
-        else:
-            west, south, east, north = bbox_projected.to_list()
-            bbox_list = reproject_bounding_box(west, south, east, north, from_crs=dataset.crs, to_crs="epsg:4326")
-            bbox_lat_lon = BoundingBox.from_list(bbox_list, epsg=4326)
-
-        transform = list(dataset.transform)[0:6]
-
-        return bbox_lat_lon, bbox_projected, transform
-
-
 class MapGeoTiffToAssetMetadata:
     """Extracts AssetMetadata from each GeoTIFF file.
 
@@ -233,8 +193,29 @@ class MapGeoTiffToAssetMetadata:
 
         with rasterio.open(asset_path) as dataset:
             asset_meta.shape = dataset.shape
-            bboxes_result = RasterBBoxReader.from_rasterio_dataset(dataset)
-            asset_meta.bbox_lat_lon, asset_meta.bbox_projected, asset_meta.transform = bboxes_result
+
+            # Get the EPSG code of the dataset
+            proj_epsg = None
+            normalized_epsg = normalize_crs(dataset.crs)
+            if normalized_epsg is not None:
+                proj_epsg = normalized_epsg
+            elif hasattr(dataset.crs, "to_epsg"):
+                proj_epsg = dataset.crs.to_epsg()
+
+            if not proj_epsg:
+                proj_epsg = 4326
+
+            # Get the projected bounding box of the dataset
+            asset_meta.bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
+
+            # Get the transform of the dataset
+            asset_meta.transform = list(dataset.transform)[0:6]
+
+            # Project the geometry to EPSG:4326 (latlon) and get the bounding box
+            asset_meta.geometry_lat_lon = project_polygon(
+                geometry=asset_meta.geometry_proj, from_crs=proj_epsg, to_crs=4326
+            )
+            asset_meta.bbox_lat_lon = BoundingBox.from_list(asset_meta.geometry_lat_lon.bounds, epsg=4326)
 
             bands = []
             tags = dataset.tags() or {}

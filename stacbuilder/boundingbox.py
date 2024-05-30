@@ -146,3 +146,4 @@ class BoundingBox:
 
     def as_geometry_dict(self):
         return mapping(self.as_polygon())
+    

@@ -193,7 +193,7 @@ class MapMetadataToSTACItem:
         item = Item(
             href=first_asset.item_href,
             id=first_asset.item_id,
-            geometry=first_asset.geometry_as_dict,
+            geometry=first_asset.geometry_lat_lon_as_dict,
             bbox=first_asset.bbox_as_list,
             datetime=first_asset.datetime,
             start_datetime=first_asset.start_datetime,
@@ -255,7 +255,7 @@ class MapMetadataToSTACItem:
         if metadata.proj_epsg:
             item_proj.epsg = first_asset.proj_epsg
         item_proj.bbox = first_asset.proj_bbox_as_list
-        item_proj.geometry = first_asset.proj_geometry_as_dict
+        item_proj.geometry = first_asset.geometry_proj_as_dict
         item_proj.transform = first_asset.transform
         item_proj.shape = first_asset.shape
 

@@ -25,7 +25,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pystac import Collection, Item
-from shapely.geometry import Polygon, shape, MultiPolygon
+from shapely.geometry import Polygon, shape, MultiPolygon, mapping
 from pystac.media_type import MediaType
 
 from stacbuilder.boundingbox import BoundingBox
@@ -339,19 +339,23 @@ class AssetMetadata:
         self._geometry_lat_lon = geometry
 
     @property
-    def geometry_as_dict(self) -> Optional[Dict[str, Any]]:
+    def geometry_lat_lon_as_dict(self) -> Optional[Dict[str, Any]]:
         # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_lat_lon:
+        if not self.geometry_lat_lon:
             return None
-        return self._bbox_lat_lon.as_geometry_dict()
+        return mapping(self.geometry_lat_lon)
+    
+    @property
+    def geometry_proj(self) -> Optional[Polygon]:
+        return self._bbox_projected.as_polygon()
 
     @property
-    def proj_geometry_as_dict(self) -> Optional[Dict[str, Any]]:
+    def geometry_proj_as_dict(self) -> Optional[Dict[str, Any]]:
         # TODO: [decide] convert this RO property to a method or not?
         if not self._bbox_projected:
             return None
-        return self._bbox_projected.as_geometry_dict()
-
+        return mapping(self.geometry_proj)
+    
     @property
     def proj_geometry_as_wkt(self) -> Optional[str]:
         # TODO: [decide] convert this RO property to a method or not?
