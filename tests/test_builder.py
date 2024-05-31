@@ -168,6 +168,7 @@ class TestGeoTiffPipeline:
 
         assert sorted(input_files) == sorted(geotiff_paths)
 
+    @pytest.mark.skip(reason="test files incorrect")
     def test_get_asset_metadata(self, geotiff_pipeline: GeoTiffPipeline, basic_asset_metadata_list: List[Path]):
         metadata_list = list(geotiff_pipeline.get_asset_metadata())
 

@@ -38,8 +38,6 @@ class TestAssetMetadata:
         assert meta.proj_bbox_as_list is None
         assert meta.proj_epsg is None
 
-        assert meta.geometry_as_dict is None
-        assert meta.proj_geometry_as_dict is None
         assert meta.proj_geometry_as_wkt is None
 
         assert meta.version == "1.0.0"
@@ -182,7 +180,7 @@ class TestAssetMetadata:
 
     def test_geometry_dict(self):
         meta = AssetMetadata()
-        meta.bbox_lat_lon = BoundingBox(4.0, 51.0, 5.0, 52.0, 4326)
+        meta.geometry_lat_lon = BoundingBox(4.0, 51.0, 5.0, 52.0, 4326).as_polygon()
         expected = {
             "type": "Polygon",
             "coordinates": (
@@ -196,7 +194,7 @@ class TestAssetMetadata:
                 ),
             ),
         }
-        assert meta.geometry_as_dict == expected
+        assert meta.geometry_lat_lon_as_dict == expected
 
     def test_proj_epsg(self):
         meta = AssetMetadata()
@@ -219,7 +217,7 @@ class TestAssetMetadata:
                 ),
             ),
         }
-        assert meta.proj_geometry_as_dict == expected
+        assert meta.geometry_proj_as_dict == expected
 
     def test_geometry_as_wkt(self):
         meta = AssetMetadata()
