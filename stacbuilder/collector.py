@@ -351,6 +351,14 @@ class GeoTiffMetadataCollector(IMetadataCollector):
     def collect(self) -> None:
         self._metadata_list = []
 
+        loop = asyncio.get_event_loop()
+
+        async def fetch_metadata(file):
+            return await loop.run_in_executor(None, self._geotiff_to_metadata_mapper.to_metadata, file)
+
+        task_list = []
         for file in self.get_input_files():
-            metadata = self._geotiff_to_metadata_mapper.to_metadata(file)
-            self._metadata_list.append(metadata)
+            task_list.append( fetch_metadata(file))
+        self._metadata_list = loop.run_until_complete(asyncio.gather( *task_list))
+
+
