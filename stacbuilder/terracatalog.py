@@ -732,6 +732,12 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                         f"Could not get EPSG code for product with ID={product.id}, {epsg_url=}", exc_info=True
                     )
                     raise
+        if epsg_code is None and asset_metadata.tile_id:
+            import re
+            results = re.findall("""\d+""", asset_metadata.tile_id)
+            epsg_code = int("326" + results[0])
+        if epsg_code is None:
+            logging.warn(f"Could not determine EPSG code for product with ID={product.id} assuming LatLon")
         asset_metadata.proj_epsg = epsg_code or EPSG_4326_LATLON
 
         asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=EPSG_4326_LATLON)
