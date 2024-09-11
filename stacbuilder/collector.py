@@ -351,6 +351,7 @@ class GeoTiffMetadataCollector(IMetadataCollector):
     def collect(self) -> None:
         self._metadata_list = []
 
+        import asyncio
         loop = asyncio.get_event_loop()
 
         async def fetch_metadata(file):
