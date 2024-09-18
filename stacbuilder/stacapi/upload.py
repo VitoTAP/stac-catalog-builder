@@ -62,6 +62,9 @@ class Uploader:
     def bulk_size(self, value: int) -> int:
         self._bulk_size = int(value)
 
+    def delete_collection(self, id:str) :
+        return self._collections_endpoint.delete_by_id(id)
+
     def upload_collection(self, collection: Path | Collection) -> dict:
         if isinstance(collection, Path):
             collection = Collection.from_file(collection)

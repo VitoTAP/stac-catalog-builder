@@ -287,7 +287,7 @@ class CollectionsEndpoint:
         else:
             return self.create(collection)
 
-    def delete(self, collection: Collection) -> dict:
+    def delete(self, collection: Collection):
         """Delete this collection.
 
         :param collection: pystac.Collection object to delete from the STAC API backend.
@@ -296,7 +296,7 @@ class CollectionsEndpoint:
         """
         return self.delete_by_id(collection.id)
 
-    def delete_by_id(self, collection_id: str) -> dict:
+    def delete_by_id(self, collection_id: str):
         """Delete the collection that has the specified ID.
 
         :param collection_id: the collection ID to look for.
@@ -314,7 +314,7 @@ class CollectionsEndpoint:
 
         response = self._rest_api.delete(f"collections/{collection_id}")
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
-        return response.json()
+
 
     def _add_authentication_section(self, collection: Collection) -> dict:
         coll_dict = collection.to_dict()
@@ -445,7 +445,7 @@ class ItemsEndpoint:
         else:
             return self.create(item)
 
-    def delete_by_id(self, collection_id: str, item_id: str) -> dict:
+    def delete_by_id(self, collection_id: str, item_id: str):
         if not collection_id:
             raise ValueError(
                 "collection_id must have a non-empty str value."
@@ -461,9 +461,9 @@ class ItemsEndpoint:
         print(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
 
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
-        return response.json()
 
-    def delete_item(self, item: Item) -> dict:
+
+    def delete_item(self, item: Item):
         if not item.collection_id:
             raise InvalidOperation(
                 "Can not delete item: item.collection_id must be a non-empty str value."
