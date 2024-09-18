@@ -597,7 +597,7 @@ class STACCollectionBuilder:
 
         RasterExtension.add_to(collection)
         collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
-        # TODO add the eo:bands extension:
+        EOExtension.add_to(collection)
 
         # TODO: Add support for custom links in the collection, like there was in the early scripts.
         ## collection.add_links(
