@@ -1,0 +1,82 @@
+{
+    "collection_id": "habitat-maps",
+    "title": "Habitat maps",
+    "description": "habitat",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<item_id>.*)_(?P<asset_type>.*).tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "year": 2021
+            }
+        }
+    },
+    "cube:dimensions": {
+      "x": {"type": "spatial", "axis": "x", "reference_system": 3035, "step": 10},
+      "y": {"type": "spatial", "axis": "y", "reference_system": 3035, "step": 10},
+      "t": {"type": "temporal"},
+      "bands": {
+        "type": "bands",
+        "values": ["L1","L2","L3"]
+      }
+    },
+    "item_assets": {
+        "L1": {
+            "title": "L1",
+            "description": "habitat",
+            "eo_bands": [
+                {
+                    "name": "L1",
+                    "description": "habitat",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "L2": {
+            "title": "L2",
+            "description": "habitat",
+            "eo_bands": [
+                {
+                    "name": "L2",
+                    "description": "habitat",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "L3": {
+            "title": "L3",
+            "description": "habitat",
+            "eo_bands": [
+                {
+                    "name": "L3",
+                    "description": "habitat",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
