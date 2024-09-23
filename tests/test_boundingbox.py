@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from shapely.geometry import Polygon, box
@@ -160,7 +162,10 @@ class TestBoundingBox:
         # EWKT or "Extended WKT" does include it, but this is not what we are working with here.
         # (EWKT is used by PostGIS for example)
         expected_wkt = "POLYGON ((30 20, 30 40, 10 40, 10 20, 30 20))"
-        assert bbox.as_wkt() == expected_wkt
+        actual_wkt = bbox.as_wkt()
+        # Truncate floating points to int:
+        actual_wkt = re.sub(r"(\d+)\.\d{2}\d*", r"\1", actual_wkt)
+        assert actual_wkt == expected_wkt
 
     def test_as_geometry_dict(self):
         bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)

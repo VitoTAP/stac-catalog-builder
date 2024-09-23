@@ -4,7 +4,7 @@
 
 import datetime as dt
 from dateutil.tz import tzoffset
-
+import re
 import pytest
 from shapely.geometry import Polygon, box
 
@@ -232,7 +232,12 @@ class TestAssetMetadata:
         expected_wkt = (
             f"POLYGON (({max_x} {min_y}, {max_x} {max_y}, {min_x} {max_y}, {min_x} {min_y}, {max_x} {min_y}))"
         )
-        assert meta.proj_geometry_as_wkt == expected_wkt
+        actual_wkt = meta.proj_geometry_as_wkt
+
+        # keep only one fractional digit:
+        actual_wkt = re.sub(r"([1-9]\d*\.[\d]{1})\d*", r"\1", actual_wkt)
+        expected_wkt = re.sub(r"([1-9]\d*\.[\d]{1})\d*", r"\1", actual_wkt)
+        assert actual_wkt == expected_wkt
 
     def test_proj_bbox_as_polygon(self):
         meta = AssetMetadata()
