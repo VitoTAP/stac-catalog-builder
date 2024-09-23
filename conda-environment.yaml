@@ -8,6 +8,7 @@ dependencies:
   - openeo=0.26.*
   - psutil
   - pyarrow=14.0.*
+  - pyarrow.parquet
   - pydantic=2.5.*
   - pyproj=3.6.*
   - pystac[validation]=1.8.*
