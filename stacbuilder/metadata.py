@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import datetime as dt
 import json
 from pathlib import Path
-from types import NoneType
+# from types import NoneType
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 
@@ -34,6 +34,7 @@ from stacbuilder.pathparsers import InputPathParser
 
 
 BoundingBoxList = List[Union[float, int]]
+NoneType = type(None)
 
 
 @dataclass

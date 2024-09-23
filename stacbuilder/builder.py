@@ -181,7 +181,9 @@ class MapMetadataToSTACItem:
 
         known_assets = [a for a in assets if is_known_asset_type(a)]
         if not known_assets:
-            error_msg = "None of the assets in 'assets' is a known item type, not defined in collection configuration."
+            error_msg = ("None of the assets is defined in collection configuration. " +
+                         f"{[a.asset_type for a in assets]} not found in {list(self.item_assets_configs.keys())}")
+
             _logger.warning(error_msg)
             return None
 
