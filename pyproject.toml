@@ -27,7 +27,7 @@ dependencies = [
   "geopandas==0.14.*",
   "openeo==0.26.*",
   "psutil",
-  "pyarrow==14.0.*",
+  "pyarrow==17.0.*",
   "pydantic==2.5.*",
   "pyproj==3.6.*",
   "pystac[validation]==1.8.*",
