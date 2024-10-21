@@ -25,10 +25,14 @@ import pandas as pd
 from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
 
-import terracatalogueclient as tcc
-from terracatalogueclient.config import CatalogueConfig
-from terracatalogueclient.config import CatalogueEnvironment
-from terracatalogueclient import ProductFile
+try:
+    import terracatalogueclient as tcc
+    from terracatalogueclient.config import CatalogueConfig
+    from terracatalogueclient.config import CatalogueEnvironment
+    from terracatalogueclient import ProductFile
+except ImportError:
+    raise ImportError("Terracatalogueclient not found. Please install it with 'pip install terracatalogueclient==0.1.14 --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple'.")
+
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
