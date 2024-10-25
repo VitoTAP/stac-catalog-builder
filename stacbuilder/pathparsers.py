@@ -179,6 +179,7 @@ class Period(Enum):
     YEARLY = "yearly"
     MONTHLY = "monthly"
     DAILY = "daily"
+    SECONDLY = "secondly"
 
 
 class DefaultInputPathParser(RegexInputPathParser):
@@ -204,6 +205,8 @@ class DefaultInputPathParser(RegexInputPathParser):
                 self._period = Period.MONTHLY
             case "daily":
                 self._period = Period.DAILY
+            case "secondly":
+                self._period = Period.SECONDLY
             case _:
                 raise ValueError(f"Period argument {period} must be one of {[p.value for p in Period]}")
 
@@ -225,20 +228,30 @@ class DefaultInputPathParser(RegexInputPathParser):
         self._data["end_datetime"] = self._get_end_datetime()
 
     def _get_start_datetime(self):
-        return dt.datetime(self._data["year"], self._data["month"], self._data["day"], 0, 0, 0, tzinfo=dt.timezone.utc)
+        return dt.datetime(
+            year=self._data["year"], 
+            month=self._data["month"], 
+            day=self._data["day"], 
+            hour=int(self._data.get("hour", 0)), 
+            minute=int(self._data.get("minute", 0)),
+            second=int(self._data.get("second", 0)),
+            tzinfo=dt.timezone.utc)
 
     def _get_end_datetime(self):
         start_dt = self._get_start_datetime()
         year = start_dt.year
 
-        if self.period is Period.YEARLY:
-            return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
-        elif self.period is Period.MONTHLY:
-            month = start_dt.month
-            end_month = calendar.monthrange(year, month)[1]
-            return dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
-        else:
-            return dt.datetime(year, start_dt.month, start_dt.day, 23, 59, 59, tzinfo=dt.timezone.utc)
+        match self.period:
+            case Period.YEARLY:
+                return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
+            case Period.MONTHLY:
+                month = start_dt.month
+                end_month = calendar.monthrange(year, month)[1]
+                return dt.datetime(year, month, end_month, 23, 59, 59, tzinfo=dt.timezone.utc)
+            case Period.SECONDLY:
+                return start_dt + dt.timedelta(seconds=1)
+            case _:
+                return dt.datetime(year, start_dt.month, start_dt.day, 23, 59, 59, tzinfo=dt.timezone.utc)
 
 
 class LandsatNDWIInputPathParser(RegexInputPathParser):

@@ -132,7 +132,7 @@ class Uploader:
         elif isinstance(items, Path):
             item_dir: Path = items
             _logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
-            item_paths = list(item_dir.glob("*/*/*/*/*.json"))
+            item_paths = list(item_dir.glob("*/*/*/*/*.json")) #TODO should this be hard coded?
             _logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 
