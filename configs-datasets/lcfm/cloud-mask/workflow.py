@@ -1,14 +1,15 @@
-
 from time import sleep
 import pystac
-from upath import UPath
 from pathlib import Path
 import pprint
 from getpass import getpass
+import logging
 
 # run pip install -e . in the root directory to install this package
 from stacbuilder import *
 
+_logger = logging.getLogger(__name__)
+_logger.setLevel(logging.DEBUG)
 
 # Collection configuration
 catalog_version = "v0.1"
@@ -25,7 +26,6 @@ test_output_path = output_path / "test" / catalog_version
 publish_output_path = output_path / "publish" / catalog_version
 overwrite = True
 
-
 # list input files
 input_files = list_input_files(
     glob=tiffs_glob,
@@ -34,8 +34,6 @@ input_files = list_input_files(
 )
 print(f"Found {len(input_files)} input files. 5 first files:")
 for i in input_files[:5]: print(i) 
-
-
 
 # list meta data
 asset_metadata = list_asset_metadata(
@@ -66,6 +64,7 @@ if failed_files: print(f"Failed files: {failed_files}")
 
 print("First stac item:")
 pprint.pprint(stac_items[0].to_dict())
+
 
 stac_api_pw = getpass("Enter password for stac api: ")
 # build collection
@@ -109,4 +108,5 @@ upload_to_stac_api(
     collection_path=test_output_path / "collection.json",
     settings=settings,
 )
+print("Sleeping for 60 seconds to allow the STAC API to update")
 sleep(60)
