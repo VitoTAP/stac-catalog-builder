@@ -119,3 +119,5 @@ tmp/
 
 # statistics files for profiling performance, output of the cProfile module.
 *.stats
+
+**/results/**

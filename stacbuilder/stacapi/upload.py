@@ -2,6 +2,7 @@ import logging
 import inspect
 import itertools
 from pathlib import Path
+from time import sleep
 from typing import Iterable
 import concurrent.futures
 
@@ -16,7 +17,7 @@ from stacbuilder.stacapi.config import Settings
 from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 
 
-_logger = logging.Logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class Uploader:
@@ -97,6 +98,7 @@ class Uploader:
                     self._log_progress_message(f"Uploading items {chunk_start} to {chunk_end}")
                     futures.append(executor.submit(self._items_endpoint.ingest_bulk,chunk.copy()))
                     chunk = []
+                    sleep(1)
 
             if chunk:
                 chunk_end = index + 1
@@ -132,7 +134,7 @@ class Uploader:
         elif isinstance(items, Path):
             item_dir: Path = items
             _logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
-            item_paths = list(item_dir.glob("*/*/*/*/*.json"))
+            item_paths = list(item_dir.glob("*/*/*/*/*.json")) #TODO should this be hard coded?
             _logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 
@@ -165,4 +167,3 @@ class Uploader:
     def _log_progress_message(self, message: str) -> None:
         calling_method_name = inspect.stack()[1][3]
         _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
-        print(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
