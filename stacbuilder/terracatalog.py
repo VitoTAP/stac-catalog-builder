@@ -31,12 +31,14 @@ try:
     from terracatalogueclient.config import CatalogueEnvironment
     from terracatalogueclient import ProductFile
 except ImportError:
-    raise ImportError("Terracatalogueclient not found. Please install it with 'pip install terracatalogueclient==0.1.14 --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple'.")
+    raise ImportError(
+        "Terracatalogueclient not found. Please install it with 'pip install terracatalogueclient==0.1.14 --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple'."
+    )
 
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
-from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
+from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel, EOBandConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
 
@@ -192,11 +194,16 @@ class CollectionConfigBuilder:
                 bits_per_sample=bit_per_value,
                 data_type=data_type,
             )
+            eobands_cfg = EOBandConfig(
+                name=title,
+                description=title,
+            )
             asset_cfg = AssetConfig(
                 title=title,
                 description=title,
                 media_type=media_type,
                 raster_bands=[raster_cfg],
+                eo_bands=[eobands_cfg],
             )
             asset_configs[title] = asset_cfg
 
@@ -738,6 +745,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     raise
         if epsg_code is None and asset_metadata.tile_id:
             import re
+
             results = re.findall("""\d+""", asset_metadata.tile_id)
             epsg_code = int("326" + results[0])
         if epsg_code is None:
