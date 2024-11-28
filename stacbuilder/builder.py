@@ -181,8 +181,10 @@ class MapMetadataToSTACItem:
 
         known_assets = [a for a in assets if is_known_asset_type(a)]
         if not known_assets:
-            error_msg = ("None of the assets is defined in collection configuration. " +
-                         f"{[a.asset_type for a in assets]} not found in {list(self.item_assets_configs.keys())}")
+            error_msg = (
+                "None of the assets is defined in collection configuration. "
+                + f"{[a.asset_type for a in assets]} not found in {list(self.item_assets_configs.keys())}"
+            )
 
             _logger.warning(error_msg)
             return None
@@ -558,9 +560,9 @@ class STACCollectionBuilder:
         # but this is not enough to also be able to move the assets.
         # The href links to asset files also have the be relative (to the location of the STAC item)
         # This needs to be done via the href_modifier
-        self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
         if not self.link_items:
             self.save_items_outside_collection()
+        self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
         self._log_progress_message("DONE: Saving collection.")
 
     @property
@@ -824,10 +826,8 @@ class AssetMetadataPipeline:
         """Creates a AssetMetadataPipeline from configurations."""
 
         pipeline = AssetMetadataPipeline(
-            metadata_collector=None,
-            output_dir=None,
-            overwrite=False,
-            item_postprocessor=item_postprocessor)
+            metadata_collector=None, output_dir=None, overwrite=False, item_postprocessor=item_postprocessor
+        )
         pipeline._setup(
             metadata_collector=metadata_collector,
             collection_config=collection_config,
@@ -977,7 +977,9 @@ class AssetMetadataPipeline:
                 self._log_progress_message(
                     f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%})"
                 )
-            sub_groups = self.split_group_by_latlon(assets) # Check that all the assets have the same lat-lon bounding box
+            sub_groups = self.split_group_by_latlon(
+                assets
+            )  # Check that all the assets have the same lat-lon bounding box
             for sub_group_assets in sub_groups.values():
                 stac_item = self._meta_to_stac_item_mapper.create_item(sub_group_assets)
                 if stac_item:
@@ -1003,7 +1005,7 @@ class AssetMetadataPipeline:
 
         self._log_progress_message("DONE: group_metadata_by_item_id")
         return groups
-    
+
     def split_group_by_latlon(self, metadata_list: List[AssetMetadata]) -> Dict[Tuple[int, int], List[AssetMetadata]]:
         """Split the metadata into groups, based on the lat-lon bounding box."""
         groups: Dict[Tuple[int, int], List[AssetMetadata]] = {}
