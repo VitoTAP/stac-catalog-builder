@@ -269,7 +269,7 @@ class CollectionsEndpoint:
 
         collection.validate()
         data = self._add_authentication_section(collection)
-        response = self._rest_api.put("collections", json=data)
+        response = self._rest_api.put(f"collections/{collection.id}", json=data)
         _check_response_status(response, _EXPECTED_STATUS_PUT)
 
         return response.json()
@@ -314,7 +314,6 @@ class CollectionsEndpoint:
 
         response = self._rest_api.delete(f"collections/{collection_id}")
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
-
 
     def _add_authentication_section(self, collection: Collection) -> dict:
         coll_dict = collection.to_dict()
@@ -435,15 +434,18 @@ class ItemsEndpoint:
         data = {"method": "upsert", "items": {item.id: item.to_dict() for item in items}}
 
         try:
+            _logger.debug(f"Rost request to {url_path}: {data}")
             response = self._rest_api.post(url_path, json=data)
             _logger.debug(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
             _check_response_status(response, _EXPECTED_STATUS_POST)
-        except requests.HTTPError as e:
+        except Exception as e:
             _logger.debug(f"ingest_bulk failed: retries={retries}, max_retries={max_retries}")
             if retries < max_retries:
                 return self.ingest_bulk(items, max_retries, retries + 1)
             else:
-                _logger.error(f"ingest_bulk failed after {max_retries} retries for items: {items[0].id} to {items[-1].id}")
+                _logger.error(
+                    f"ingest_bulk failed after {max_retries} retries for items: {items[0].id} to {items[-1].id}. error: {e}"
+                )
                 raise e
         return response.json()
 
@@ -468,7 +470,6 @@ class ItemsEndpoint:
         _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
 
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
-
 
     def delete_item(self, item: Item):
         if not item.collection_id:
