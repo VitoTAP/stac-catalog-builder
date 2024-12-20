@@ -1,0 +1,35 @@
+{
+    "collection_id": "CVX10_LAEA",
+    "title": "Convexity 10m LAEA",
+    "description": "Convexity 10m LAEA",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/LCFM_LOI-10_V003N_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})T(?P<hour>\\d{2})(?P<minute>\\d{2})(?P<second>\\d{2})_\\d{8}T\\d{6}_(?P<tile_id>\\d{2}[A-Z]{3})_MASK.tif$",
+            "period": "daily",
+            "fixed_values": {
+                "asset_type": "mask"
+            }
+        }
+    },
+    "item_assets": {
+        "mask": {
+            "title": "Cloud Mask",
+            "description": "Cloud Mask",
+            "eo_bands": [
+                {
+                    "name": "cloud_mask",
+                    "description": "Cloud Mask"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}
