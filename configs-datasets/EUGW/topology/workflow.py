@@ -1,10 +1,6 @@
-# %%
 # from time import sleep
-from time import sleep
-import pystac
 from pathlib import Path
 from upath import UPath
-import pprint
 from getpass import getpass
 import logging
 import os
@@ -13,9 +9,6 @@ import configparser
 # run pip install -e . in the root directory to install this package
 from stacbuilder import (
     CollectionConfig,
-    list_input_files,
-    list_asset_metadata,
-    list_stac_items,
     build_collection,
     validate_collection,
     upload_to_stac_api,
@@ -27,7 +20,7 @@ _logger.setLevel(logging.INFO)
 
 # Collection configuration
 catalog_version = "v0.1"
-collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
+collection_config_path = Path(__file__).parent.resolve() / "config-collection-CVX10_LAEA.json"
 collection_config = CollectionConfig.from_json_file(collection_config_path)
 collection_name = collection_config.collection_id
 
@@ -52,45 +45,6 @@ overwrite = True
 
 tiffs_glob = "*.tif"
 
-
-# list input files
-input_files = list_input_files(glob=tiffs_glob, input_dir=tiff_input_path, max_files=5)
-print(f"Found {len(input_files)} input files. 5 first files:")
-for i in input_files[:5]:
-    print(i)
-
-
-# %%
-# list meta data
-asset_metadata = list_asset_metadata(
-    collection_config_path=collection_config_path, glob=tiffs_glob, input_dir=tiff_input_path, max_files=1
-)
-for k in asset_metadata:
-    pprint.pprint(k.to_dict())
-
-
-def item_postprocessor(item: pystac.Item) -> pystac.Item:
-    item.properties["tileId"] = item.properties["product_tile"]
-    del item.properties["product_tile"]
-    return item
-
-
-# list items
-stac_items, failed_files = list_stac_items(
-    collection_config_path=collection_config_path,
-    glob=tiffs_glob,
-    input_dir=tiff_input_path,
-    max_files=1,
-    item_postprocessor=item_postprocessor,
-)
-print(f"Found {len(stac_items)} STAC items")
-if failed_files:
-    print(f"Failed files: {failed_files}")
-
-print("First stac item:")
-pprint.pprint(stac_items[0].to_dict())
-
-
 stac_api_pw = getpass("Enter password for stac api: ")
 # build collection
 build_collection(
@@ -100,14 +54,12 @@ build_collection(
     output_dir=stac_output_path,
     overwrite=overwrite,
     link_items=False,
-    item_postprocessor=item_postprocessor,
 )
 
 # validate collection
 validate_collection(
     collection_file=stac_output_path / "collection.json",
 )
-
 
 auth_settings = AuthSettings(
     enabled=True,
@@ -128,6 +80,3 @@ upload_to_stac_api(
     collection_path=stac_output_path / "collection.json",
     settings=settings,
 )
-_logger.info("Sleeping for 60 seconds to allow the STAC API to update")
-sleep(60)
-_logger.info("Done")

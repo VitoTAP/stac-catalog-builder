@@ -1,0 +1,36 @@
+{
+    "collection_id": "CVX30_LAEA",
+    "title": "Convexity 30m LAEA",
+    "description": "Convexity 30m LAEA",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "year": 2015,
+                "asset_type": "CVX30"
+            }
+        }
+    },
+    "item_assets": {
+        "CVX30": {
+            "title": "Convexity",
+            "description": "Convexity",
+            "eo_bands": [
+                {
+                    "name": "Convexity",
+                    "description": "Convexity"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}

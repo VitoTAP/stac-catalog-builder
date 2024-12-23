@@ -135,10 +135,10 @@ class RegexInputPathParser(InputPathParser):
         match = self._regex.search(self._path)
         if match:
             data = match.groupdict()
-        else:
-            logger.warning(
-                f"No data could be extracted from this path: {self._path}, " + f"regex pattern={self._regex.pattern}"
-            )
+        # else:
+        #     logger.warning(
+        #         f"No data could be extracted from this path: {self._path}, " + f"regex pattern={self._regex.pattern}"
+        #     )
 
         for key, value in data.items():
             if key in self._type_converters:
@@ -229,13 +229,14 @@ class DefaultInputPathParser(RegexInputPathParser):
 
     def _get_start_datetime(self):
         return dt.datetime(
-            year=self._data["year"], 
-            month=self._data["month"], 
-            day=self._data["day"], 
-            hour=int(self._data.get("hour", 0)), 
+            year=self._data["year"],
+            month=self._data["month"],
+            day=self._data["day"],
+            hour=int(self._data.get("hour", 0)),
             minute=int(self._data.get("minute", 0)),
             second=int(self._data.get("second", 0)),
-            tzinfo=dt.timezone.utc)
+            tzinfo=dt.timezone.utc,
+        )
 
     def _get_end_datetime(self):
         start_dt = self._get_start_datetime()
