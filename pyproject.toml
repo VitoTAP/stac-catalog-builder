@@ -27,6 +27,7 @@ dependencies = [
   "dynaconf==3.2.*",
   "fsspec[s3,http]==2024.12.*",
   "geopandas==0.14.*",
+  "numpy<2",
   "openeo==0.36",
   "psutil",
   "pyarrow==18.1.*",
