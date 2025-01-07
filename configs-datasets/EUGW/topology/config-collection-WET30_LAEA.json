@@ -1,0 +1,35 @@
+{
+    "collection_id": "WET30_LAEA",
+    "title": "Wetness 30m LAEA",
+    "description": "Wetness 30m LAEA",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "WAW(?P<year>\\d{4})/.*\\.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "WET30"
+            }
+        }
+    },
+    "item_assets": {
+        "WET30": {
+            "title": "Wetness",
+            "description": "Wetness",
+            "eo_bands": [
+                {
+                    "name": "Wetness",
+                    "description": "Wetness"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}

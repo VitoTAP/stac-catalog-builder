@@ -121,6 +121,10 @@ class RegexInputPathParser(InputPathParser):
             self._regex = regex_pattern
         else:
             self._regex = re.compile(regex_pattern)
+        if not self._regex_has_named_groups():
+            logger.warning(
+                f"The regex pattern does not have named groups: {self._regex.pattern}. Path parsing will be skipped and only fixed values will be used."
+            )
 
         self._type_converters = type_converters or {}
         self._fixed_values = fixed_values or {}
@@ -132,13 +136,15 @@ class RegexInputPathParser(InputPathParser):
         data = {}
         self._path = str(input_file)
 
-        match = self._regex.search(self._path)
-        if match:
-            data = match.groupdict()
-        # else:
-        #     logger.warning(
-        #         f"No data could be extracted from this path: {self._path}, " + f"regex pattern={self._regex.pattern}"
-        #     )
+        if self._regex_has_named_groups():
+            match = self._regex.search(self._path)
+            if match:
+                data = match.groupdict()
+            else:
+                logger.warning(
+                    f"No data could be extracted from this path: {self._path}, "
+                    + f"regex pattern={self._regex.pattern}"
+                )
 
         for key, value in data.items():
             if key in self._type_converters:
@@ -171,6 +177,11 @@ class RegexInputPathParser(InputPathParser):
     def type_converters(self) -> TypeConverterMapping:
         """Return a"""
         return self._type_converters
+
+    def _regex_has_named_groups(self):
+        if not self._regex:
+            raise ValueError("The regex pattern is not set.")
+        return re.search(r"\(\?P<", self._regex.pattern) is not None
 
 
 class Period(Enum):

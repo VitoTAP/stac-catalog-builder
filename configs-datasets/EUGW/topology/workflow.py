@@ -7,26 +7,23 @@ import os
 import configparser
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import (
-    CollectionConfig,
-    build_collection,
-    validate_collection,
-    upload_to_stac_api,
-)
+from stacbuilder import CollectionConfig, build_collection, validate_collection, upload_to_stac_api
 from stacbuilder.stacapi.config import AuthSettings, Settings
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
 # Collection configuration
-catalog_version = "v0.1"
-collection_config_path = Path(__file__).parent.resolve() / "config-collection-CVX10_LAEA.json"
+collection_config_path = Path(__file__).parent.resolve() / "config-collection-TPI10_LAEA.json"
 collection_config = CollectionConfig.from_json_file(collection_config_path)
 collection_name = collection_config.collection_id
+_logger.info(f"Collection name: {collection_name}")
 
 # Input Paths
 # Set environment variables for AWS S3
 config = configparser.ConfigParser()
+if not (Path(__file__).parent / "eugw_gisat.conf").exists():
+    raise FileNotFoundError("Configuration file for S3 not found")
 config.read(Path(__file__).parent / "eugw_gisat.conf")
 os.environ["AWS_ACCESS_KEY_ID"] = config["EUGrasslandwatch"]["access_key_id"]
 os.environ["AWS_SECRET_ACCESS_KEY"] = config["EUGrasslandwatch"]["secret_access_key"]
@@ -40,12 +37,17 @@ assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 
 # Output Paths
 output_path = Path(__file__).parent.resolve() / "results"
-stac_output_path = output_path / collection_name / catalog_version
+stac_output_path = output_path / collection_name
 overwrite = True
 
-tiffs_glob = "*.tif"
+tiffs_glob = "*.tif"  # CLCBB*/ WAW*/
 
-stac_api_pw = getpass("Enter password for stac api: ")
+# print(list_input_files(input_dir=tiff_input_path, glob=tiffs_glob))
+# exit()
+stac_api_pw = os.getenv("STAC_API_PW")
+if stac_api_pw is None:
+    stac_api_pw = getpass("Enter password for stac api: ")
+
 # build collection
 build_collection(
     collection_config_path=collection_config_path,
@@ -55,12 +57,10 @@ build_collection(
     overwrite=overwrite,
     link_items=False,
 )
-
 # validate collection
 validate_collection(
     collection_file=stac_output_path / "collection.json",
 )
-
 auth_settings = AuthSettings(
     enabled=True,
     interactive=False,
@@ -80,3 +80,4 @@ upload_to_stac_api(
     collection_path=stac_output_path / "collection.json",
     settings=settings,
 )
+_logger.info(f"Done uploading {collection_name} to STAC API")

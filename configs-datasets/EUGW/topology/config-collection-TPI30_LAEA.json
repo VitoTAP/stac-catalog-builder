@@ -1,0 +1,36 @@
+{
+    "collection_id": "TPI30_LAEA",
+    "title": "Topographic Position Index 30m LAEA",
+    "description": "Topographic Position Index 30m LAEA",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "year": 2015,
+                "asset_type": "TPI30"
+            }
+        }
+    },
+    "item_assets": {
+        "TPI30": {
+            "title": "Topographic Position Index",
+            "description": "Topographic Position Index",
+            "eo_bands": [
+                {
+                    "name": "Topographic Position Index",
+                    "description": "Topographic Position Index"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}
