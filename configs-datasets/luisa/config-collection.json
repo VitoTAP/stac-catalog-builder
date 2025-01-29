@@ -12,7 +12,10 @@
         "classname": "DefaultInputPathParser",
         "parameters": {
             "regex_pattern": ".*/cog_npp_pot_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2})\\.tif$",
-            "period": "daily"
+            "period": "daily",
+            "fixed_values": {
+                "asset_type": "npp_pot"
+            }
         }
     },
     "item_assets": {

@@ -1,7 +1,6 @@
 from time import sleep
 import pystac
 from pathlib import Path
-from upath import UPath
 import pprint
 from getpass import getpass
 import logging
@@ -17,8 +16,7 @@ catalog_version = "v0.1"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
-# tiff_input_path = Path("/home/vverelst/Documents/local_testing/luisa/npp_pot/cogs/")
-tiff_input_path = UPath("s3://luisa/npp_pot/")
+tiff_input_path = Path("/data/open/luisa_npp_pot_jules_africa")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 tiffs_glob = "*.tif"
 
@@ -37,15 +35,15 @@ input_files = list_input_files(
 print(f"Found {len(input_files)} input files. 5 first files:")
 for i in input_files[:5]: print(i) 
 
-# # list meta data
-# asset_metadata = list_asset_metadata(
-#     collection_config_path=collection_config_path,
-#     glob=tiffs_glob,
-#     input_dir=tiff_input_path,
-#     max_files=1
-# )
-# for k in asset_metadata: 
-#     pprint.pprint(k.to_dict())
+# list meta data
+asset_metadata = list_asset_metadata(
+    collection_config_path=collection_config_path,
+    glob=tiffs_glob,
+    input_dir=tiff_input_path,
+    max_files=1
+)
+for k in asset_metadata: 
+    pprint.pprint(k.to_dict())
 
 # def item_postprocessor(item: pystac.Item) -> pystac.Item:
 #     item.properties["tileId"] = item.properties["product_tile"]
@@ -53,62 +51,62 @@ for i in input_files[:5]: print(i)
 #     return item
 
 
-# # list items
-# stac_items, failed_files = list_stac_items(
-#     collection_config_path=collection_config_path,
-#     glob=tiffs_glob,
-#     input_dir=tiff_input_path,
-#     max_files=1,
-#     # item_postprocessor=item_postprocessor
-# )
-# print(f"Found {len(stac_items)} STAC items")
-# if failed_files: print(f"Failed files: {failed_files}")
+# list items
+stac_items, failed_files = list_stac_items(
+    collection_config_path=collection_config_path,
+    glob=tiffs_glob,
+    input_dir=tiff_input_path,
+    max_files=1,
+    # item_postprocessor=item_postprocessor
+)
+print(f"Found {len(stac_items)} STAC items")
+if failed_files: print(f"Failed files: {failed_files}")
 
 # print("First stac item:")
 # pprint.pprint(stac_items[0].to_dict())
 
 
-# stac_api_pw = getpass("Enter password for stac api: ")
-# # build collection
-# build_collection(
-#     collection_config_path=collection_config_path,
-#     glob=tiffs_glob,
-#     input_dir=tiff_input_path,
-#     output_dir=test_output_path,
-#     overwrite=overwrite,
-#     link_items=False,
-#     item_postprocessor=item_postprocessor,
-# )
+stac_api_pw = getpass("Enter password for stac api: ")
+# build collection
+build_collection(
+    collection_config_path=collection_config_path,
+    glob=tiffs_glob,
+    input_dir=tiff_input_path,
+    output_dir=test_output_path,
+    overwrite=overwrite,
+    link_items=False,
+    # item_postprocessor=item_postprocessor,
+)
 
-# # validate collection
-# validate_collection(
-#     collection_file=test_output_path / "collection.json",
-# )
+# validate collection
+validate_collection(
+    collection_file=test_output_path / "collection.json",
+)
 
 
-# auth_settings = AuthSettings(
-#     enabled=True,
-#     interactive=False,
-#     token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
-#     authorization_url= "https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
-#     client_id="terracatalogueclient",
-#     username = "victor.verhaert",
-#     password = stac_api_pw,
-# )
-# settings = Settings(
-#     auth=auth_settings,
-#     stac_api_url="https://stac.openeo.vito.be/",
-#     collection_auth_info={
-#             "_auth": {
-#                 "read": ["anonymous"],
-#                 "write": ["stac-openeo-admin", "stac-openeo-editor"]
-#             }
-#         },
-#     bulk_size=1000,  
-# )
-# upload_to_stac_api(
-#     collection_path=test_output_path / "collection.json",
-#     settings=settings,
-# )
-# print("Sleeping for 60 seconds to allow the STAC API to update")
-# sleep(60)
+auth_settings = AuthSettings(
+    enabled=True,
+    interactive=False,
+    token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
+    authorization_url= "https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
+    client_id="terracatalogueclient",
+    username = "vincent.verelst",
+    password = stac_api_pw,
+)
+settings = Settings(
+    auth=auth_settings,
+    stac_api_url="https://stac.openeo.vito.be/",
+    collection_auth_info={
+            "_auth": {
+                "read": ["anonymous"],
+                "write": ["stac-openeo-admin", "stac-openeo-editor"]
+            }
+        },
+    bulk_size=1000,  
+)
+upload_to_stac_api(
+    collection_path=test_output_path / "collection.json",
+    settings=settings,
+)
+print("Sleeping for 60 seconds to allow the STAC API to update")
+sleep(60)
