@@ -274,21 +274,23 @@ class MapMetadataToSTACItem:
         #     grid = GridExtension.ext(item, add_if_missing=True)
         #     grid.code = metadata.tile_id
 
+
         asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
         if asset_config.eo_bands:
             EOExtension.add_to(item)
-            item_eo = EOExtension.ext(item, add_if_missing=True)
-            eo_bands = []
+            if len(assets) == 1:
+                item_eo = EOExtension.ext(item, add_if_missing=True)
+                eo_bands = []
 
-            # TODO: detect if the band is an Electro-Optical one.
-            # TODO: https://github.com/VitoTAP/stac-catalog-builder/issues/29 set band's common_name property if common band, and wavelenght info when available
-            for band_cfg in asset_config.eo_bands:
-                new_band: EOBand = EOBand.create(
-                    name=band_cfg.name,
-                    description=band_cfg.description,
-                )
-                eo_bands.append(new_band)
-            item_eo.apply(eo_bands)
+                # TODO: detect if the band is an Electro-Optical one.
+                # TODO: https://github.com/VitoTAP/stac-catalog-builder/issues/29 set band's common_name property if common band, and wavelenght info when available
+                for band_cfg in asset_config.eo_bands:
+                    new_band: EOBand = EOBand.create(
+                        name=band_cfg.name,
+                        description=band_cfg.description,
+                    )
+                    eo_bands.append(new_band)
+                item_eo.apply(eo_bands)
 
         item.stac_extensions.append(CLASSIFICATION_SCHEMA)
         item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
