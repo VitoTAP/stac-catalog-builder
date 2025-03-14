@@ -1,0 +1,35 @@
+{
+    "collection_id": "ALP10_LAEA",
+    "title": "Alpine Mask 10m LAEA",
+    "description": "Alpine mask 10m LAEA for the years 2018 and 2021",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "CLCBB(?P<year>\\d{4})/.*\\.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "ALP10"
+            }
+        }
+    },
+    "item_assets": {
+        "ALP10": {
+            "title": "Alpine Mask",
+            "description": "Alpine mask",
+            "eo_bands": [
+                {
+                    "name": "Alpine mask",
+                    "description": "Alpine mask"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}
