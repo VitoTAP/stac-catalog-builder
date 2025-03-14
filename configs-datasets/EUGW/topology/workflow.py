@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
 # Collection configuration
-collection_config_path = Path(__file__).parent.resolve() / "config-collection-TPI10_LAEA.json"
+collection_config_path = Path(__file__).parent.resolve() / "config-collection-WET30_LAEA.json"
 collection_config = CollectionConfig.from_json_file(collection_config_path)
 collection_name = collection_config.collection_id
 _logger.info(f"Collection name: {collection_name}")

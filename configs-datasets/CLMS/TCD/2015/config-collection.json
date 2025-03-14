@@ -1,0 +1,48 @@
+{
+    "collection_id": "TREE_COVER_DENSITY_2015",
+    "title": "Tree Cover Density 2015",
+    "description": "Provides at pan-European level in the spatial resolution of 20 m the level of tree cover density in a range from 0% to 100% for the 2015 reference year. More info: https://land.copernicus.eu/en/products/high-resolution-layer-tree-cover-density/tree-cover-density-2015",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "CLMS",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://land.copernicus.eu/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "",
+            "period": "yearly",
+            "fixed_values": {
+                "year" : 2015,
+                "asset_type" : "TCD"
+            }
+        }
+    },
+    "item_assets": {
+        "TCD": {
+            "title": "Tree cover Density",
+            "description": "tree cover density in a range from 0% to 100%",
+            "eo_bands": [
+                {
+                    "name": "TCD",
+                    "description": "tree cover density in a range from 0% to 100%",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 20
+                }
+            ]
+        }
+    },
+    "overrides": {}
+}
