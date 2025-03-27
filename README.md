@@ -14,7 +14,7 @@ Support for uploading to a STAC API is in the making.
 See also: [Goals and User Stories](docs/goals-and-user-stories.md): A longer explanation of the goals or use case for the STAC catalog builder.
 
 ## Documentation
-[WARNING] Do not use notebooks as these will fail
+**[WARNING] Do not use notebooks as these will fail**
 
 
 Documentation can be found in here [docs/index.md](./docs/index.md)
