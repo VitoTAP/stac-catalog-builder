@@ -15,24 +15,49 @@ fsspec
 
 """
 
+import configparser
+import os
 from upath import UPath
 from pathlib import Path
 from typing import Optional, List
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, GeoTiffPipeline, AssetMetadataPipeline, AssetMetadata
+from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
+
+
+def set_var_conf(var_name: str, conf_file: str):
+    if var_name not in os.environ:
+        print(f"Setting {var_name} from {conf_file}")
+        config = configparser.ConfigParser()
+        if not Path(conf_file).exists():
+            raise FileNotFoundError(f"Configuration file for {var_name} not found")
+        config.read(conf_file)
+        os.environ[var_name] = config["eodata"][var_name]
+
+
+for var_name in [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_ENDPOINT_URL",
+    "AWS_S3_ENDPOINT",
+    "AWS_VIRTUAL_HOSTING",
+    "AWS_DEFAULT_REGION",
+    "CPL_VSIL_CURL_CHUNK_SIZE",
+]:
+    set_var_conf(var_name, "./eodata.conf")
 
 
 def build_collection(
     collection_id: Optional[str] = None,
     output_dir: Optional[Path] = None,
-
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
     collection_config_path = Path("./config-collection.json").expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
-    file_coll_cfg = FileCollectorConfig(input_dir=UPath("s3://eodata/auxdata/ESA_WORLD_COVER/2021/"), glob="*/*.tif", max_files=1000)
+    file_coll_cfg = FileCollectorConfig(
+        input_dir=UPath("s3://eodata/auxdata/ESA_WORLD_COVER/2020/"), glob="*/*.tif", max_files=1000
+    )
 
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
@@ -44,7 +69,6 @@ def build_collection(
         output_dir = output_dir / collection_id
 
     class CustomCollector(IMetadataCollector):
-
         def has_collected(self) -> bool:
             return collector.has_collected()
 
@@ -56,9 +80,9 @@ def build_collection(
             metadata_list = collector.metadata_list
 
             def update_metadata(metadata: AssetMetadata) -> AssetMetadata:
-
                 return metadata
-            return [update_metadata(m) for m in metadata_list ]
+
+            return [update_metadata(m) for m in metadata_list]
 
         def collect(self) -> None:
             collector.collect()
@@ -72,11 +96,12 @@ def build_collection(
     )
 
     def process_item(item):
-        parts = item.id.split("_")
+        # parts = item.id.split("_")
 
         return item
 
     pipeline.item_postprocessor = process_item
     pipeline.build_collection()
 
-build_collection("worldcover","./STAC_wip")
+
+build_collection("worldcover", "./STAC_wip")
