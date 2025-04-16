@@ -191,7 +191,7 @@ class MapGeoTiffToAssetMetadata:
         else:
             asset_meta.href = asset_path
 
-        with rasterio.open(asset_path) as dataset:
+        with rasterio.open(asset_path.as_uri()) as dataset:
             asset_meta.shape = dataset.shape
 
             # Get the EPSG code of the dataset
