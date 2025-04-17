@@ -1,4 +1,5 @@
 import datetime as dt
+from math import log10
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, List, Optional, Protocol, Tuple, Union
@@ -205,11 +206,21 @@ class MapGeoTiffToAssetMetadata:
             if not proj_epsg:
                 proj_epsg = 4326
 
+            # round of values defined in terms of number of digits to keep
+            # after decimals, which is defined to be between 0.1-1.0% of the resolution.
+            # default is set to 6 decimals (approx single point float-precision)
+            if isinstance(dataset.res[0], (float, int)):
+                precision = abs(int(log10(abs(dataset.res[0]*0.001))))
+            else:
+                precision = 6   # default
+
             # Get the projected bounding box of the dataset
-            asset_meta.bbox_projected = BoundingBox.from_list(list(dataset.bounds), epsg=proj_epsg)
+            _bounds = [round(_bo, precision) for _bo in list(dataset.bounds)]  # round off data
+            asset_meta.bbox_projected = BoundingBox.from_list(_bounds, epsg=proj_epsg)
 
             # Get the transform of the dataset
-            asset_meta.transform = list(dataset.transform)[0:6]
+            _transform = [round(_bo, precision) for _bo in list(dataset.transform)[:6]]    # round off data
+            asset_meta.transform = list(_transform)[0:6]
 
             # Project the geometry to EPSG:4326 (latlon) and get the bounding box
             asset_meta.geometry_lat_lon = project_polygon(
