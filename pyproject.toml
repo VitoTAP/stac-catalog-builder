@@ -44,6 +44,7 @@ dependencies = [
   "pytest",
   "yarl==1.9.*",
   "universal_pathlib",
+  "s3fs>=2025.3.2",
 ]
 dynamic = ["version"]
 

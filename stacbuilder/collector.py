@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Protocol, Tuple, Union
 from openeo.util import normalize_crs
 import rasterio
+from upath.implementations.cloud import S3Path
 
 from stactools.core.io import ReadHrefModifier
 
@@ -192,7 +193,13 @@ class MapGeoTiffToAssetMetadata:
         else:
             asset_meta.href = asset_path
 
-        with rasterio.open(asset_path.as_uri()) as dataset:
+        # check for s3 path and adjust the file path.
+        if isinstance(asset_path, S3Path):
+            _asset_path = asset_path.as_uri()
+        else:
+            _asset_path = asset_path
+
+        with rasterio.open(_asset_path) as dataset:
             asset_meta.shape = dataset.shape
 
             # Get the EPSG code of the dataset
