@@ -50,6 +50,11 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+hrvpp = [
+  "terracatalogueclient==0.1.14",
+]
+
 [project.urls]
 Homepage = "https://github.com/VitoTAP/stac-catalog-builder"
 Documentation = "https://github.com/VitoTAP/stac-catalog-builder#readme"
@@ -86,3 +91,11 @@ profile = "black"
 
 [tool.ruff]
 line-length = 120
+
+[tool.uv.sources]
+terracatalogueclient = { index = "vito-atf" }
+
+[[tool.uv.index]]
+name = "vito-atf"
+url = "https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple"
+explicit = true
