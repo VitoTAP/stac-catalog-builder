@@ -205,10 +205,6 @@ class MapMetadataToSTACItem:
             properties={},
         )
 
-        # TODO: looks like we should get description from a source/config at the item level.
-        description = self.item_assets_configs[first_asset.asset_type].description
-        item.common_metadata.description = description
-
         item.common_metadata.created = dt.datetime.now(dt.timezone.utc)
 
         # TODO: support summaries: these fields are recommended but they are also not always relevant or present.
