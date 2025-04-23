@@ -1,4 +1,4 @@
-# How-to Run the STAC Catalog Builder
+# How-to Run the STAC Catalog Builder from the Command Line
 
 ## Getting Help
 

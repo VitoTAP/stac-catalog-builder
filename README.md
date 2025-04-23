@@ -9,7 +9,7 @@ It requires a some configuration for the fields we need to fill in, but the goal
 For now it only supports GeoTIFFs. For example, netCDF is not supported yet, because it can be a lot more complex to extract info from than GeoTIFF.
 We wanted to start with GeoTIFF and we can see about other needs later.
 
-Support for uploading to a STAC API is in the making.
+This tool also provied support for uploading to a STAC API.
 
 See also: [Goals and User Stories](docs/goals-and-user-stories.md): A longer explanation of the goals or use case for the STAC catalog builder.
 
@@ -17,16 +17,14 @@ See also: [Goals and User Stories](docs/goals-and-user-stories.md): A longer exp
 **[WARNING] Do not use notebooks as these will fail**
 
 
-Documentation can be found in here [docs/index.md](./docs/index.md)
+## Getting Started
 
-Below, als the links to the important topics, for convenience:
+- [Setup - Installation](docs/installation.md)
+- [How to Configure and Run a New Dataset](docs/how-to-configure-new-dataset.md)
+- [Workflow of the Stac Builder Explained](docs/workflow.md)
+- [How to run the STAC builder from command line](docs/how-to-run-stacbuilder-cli.md)
 
-Getting Started:
+## Development
 
-- [Installation](docs/installation.md)
-- [Running the Stacbuilder Tool](docs/how-to-run-stacbuilder.md)
-- [How to Configure a New Dataset](docs/how-to-configure-new-dataset.md)
-
-Development:
-
-- [Software Development Guidelines](docs/developer-guidelines.md)
+- [Developer Guidelines](docs/developer-guidelines.md)
+- [Goals and User Stories](docs/goals-and-user-stories.md)

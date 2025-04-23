@@ -44,9 +44,8 @@ tiffs_glob = "*.tif"  # CLCBB*/ WAW*/
 
 # print(list_input_files(input_dir=tiff_input_path, glob=tiffs_glob))
 # exit()
-stac_api_pw = os.getenv("STAC_API_PW")
-if stac_api_pw is None:
-    stac_api_pw = getpass("Enter password for stac api: ")
+stac_api_un = input("Enter username for STAC API: ")
+stac_api_pw = getpass("Enter password for stac api: ")
 
 # build collection
 build_collection(
@@ -67,7 +66,7 @@ auth_settings = AuthSettings(
     token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
     authorization_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
     client_id="terracatalogueclient",
-    username="victor.verhaert",
+    username=stac_api_un,
     password=stac_api_pw,
 )
 settings = Settings(
