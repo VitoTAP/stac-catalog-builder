@@ -186,7 +186,7 @@ class MapGeoTiffToAssetMetadata:
         asset_meta.asset_path = asset_path
         asset_meta.asset_id = Path(asset_path).stem
         asset_meta.item_id = Path(asset_path).stem
-        asset_meta.datetime = dt.datetime.utcnow()  # TODO VVVV Why do we take the current time?
+        asset_meta.datetime = dt.datetime.now(dt.timezone.utc)  # TODO VVVV Why do we take the current time?  get time from the asset name?
 
         if self._href_modifier:
             asset_meta.href = self._href_modifier(asset_path)
@@ -251,7 +251,6 @@ class MapGeoTiffToAssetMetadata:
             asset_meta.raster_metadata = raster_meta
 
         asset_meta.process_href_info()
-
         file_stat = asset_path.stat()
         asset_meta.file_size = file_stat.st_size
 

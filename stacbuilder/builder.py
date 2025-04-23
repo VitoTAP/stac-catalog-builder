@@ -202,17 +202,11 @@ class MapMetadataToSTACItem:
             datetime=first_asset.datetime,
             start_datetime=first_asset.start_datetime,
             end_datetime=first_asset.end_datetime,
-            properties={
-                "product_version": first_asset.version,
-                "product_tile": first_asset.tile_id,
-            },
+            collection=first_asset.collection_id,
+            properties={},
         )
 
-        # TODO: looks like we should get description from a source/config at the item level.
-        description = self.item_assets_configs[first_asset.asset_type].description
-        item.common_metadata.description = description
-
-        item.common_metadata.created = dt.datetime.utcnow()
+        item.common_metadata.created = dt.datetime.now(dt.timezone.utc)
 
         # TODO: support summaries: these fields are recommended but they are also not always relevant or present.
         #   Originally defined in a module with only constants but now we work with configuration
@@ -273,7 +267,6 @@ class MapMetadataToSTACItem:
         # if metadata.tile_id:
         #     grid = GridExtension.ext(item, add_if_missing=True)
         #     grid.code = metadata.tile_id
-
 
         asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
         if asset_config.eo_bands:
@@ -617,7 +610,7 @@ class STACCollectionBuilder:
         self._log_progress_message("DONE: create_empty_collection")
 
     def get_default_extent(self) -> Extent:
-        end_dt = dt.datetime.utcnow()
+        end_dt = dt.datetime.now(dt.timezone.utc)
 
         return Extent(
             # Default spatial extent is the entire world.
