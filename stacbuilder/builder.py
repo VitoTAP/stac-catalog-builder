@@ -202,13 +202,8 @@ class MapMetadataToSTACItem:
             datetime=first_asset.datetime,
             start_datetime=first_asset.start_datetime,
             end_datetime=first_asset.end_datetime,
-            collection=first_asset.collection_id,
             properties={},
         )
-
-        # TODO: looks like we should get description from a source/config at the item level.
-        description = self.item_assets_configs[first_asset.asset_type].description
-        item.common_metadata.description = description
 
         item.common_metadata.created = dt.datetime.now(dt.timezone.utc)
 
