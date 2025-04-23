@@ -1,7 +1,10 @@
-name: Run Pytest
+name: Run Pre-commit and Pytest
 
 on:
   push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
