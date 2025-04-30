@@ -21,6 +21,6 @@
 3. build_stac.py 
    - Builds data from s3 storage and creates stac collection locally.
    - Validates the data.
-4. ecdccollection.py
+4. upload_delete_collection.py
    - Uploads the data to weed stac server.
    - Deletes the collection in weed stac server.
