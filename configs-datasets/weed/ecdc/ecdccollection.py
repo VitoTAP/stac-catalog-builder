@@ -21,9 +21,9 @@ data = get_datafrom_toml("config.toml")
 set_s3bucket_env(data)
 # Define parameters
 coll_inputs = data["stacbucket"]
-inputdir = UPath(coll_inputs["input_datadir"])
-configfile = coll_inputs["input_config_json"]
-filepattern = coll_inputs["filepattern"]
+inputdir = UPath(coll_inputs["INPUT_DATADIR"])
+configfile = coll_inputs["INPUT_CONFIG_JSON"]
+filepattern = coll_inputs["FILEPATTERN"]
 no_input_assets = buildcollection_locally(inputdir, configfile, filepattern)
 
 

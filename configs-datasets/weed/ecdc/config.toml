@@ -17,6 +17,6 @@ APEX_TOKEN_URL = "https://auth.apex.esa.int/realms/apex/protocol/openid-connect/
 CATALOGUE_URL = "https://catalogue.weed.apex.esa.int"
 
 [stacbuild]
-INPUT_DATADIR = "s3://bucket/tests/Manu/Europe/ERA5-Land/"
-input_config_json = "config-collection.json"
-filepattern = "*/*.tiff"
+INPUT_DATADIR = "s3://test-waw3-1-hr5zivdsybnyfofl9lx96mrxxgphsy3505zxua8rjzf3hjyxdzu/Manu/Europe/ERA5-Land/"
+INPUT_CONFIG_JSON = "era5land-config-collection.json"
+FILEPATTERN = "*/*.tiff"

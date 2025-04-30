@@ -19,11 +19,11 @@ from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 def get_datafrom_toml(tomlfile):
     with open(tomlfile, "rb") as f:
         data = load(f)
-    config_json = Path(data["stacbuild"]["input_config_file"]).expanduser().absolute()
+    config_json = Path(data["stacbuild"]["INPUT_CONFIG_JSON"]).expanduser().absolute()
     if config_json.exists():
         df = loads(config_json.read_text())
         if "collection_id" in df.keys():
-            data["weedstac"]["data"]["collectionname"] = df["collection_id"]
+            data["weedstac"]["data"]["COLLECTIONNAME"] = df["collection_id"]
         else:
             print("No collection_id in config")
     else:
@@ -46,7 +46,7 @@ def set_s3bucket_env(data):
             environ[key] = value
 
 
-def buildcollection_locally(data_input_path, configfile, filepattern):
+def buildcollection_locally(data_input_path, configfile, filepattern, overwrite):
     # create a custom collector
     class CustomCollector(IMetadataCollector):
         def has_collected(self) -> bool:
@@ -101,7 +101,7 @@ def buildcollection_locally(data_input_path, configfile, filepattern):
         metadata_collector=CustomCollector(),
         collection_config=coll_cfg,
         output_dir=output_path,
-        overwrite=True,
+        overwrite=overwrite,
     )
 
     # postprocessor to add new properties into items
@@ -116,15 +116,15 @@ def buildcollection_locally(data_input_path, configfile, filepattern):
 
 # check if collection was created and files do exist
 def check_collection_exists(data):
-    output_path = Path(data["weedstac"]["data"]["collectionname"]).expanduser().absolute()
+    output_path = Path(data["weedstac"]["data"]["COLLECTIONNAME"]).expanduser().absolute()
     if output_path.exists():
         collection_json = output_path / "collection.json"
         if not collection_json.exists():
             print(f"Collection JSON not found at {collection_json}")
             exit(1)
             # add to collection json link to data dict
-        data["weedstac"]["data"]["collectionpath"] = output_path
-        data["weedstac"]["data"]["collection_json"] = collection_json
+        data["weedstac"]["data"]["COLLECTIONPATH"] = output_path
+        data["weedstac"]["data"]["COLLECTION_JSON"] = collection_json
     else:
         print("There is no collection in the given path")
         exit(1)
@@ -161,7 +161,7 @@ def get_bearer_auth(stacauth) -> BearerAuth:
 def create_collection_url(auth: BearerAuth, stacdata: Dict):
     """POST the collection.json to the catalogue, returns collection ID."""
     # load the collection.json from the created collection.
-    coll = loads(stacdata["collection_json"].read_text())
+    coll = loads(stacdata["COLLECTION_JSON"].read_text())
     coll.setdefault("_auth", {"read": ["anonymous"], "write": ["stac-admin-prod"]})
 
     # define url for collection
@@ -210,7 +210,6 @@ def ingest_all_items(auth: BearerAuth, CATALOGUE_URL, coll_id: str, items_base: 
 
 def delete_collection(auth: BearerAuth, url_collection: str):
     """DELETE the collection from the catalogue."""
-    #     url = f"{CATALOGUE_URL}/collections/{coll_id}"
     resp = delete(url_collection, auth=auth)
     if resp.status_code == 204:
         print(f"Collection {url_collection.rsplit('/')[-1]} deleted successfully")
