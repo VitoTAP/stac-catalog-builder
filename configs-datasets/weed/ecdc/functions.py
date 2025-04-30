@@ -16,7 +16,17 @@ from stacbuilder import (
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
 
-def get_datafrom_toml(tomlfile):
+def get_datafrom_toml(tomlfile) -> Dict:
+    """Load configuration data from a TOML file.
+    This function reads a TOML file and extracts the configuration data.
+    It also checks for the existence of a JSON configuration file and updates
+    the TOML data with the collection ID if present.
+
+    Args:
+            tomlfile (str): Path to the TOML file.
+    Returns:
+            dict: Configuration data as a dictionary.
+    """
     with open(tomlfile, "rb") as f:
         data = load(f)
     config_json = Path(data["stacbuild"]["INPUT_CONFIG_JSON"]).expanduser().absolute()
@@ -32,6 +42,14 @@ def get_datafrom_toml(tomlfile):
 
 
 def set_s3bucket_env(data):
+    """Set environment variables for S3 bucket access.
+    This function checks if the variables for S3 bucket access exist in the input
+    and sets them in the environment. If any of the required variables are missing,
+    it raises a ValueError.
+
+    Args:
+            data (dict): Configuration data as a dictionary.
+    """
     if "s3bucket" not in data.keys():
         print("No s3bucket in config")
         exit()
@@ -47,6 +65,20 @@ def set_s3bucket_env(data):
 
 
 def buildcollection_locally(data_input_path, configfile, filepattern, overwrite):
+    """Build a STAC collection locally from GeoTIFF files.
+    This function collects metadata from GeoTIFF files in the specified input
+    directory, creates a collection configuration, and builds the collection.
+    It also defines a custom metadata collector to modify the item IDs in the
+    metadata.
+    Args:
+            data_input_path (str): Path to the input directory containing GeoTIFF files.
+            configfile (str): Path to the JSON configuration file.
+            filepattern (str): File pattern to match GeoTIFF files.
+            overwrite (bool): Flag indicating whether to overwrite existing collection.
+    Returns:
+            int: Number of input assets globed.
+    """
+
     # create a custom collector
     class CustomCollector(IMetadataCollector):
         def has_collected(self) -> bool:
@@ -114,9 +146,18 @@ def buildcollection_locally(data_input_path, configfile, filepattern, overwrite)
     return noofassets
 
 
-# check if collection was created and files do exist
-def check_collection_exists(data):
-    output_path = Path(data["weedstac"]["data"]["COLLECTIONNAME"]).expanduser().absolute()
+def check_collection(data):
+    """Check if the collection exists and defines a few parameters.
+    This function checks if the collection exists in the specified path and
+    updates the configuration data with the collection path and JSON file.
+    Args:
+            data (dict): Configuration data as a dictionary.
+    Returns:
+            dict: Updated configuration data with collection path and JSON file.
+    """
+    output_path = (
+        Path(data["weedstac"]["data"]["COLLECTIONNAME"]).expanduser().absolute()
+    )
     if output_path.exists():
         collection_json = output_path / "collection.json"
         if not collection_json.exists():
@@ -131,10 +172,9 @@ def check_collection_exists(data):
     return data
 
 
-
-# load to stac
 class BearerAuth(auth.AuthBase):
-    """Attach a Bearer token to the Authorization header."""
+    """Attach a Bearer token to the Authorization header.
+    requests for authentication."""
 
     def __init__(self, token: str):
         self.token = token
@@ -168,7 +208,7 @@ def create_collection_url(auth: BearerAuth, stacdata: Dict):
     url = f"{stacdata['CATALOGUE_URL']}/collections"
     resp = post(url, auth=auth, json=coll)
     if resp.status_code == 201:
-        coll_id = resp.json()["id"]        # collection_id
+        coll_id = resp.json()["id"]  # collection_id
         print(f"Collection created: {coll_id}")
         return coll_id
     elif resp.status_code == 400:
@@ -190,7 +230,7 @@ def ingest_all_items(auth: BearerAuth, CATALOGUE_URL, coll_id: str, items_base: 
         # skip the collection.json if it lives in the same tree
         if item_file.name == "collection.json":
             continue
-        
+
         try:
             item = loads(item_file.read_text())
             item["collection"] = coll_id
@@ -209,7 +249,11 @@ def ingest_all_items(auth: BearerAuth, CATALOGUE_URL, coll_id: str, items_base: 
 
 
 def delete_collection(auth: BearerAuth, url_collection: str):
-    """DELETE the collection from the catalogue."""
+    """ Delete a collection from the catalogue.
+    Args:
+        auth (BearerAuth): Bearer authentication object.
+        url_collection (str): URL of the collection to be deleted.
+    """
     resp = delete(url_collection, auth=auth)
     if resp.status_code == 204:
         print(f"Collection {url_collection.rsplit('/')[-1]} deleted successfully")

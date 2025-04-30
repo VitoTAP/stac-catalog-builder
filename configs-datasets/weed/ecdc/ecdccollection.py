@@ -1,48 +1,29 @@
-from pystac import Collection
-from upath import UPath
+"""
+Upload the collection to the STAC server and delete it. It is important to
+follow first three steps before either creating or deleting a collection from the STAC server.
+
+1. Load config file from toml
+2. Check if the collection exists also define the few parameters
+3. Authenticate to the STAC server
+4. Upload the collection to the STAC server
+    - Create a collection or gets its url from stac server
+    - Upload all items to the STAC server
+5. Delete the collection from the STAC server
+"""
 
 from .functions import (
-    buildcollection_locally,
-    check_collection_exists,
-    get_bearer_auth,
-    set_s3bucket_env,
-    create_collection_url,
-    check_collection_exists,
-    ingest_all_items,
     get_datafrom_toml,
+    check_collection,
+    get_bearer_auth,
+    create_collection_url,
+    ingest_all_items,
     delete_collection,
 )
 
 # read input toml file
 data = get_datafrom_toml("config.toml")
-
-# BUILD COLLECTION
-# Set environment variables for S3 bucket access
-set_s3bucket_env(data)
-# Define parameters
-coll_inputs = data["stacbucket"]
-inputdir = UPath(coll_inputs["INPUT_DATADIR"])
-configfile = coll_inputs["INPUT_CONFIG_JSON"]
-filepattern = coll_inputs["FILEPATTERN"]
-no_input_assets = buildcollection_locally(inputdir, configfile, filepattern)
-
-
-# CHECK IF COLLECTION WAS CREATED AND FILES DO EXIST
-data = check_collection_exists(data)
-
-# VALIDATE COLLECTION
-# stac validation
-print("VALIDATION:")
-# assume the collection consists of linked items
-collection = Collection.from_file(data["weedstac"]["data"]["collection_json"])
-noitems = collection.validate_all()
-print(f"  Number of items created in collection is {noitems}")
-# if the number of assets are proper
-noassets = 0
-for _i in collection.get_items():
-    noassets += len(_i.assets)
-print(f"  Number of assets in collection is {noassets} and input is {no_input_assets}")
-
+# Check if collection exists locally
+data = check_collection(data)
 
 # UPLOADING and DELETING
 # authentication
@@ -54,7 +35,10 @@ stacdata = data["weedstac"]["data"]
 coll_id = create_collection_url(auth, stacdata)
 # upload data
 ingest_all_items(
-    auth, stacdata["CATALOGUE_URL"], stacdata["collectionname"], stacdata["collectionpath"]
+    auth,
+    stacdata["CATALOGUE_URL"],
+    stacdata["COLLECTIONNAME"],
+    stacdata["COLLECTIONPATH"],
 )
 
 # DELETE
