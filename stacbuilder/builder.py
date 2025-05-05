@@ -80,7 +80,7 @@ class AlternateHrefGenerator:
         return self._callbacks[key](asset_metadata)
 
     def add_MEP(self):
-        self.register_callback("MEP", lambda asset_md: asset_md.asset_path.as_posix())
+        self.register_callback("local", lambda asset_md: asset_md.asset_path.as_posix())
 
     def add_basic_S3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
         """Add a S3 with an S3 bucket and the asset's file path concatenated to that bucket.
@@ -870,7 +870,7 @@ class AssetMetadataPipeline:
     ) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
 
-        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs)
+        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs, alternate_href_generator=AlternateHrefGenerator.from_config(self.collection_config.alternate_links))
 
         # The default way we group items into multiple collections is by year
         # Currently we don't use any other ways to create a group of collections.
