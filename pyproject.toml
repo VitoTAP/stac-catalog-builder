@@ -24,7 +24,7 @@ classifiers = [
 dependencies = [
   "click==8.1.*",
   "dynaconf==3.2.*",
-  "fsspec[http,s3]==2025.*",
+  "fsspec==2025.*",
   "geopandas==1.*",
   "openeo>=0.36",
   "psutil",
@@ -39,6 +39,7 @@ dependencies = [
   "pytest",
   "yarl==1.9.*",
   "universal_pathlib",
+  "s3fs>=2025.3.*",
 ]
 dynamic = ["version"]
 
