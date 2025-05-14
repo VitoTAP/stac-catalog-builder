@@ -27,9 +27,9 @@ dependencies = [
   "click==8.1.*",
   "dynaconf==3.2.*",
   "fsspec[http,s3]==2025.3.2",
-  "geopandas==0.14.*",
+  "geopandas>=1.0",
   "numpy<2",
-  "openeo==0.36",
+  "openeo>=0.36",
   "psutil",
   "pyarrow==18.1.*",
   "pydantic==2.5.*",
@@ -38,7 +38,6 @@ dependencies = [
   "rasterio==1.3.9",
   "requests==2.31.*",
   "requests_auth==7.0.*",
-  "requests-mock==1.11.*",
   "rio-stac==0.10",
   "shapely==2.0.*",
   "stac-validator==3.3.*",
@@ -103,5 +102,5 @@ terracatalogueclient = { index = "vito-atf" }
 
 [[tool.uv.index]]
 name = "vito-atf"
-url = "https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple"
+url = "https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages-public/simple"
 explicit = true

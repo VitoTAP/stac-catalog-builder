@@ -1,15 +1,5 @@
 
 # Setup - Installation
-<!-- - [Python version, in a virtualenv or in a conda environment.](#python-version-in-a-virtualenv-or-in-a-conda-environment)
-  - [Create Conda Environment with `conda-environment.yaml`](#create-conda-environment-with-conda-environmentyaml)
-    - [Notes regarding conda environments](#notes-regarding-conda-environments)
-  - [How to Manually Create the Conda Environment](#how-to-manually-create-the-conda-environment)
-    - [Create the Conda Environment:](#create-the-conda-environment)
-    - [Activate the Environment:](#activate-the-environment)
-    - [Install Dependencies](#install-dependencies)
-- [For developers: Updates to do when dependencies have changed:](#for-developers-updates-to-do-when-dependencies-have-changed)
-- [For developers: Dockerfiles to test the installation](#for-developers-dockerfiles-to-test-the-installation)
-- [Export Conda Environment as `environment.yaml`](#export-conda-environment-as-environmentyaml) -->
 There are two ways to install the STAC catalog builder tool:
 - Use [uv](https://docs.astral.sh/uv/) to install the tool in a virtualenv.
 - Create your own virtualenv and install the package manually.
