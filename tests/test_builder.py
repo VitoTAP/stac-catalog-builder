@@ -318,13 +318,13 @@ class TestAlternateLinksGenerator:
     def test_mep(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("MEP") is False
+        assert alternate_generator.has_alternate_key("local") is False
         alternate_generator.add_MEP()
-        assert alternate_generator.has_alternate_key("MEP") is True
+        assert alternate_generator.has_alternate_key("local") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
 
-        assert alternates == {"alternate": {"MEP": {"href": "/data/collection789/item456/asset123.tif"}}}
+        assert alternates == {"alternate": {"local": {"href": "/data/collection789/item456/asset123.tif"}}}
 
     def test_S3_only_bucket(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
