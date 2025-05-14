@@ -353,18 +353,18 @@ class TestAlternateLinksGenerator:
     def test_MEP_and_S3(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("MEP") is False
+        assert alternate_generator.has_alternate_key("local") is False
         assert alternate_generator.has_alternate_key("S3") is False
 
         alternate_generator.add_MEP()
         alternate_generator.add_basic_S3("test-bucket")
-        assert alternate_generator.has_alternate_key("MEP") is True
+        assert alternate_generator.has_alternate_key("local") is True
         assert alternate_generator.has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {
             "alternate": {
-                "MEP": {"href": "/data/collection789/item456/asset123.tif"},
+                "local": {"href": "/data/collection789/item456/asset123.tif"},
                 "S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"},
             }
         }
@@ -372,19 +372,19 @@ class TestAlternateLinksGenerator:
     def test_MEP_and_S3_with_root_path(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("MEP") is False
+        assert alternate_generator.has_alternate_key("local") is False
         assert alternate_generator.has_alternate_key("S3") is False
 
         alternate_generator.add_MEP()
         alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
 
-        assert alternate_generator.has_alternate_key("MEP") is True
+        assert alternate_generator.has_alternate_key("local") is True
         assert alternate_generator.has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {
             "alternate": {
-                "MEP": {"href": "/data/collection789/item456/asset123.tif"},
+                "local": {"href": "/data/collection789/item456/asset123.tif"},
                 "S3": {"href": "s3://test-bucket/test/data-root/path/data/collection789/item456/asset123.tif"},
             }
         }
@@ -404,10 +404,10 @@ class TestAlternateLinksGenerator:
         alt_href_gen = AlternateHrefGenerator.from_config(config)
 
         if config is None:
-            assert alt_href_gen.has_alternate_key("MEP") is False
+            assert alt_href_gen.has_alternate_key("local") is False
             assert alt_href_gen.has_alternate_key("S3") is False
         else:
-            assert alt_href_gen.has_alternate_key("MEP") == config.add_MEP
+            assert alt_href_gen.has_alternate_key("local") == config.add_MEP
             assert alt_href_gen.has_alternate_key("S3") == config.add_S3
 
     @pytest.mark.parametrize(
