@@ -1,4 +1,0 @@
--r requirements-test.txt
-hatch==1.9.*
-pre-commit
-ruff
