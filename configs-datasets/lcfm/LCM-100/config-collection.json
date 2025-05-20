@@ -1,0 +1,166 @@
+{
+    "collection_id": "LCFM_LCM-100_v005",
+    "title": "LCFM LCM 100 v005",
+    "description": "LCFM Land Cover Map 100m v005",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/LCFM_LCM-100_V005_(?P<year>\\d{4})_(?P<tile_id>[A-Z]\\d{2}[A-Z]\\d{3})_(?P<asset_type>MAP|CFRAC_[A-Z]{1,10}).tif$",
+            "period": "yearly",
+            "fixed_values": { }
+        }
+    },
+    "item_assets": {
+        "MAP": {
+            "title": "Land Cover Map 100m",
+            "description": "Classification band",
+            "eo_bands": [
+                {
+                    "name": "Map",
+                    "description": "Classification",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_BARE": {
+            "title": "CFRAC_BARE",
+            "description": "Cover fraction for bare class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_BARE",
+                    "description": "Cover fraction for bare class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_BUILTUP": {
+            "title": "CFRAC_BUILTUP",
+            "description": "Cover fraction for builtup class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_BUILTUP",
+                    "description": "Cover fraction for builtup class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_CROPLAND": {
+            "title": "CFRAC_CROPLAND",
+            "description": "Cover fraction for cropland class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_CROPLAND",
+                    "description": "Cover fraction for cropland class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_GRASSLAND": {
+            "title": "CFRAC_GRASSLAND",
+            "description": "Cover fraction for grassland class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_GRASSLAND",
+                    "description": "Cover fraction for grassland class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_LICHENS": {
+            "title": "CFRAC_LICHENS",
+            "description": "Cover fraction for lichens class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_LICHENS",
+                    "description": "Cover fraction for lichens class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_SHRUBLAND": {
+            "title": "CFRAC_SHRUBLAND",
+            "description": "Cover fraction for shrubland class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_SHRUBLAND",
+                    "description": "Cover fraction for shrubland class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_SNOW": {
+            "title": "CFRAC_SNOW",
+            "description": "Cover fraction for snow and ice class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_SNOW",
+                    "description": "Cover fraction for snow and ice class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_TREECOVER": {
+            "title": "CFRAC_TREECOVER",
+            "description": "Cover fraction for bare class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_TREECOVER",
+                    "description": "Cover fraction for bare class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_WATER": {
+            "title": "CFRAC_WATER",
+            "description": "Cover fraction for water class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_WATER",
+                    "description": "Cover fraction for water class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        },
+        "CFRAC_WETLAND": {
+            "title": "CFRAC_WETLAND",
+            "description": "Cover fraction for wetland class",
+            "eo_bands": [
+                {
+                    "name": "CFRAC_WETLAND",
+                    "description": "Cover fraction for wetland class",
+                    "data_type": "uint8",
+                    "sampling": "area",
+                    "spatial_resolution": 10
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}
