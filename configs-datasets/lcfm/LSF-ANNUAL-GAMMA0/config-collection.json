@@ -1,0 +1,29 @@
+{
+    "collection_id": "LCFM_LSF-ANNUAL-GAMMA0_v001",
+    "title": "LCFM LSF ANNUAL GAMMA0 20m v001",
+    "description": "LCFM Annual Land Surface Features of gamma0 at 20m resultion v001",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/LCFM_LSF-ANNUAL-GAMMA0_V001_(?P<year>\\d{4})_(?P<tile_id>\\d{2}[A-Z]{3})_FEATURES.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "features"
+            }
+        }
+    },
+    "item_assets": {
+        "features": {
+            "title": "LSF ANNUAL GAMMA0 20m v001",
+            "description": "LCFM Annual Land Surface Features of gamma0 at 20m resultion v001"
+        }
+    },
+    "overrides": {
+    }
+}
