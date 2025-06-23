@@ -1,7 +1,7 @@
 {
-    "collection_id": "PLANETSCOPE-V01",
-    "title": "PlanetScope-Flanders",
-    "description": "PlanetScope is a high-resolution Earth observation product from Planet Labs. See also: https://www.planet.com/products/planet-imagery/",
+    "collection_id": "PLANETSCOPE-DOVES_V01",
+    "title": "PlanetScope-Doves-Flanders",
+    "description": "PlanetScope data derived from PS2 sattelites (Doves) is a high-resolution Earth observation product from Planet Labs, offering 4-band surface reflectance data suitable for scientific and geospatial analysis. See also: https://www.planet.com/products/planet-imagery/",
     "instruments": [],
     "keywords": [
         "Planet", "PlanetScope", "Doves", "Flanders", "Surface Reflectance", "High Resolution"
