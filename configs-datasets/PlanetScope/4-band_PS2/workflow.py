@@ -19,7 +19,7 @@ collection_config_path = Path(__file__).parent.resolve() / "config-collection.js
 # For Windows UNC path
 tiff_input_path = Path("/vitodata/PlanetScope/prod/flanders/archive/")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
-tiffs_glob = "*/*/*/*/*/*_3B_AnalyticMS_SR_clip.tif"
+tiffs_glob = "ortho_analytic_4b_sr/*/*/*/*/*_3B_AnalyticMS_SR_clip.tif"
 
 # Output Paths
 output_path = Path(__file__).parent.resolve() / "results"
@@ -47,7 +47,8 @@ for k in asset_metadata:
     pprint.pprint(k.to_dict())
 
 def item_postprocessor(item: pystac.Item) -> pystac.Item:
-    item.id = item.id.replace("_3B_AnalyticMS_SR_clip", "")
+    item.id = item.id.replace("_3B_AnalyticMS_SR_clip", "_SR") # Spectral Reflectance
+    item.id = item.id.replace("_3B_udm2_clip", "_UDM") # Usable Data Mask
     return item
 
 
@@ -65,6 +66,17 @@ if failed_files: print(f"Failed files: {failed_files}")
 print("First stac item:")
 pprint.pprint(stac_items[0].to_dict())
 
+stac_api_pw = getpass("Enter password for stac api: ")
+# build collection
+build_collection(
+    collection_config_path=collection_config_path,
+    glob=tiffs_glob,
+    input_dir=tiff_input_path,
+    output_dir=test_output_path,
+    overwrite=overwrite,
+    link_items=False,
+    # item_postprocessor=item_postprocessor,
+)
 
 # validate collection
 validate_collection(
