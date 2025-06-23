@@ -1,0 +1,125 @@
+{
+    "collection_id": "PLANETSCOPE-V01",
+    "title": "PlanetScope-Flanders",
+    "description": "PlanetScope is a high-resolution Earth observation product from Planet Labs. See also: https://www.planet.com/products/planet-imagery/",
+    "instruments": [],
+    "keywords": [
+        "Planet", "PlanetScope", "Doves", "Flanders", "Surface Reflectance", "High Resolution"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Planet",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.planet.com/"
+        },
+        {
+            "name": "VITO",
+            "roles": [
+                "processor"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/",
+    "input_path_parser": {
+	"classname": "DefaultInputPathParser",
+	"parameters": {
+	    "regex_pattern":  ".*/(?P<asset_type>ortho_analytic_\\d{1}b_sr)/(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<day>\\d{2})/\\d{8}_(?P<hour>\\d{2})(?P<minute>\\d{2})(?P<second>\\d{2})_(?P<satellite_id>\\w+)/\\d{8}_\\d{6}_\\w+_3B_AnalyticMS_SR_clip.tif$",
+	    "period": "secondly",
+	    "fixed_values": {
+	    }
+	}
+    },
+    "item_assets": {
+	"ortho_analytic_4b_sr": {
+	    "title": "ortho_analytic_4b_sr",
+	    "description": "Imagery from both the older 4-band PS2 satellites (300km2) and the new SuperDove (600km2).",
+	    "eo_bands": [
+		{
+			"name": "Band 1",
+			"description": "blue",
+			"wavelength": "490 (50)",
+			"interoperability": "With Sentinel-2 band 2"
+		},
+		{
+			"name": "Band 2",
+			"description": "green",
+			"wavelength": "565 (36)",
+			"interoperability": "With Sentinel-2 band 3"
+		},
+		{
+			"name": "Band 3",
+			"description": "red",
+			"wavelength": "665 (31)",
+			"interoperability": "With Sentinel-2 band 4"
+		},
+		{
+			"name": "Band 4",
+			"description": "nir",
+			"wavelength": "865 (40)",
+			"interoperability": "With Sentinel-2 band 8a"
+		}
+	    ]
+	},
+	"ortho_analytic_8b_sr": {
+	    "title": "ortho_analytic_8b_sr",
+	    "description": "Imagery (600km2) derived from the SuperDove satellites, containing 8 bands",
+	    "eo_bands": [
+		{
+			"name": "Band 1",
+			"description": "coastal_blue",
+			"wavelength": "443 (20)",
+			"interoperability": "With Sentinel-2 band 1"
+		},
+		{
+			"name": "Band 2",
+			"description": "blue",
+			"wavelength": "490 (50)",
+			"interoperability": "With Sentinel-2 band 2"
+		},
+		{
+			"name": "Band 3",
+			"description": "green_i",
+			"wavelength": "531 (36)",
+			"interoperability": "No equivalent with Sentinel-2"
+		},
+		{
+			"name": "Band 4",
+			"description": "green",
+			"wavelength": "565 (36)",
+			"interoperability": "With Sentinel-2 band 3"
+		},
+		{
+			"name": "Band 5",
+			"description": "yellow",
+			"wavelength": "610 (20)",
+			"interoperability": "No equivalent with Sentinel-2"
+		},
+		{
+			"name": "Band 6",
+			"description": "red",
+			"wavelength": "665 (31)",
+			"interoperability": "With Sentinel-2 band 4"
+		},
+		{
+			"name": "Band 7",
+			"description": "rededge",
+			"wavelength": "705 (15)",
+			"interoperability": "With Sentinel-2 band 5"
+		},
+		{
+			"name": "Band 8",
+			"description": "nir",
+			"wavelength": "865 (40)",
+			"interoperability": "With Sentinel-2 band 8a"
+		}
+	    ]
+	}
+    }
+}
