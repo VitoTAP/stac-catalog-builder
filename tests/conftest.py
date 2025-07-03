@@ -11,7 +11,6 @@ from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.pathparsers import RegexInputPathParser
-from stacbuilder.builder import GeoTiffPipeline
 
 
 @pytest.fixture(scope="session")
@@ -47,28 +46,6 @@ def collection_output_dir(tmp_path_factory) -> Path:
 @pytest.fixture(scope="session")
 def grouped_collection_output_dir(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("collections-per-group")
-
-
-@pytest.fixture(scope="session")
-def geotiff_pipeline(collection_config_from_file, file_collector_config, collection_output_dir) -> GeoTiffPipeline:
-    return GeoTiffPipeline.from_config(
-        collection_config=collection_config_from_file,
-        file_coll_cfg=file_collector_config,
-        output_dir=collection_output_dir,
-        overwrite=False,
-    )
-
-
-@pytest.fixture(scope="session")
-def geotiff_pipeline_grouped(
-    grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
-) -> GeoTiffPipeline:
-    return GeoTiffPipeline.from_config(
-        collection_config=grouped_collection_test_config,
-        file_coll_cfg=file_collector_config,
-        output_dir=grouped_collection_output_dir,
-        overwrite=False,
-    )
 
 
 @pytest.fixture(scope="session")

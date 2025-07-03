@@ -1,20 +1,23 @@
 from pathlib import Path
 from typing import Optional, List
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, GeoTiffPipeline, AssetMetadataPipeline, AssetMetadata
+from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
 
 def build_collection(
     collection_id: Optional[str] = None,
     output_dir: Optional[Path] = None,
-
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
     collection_config_path = Path("./config-collection.json").expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
-    file_coll_cfg = FileCollectorConfig(input_dir="/vitodata/worldcereal_data/MAP-v3/2021/tc-maize-main/maize/tiles_utm", glob="c*/2021_summer1_33117*11SPR.tif", max_files=100)
+    file_coll_cfg = FileCollectorConfig(
+        input_dir="/vitodata/worldcereal_data/MAP-v3/2021/tc-maize-main/maize/tiles_utm",
+        glob="c*/2021_summer1_33117*11SPR.tif",
+        max_files=100,
+    )
 
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
@@ -26,7 +29,6 @@ def build_collection(
         output_dir = output_dir / collection_id
 
     class CustomCollector(IMetadataCollector):
-
         def has_collected(self) -> bool:
             return collector.has_collected()
 
@@ -38,9 +40,10 @@ def build_collection(
             metadata_list = collector.metadata_list
 
             def update_metadata(metadata: AssetMetadata) -> AssetMetadata:
-                metadata.item_id = metadata.asset_id.replace("_confidence","").replace("_classification","")
+                metadata.item_id = metadata.asset_id.replace("_confidence", "").replace("_classification", "")
                 return metadata
-            return [update_metadata(m) for m in metadata_list ]
+
+            return [update_metadata(m) for m in metadata_list]
 
         def collect(self) -> None:
             collector.collect()
@@ -66,4 +69,5 @@ def build_collection(
     pipeline.item_postprocessor = process_item
     pipeline.build_collection()
 
-build_collection("worldcereal_maize","./STAC_wip")
+
+build_collection("worldcereal_maize", "./STAC_wip")

@@ -15,22 +15,23 @@ import logging
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
-from pystac import Collection, Item
+from deprecated import deprecated
+from pystac import Collection
 
 from stacbuilder.metadata import GeodataframeExporter
-from stacbuilder.collector import FileCollector
+from stacbuilder.collector import FileCollector, GeoTiffMetadataCollector
 
 
 from stacbuilder.builder import (
     AssetMetadataPipeline,
-    GeoTiffPipeline,
+    # GeoTiffPipeline,
     PostProcessSTACCollectionFile,
 )
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
 
 from stacbuilder.stacapi.upload import Uploader
-from stacbuilder.stacapi.config import Settings, AuthSettings
+from stacbuilder.stacapi.config import Settings
 
 log_level = logging.INFO
 # create console handler with a higher log level
@@ -73,9 +74,14 @@ def build_collection(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    pipeline = GeoTiffPipeline.from_config(
+    metadata_collector = GeoTiffMetadataCollector.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
+    )
+
+    pipeline = AssetMetadataPipeline.from_config(
+        collection_config=coll_cfg,
+        metadata_collector=metadata_collector,
         output_dir=output_dir,
         overwrite=overwrite,
         link_items=link_items,
@@ -88,6 +94,7 @@ def build_collection(
         GeodataframeExporter.export_item_bboxes(pipeline.collection)
 
 
+@deprecated(reason="use build_collection instead")
 def build_grouped_collections(
     collection_config_path: Path,
     glob: str,
@@ -119,9 +126,14 @@ def build_grouped_collections(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    pipeline = GeoTiffPipeline.from_config(
+    metadata_collector = GeoTiffMetadataCollector.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
+    )
+
+    pipeline = AssetMetadataPipeline.from_config(
+        collection_config=coll_cfg,
+        metadata_collector=metadata_collector,
         output_dir=output_dir,
         overwrite=overwrite,
     )
@@ -188,7 +200,13 @@ def list_asset_metadata(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-    pipeline = GeoTiffPipeline.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    pipeline = AssetMetadataPipeline.from_config(
+        collection_config=coll_cfg,
+        metadata_collector=GeoTiffMetadataCollector.from_config(
+            collection_config=coll_cfg,
+            file_coll_cfg=file_coll_cfg,
+        ),
+    )
 
     if save_dataframe:
         df = pipeline.get_metadata_as_geodataframe()
@@ -196,7 +214,7 @@ def list_asset_metadata(
         out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-assetmetadata"
         GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
 
-    return pipeline.get_asset_metadata()
+    return pipeline.get_metadata()
 
 
 def list_stac_items(
@@ -223,9 +241,13 @@ def list_stac_items(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-    pipeline = GeoTiffPipeline.from_config(
+    metadata_collector = GeoTiffMetadataCollector.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
+    )
+    pipeline = AssetMetadataPipeline.from_config(
+        collection_config=coll_cfg,
+        metadata_collector=metadata_collector,
         output_dir=None,
         overwrite=False,
         item_postprocessor=item_postprocessor,
@@ -290,8 +312,6 @@ def validate_collection(
     collection.validate_all()
 
 
-
-
 def upload_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):
@@ -310,4 +330,3 @@ def upload_items_to_stac_api(collection_path: Path, settings: Settings, limit: i
 
     uploader = Uploader.from_settings(settings)
     uploader.upload_items(collection_path, items=collection_path.parent, limit=limit, offset=offset)
-

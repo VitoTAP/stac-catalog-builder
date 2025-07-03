@@ -15,18 +15,16 @@ fsspec
 
 """
 
-from upath import UPath
 from pathlib import Path
 from typing import Optional, List
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, GeoTiffPipeline, AssetMetadataPipeline, AssetMetadata
+from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
 
 def build_collection(
     collection_id: Optional[str] = None,
     output_dir: Optional[Path] = None,
-
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
@@ -44,18 +42,17 @@ def build_collection(
         output_dir = output_dir / collection_id
 
     type_mapping = {
-        "temperature-max":"2m_temperature_max",
-        "temperature-min":"2m_temperature_min",
+        "temperature-max": "2m_temperature_max",
+        "temperature-min": "2m_temperature_min",
         "temperature-mean": "2m_temperature_mean",
         "dewpoint-temperature": "dewpoint_temperature_mean",
-        "precipitation-flux":"total_precipitation",
+        "precipitation-flux": "total_precipitation",
         "solar-radiation-flux": "solar_radiation_flux",
-        "vapour-pressure":"vapour_pressure",
-        "wind-speed":"wind_speed"
+        "vapour-pressure": "vapour_pressure",
+        "wind-speed": "wind_speed",
     }
 
     class CustomCollector(IMetadataCollector):
-
         def has_collected(self) -> bool:
             return collector.has_collected()
 
@@ -67,11 +64,12 @@ def build_collection(
             metadata_list = collector.metadata_list
 
             def update_metadata(metadata: AssetMetadata) -> AssetMetadata:
-                metadata.asset_type = type_mapping.get(metadata.asset_type,metadata.asset_type)
-                metadata.item_id = "agera5"  + metadata.item_id
-                metadata.href = metadata.href.replace("/data/MTDA","https://services.terrascope.be/download")
+                metadata.asset_type = type_mapping.get(metadata.asset_type, metadata.asset_type)
+                metadata.item_id = "agera5" + metadata.item_id
+                metadata.href = metadata.href.replace("/data/MTDA", "https://services.terrascope.be/download")
                 return metadata
-            return [update_metadata(m) for m in metadata_list ]
+
+            return [update_metadata(m) for m in metadata_list]
 
         def collect(self) -> None:
             collector.collect()
@@ -85,11 +83,10 @@ def build_collection(
     )
 
     def process_item(item):
-        parts = item.id.split("_")
-
         return item
 
     pipeline.item_postprocessor = process_item
     pipeline.build_collection()
 
-build_collection("worldcover","./STAC_wip")
+
+build_collection("worldcover", "./STAC_wip")

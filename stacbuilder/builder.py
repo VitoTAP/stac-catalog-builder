@@ -39,10 +39,9 @@ from stacbuilder.config import (
     AssetConfig,
     AlternateHrefConfig,
     CollectionConfig,
-    FileCollectorConfig,
 )
 from stacbuilder.metadata import AssetMetadata, GeodataframeExporter
-from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
+from stacbuilder.collector import IMetadataCollector
 
 
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
@@ -818,6 +817,11 @@ class AssetMetadataPipeline:
         item_postprocessor: Optional[Callable] = None,
     ) -> "AssetMetadataPipeline":
         """Creates a AssetMetadataPipeline from configurations."""
+        if output_dir and not isinstance(output_dir, Path):
+            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
+
+        if collection_config is None:
+            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
 
         pipeline = AssetMetadataPipeline(
             metadata_collector=None, output_dir=None, overwrite=False, item_postprocessor=item_postprocessor
@@ -870,7 +874,10 @@ class AssetMetadataPipeline:
     ) -> None:
         """Setup the internal components based on the components that we receive via dependency injection."""
 
-        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(item_assets_configs=self.item_assets_configs, alternate_href_generator=AlternateHrefGenerator.from_config(self.collection_config.alternate_links))
+        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(
+            item_assets_configs=self.item_assets_configs,
+            alternate_href_generator=AlternateHrefGenerator.from_config(self.collection_config.alternate_links),
+        )
 
         # The default way we group items into multiple collections is by year
         # Currently we don't use any other ways to create a group of collections.
@@ -938,6 +945,10 @@ class AssetMetadataPipeline:
         """Generate the intermediate metadata objects, from the input files."""
         self._metadata_collector.collect()
         return self._metadata_collector.metadata_list
+
+    def get_input_files(self) -> List[Path]:
+        """Get the input files that were used to collect the metadata."""
+        return self._metadata_collector.get_input_files()
 
     @property
     def uses_collection_groups(self):
@@ -1093,152 +1104,3 @@ class AssetMetadataPipeline:
     def _log_progress_message(self, message: str) -> None:
         calling_method_name = inspect.stack()[1][3]
         _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
-
-
-class GeoTiffPipeline:
-    """A pipeline to generate a STAC collection from a directory containing GeoTIFF files.
-    TODO: move remaining logic (from_config) to commandapi and remove this class. Follow example of command `vpp_build_collection`
-    """
-
-    def __init__(
-        self,
-        metadata_collector: GeoTiffMetadataCollector,
-        asset_metadata_pipeline: AssetMetadataPipeline,
-    ) -> None:
-        # Components / dependencies that must be provided
-        if not metadata_collector:
-            raise ValueError("You must provide an IMetadataCollector implementation for metadata_collector")
-
-        if not asset_metadata_pipeline:
-            raise ValueError("You must provide an AssetMetadataPipeline instance for asset_metadata_pipeline")
-
-        self._metadata_collector: GeoTiffMetadataCollector = metadata_collector
-        self._asset_metadata_pipeline: AssetMetadataPipeline = asset_metadata_pipeline
-
-    @property
-    def collection(self) -> Collection | None:
-        return self._asset_metadata_pipeline.collection
-
-    @property
-    def collection_file(self) -> Path | None:
-        return self._asset_metadata_pipeline.collection_file
-
-    @property
-    def collection_groups(self) -> Dict[Hashable, Collection] | None:
-        return self._asset_metadata_pipeline.collection_groups
-
-    @property
-    def collection_config(self) -> CollectionConfig:
-        return self._asset_metadata_pipeline.collection_config
-
-    @property
-    def metadata_collector(self) -> GeoTiffMetadataCollector:
-        return self._metadata_collector
-
-    @property
-    def asset_metadata_pipeline(self) -> AssetMetadataPipeline:
-        return self._asset_metadata_pipeline
-
-    @staticmethod
-    def from_config(
-        collection_config: CollectionConfig,
-        file_coll_cfg: FileCollectorConfig,
-        output_dir: Optional[Path] = None,
-        overwrite: Optional[bool] = False,
-        link_items: bool = True,
-        item_postprocessor: Optional[Callable] = None,
-    ) -> "GeoTiffPipeline":
-        """Creates a GeoTiffPipeline from configurations.
-
-        We want the two configuration objects to remain separate, because one is the
-        general collection configuration which is typically read from a JSON file
-        and the other defines what paths to read from and write too.
-        Especially the options about output path can change a lot so these are
-        specified via CLI options.
-
-        For example they can be different for testing versus for final output,
-        and each user would typically work in their own home or user data folders
-        for test output.
-
-        Also we do not want to mix these (volatile) path settings with the
-        stable/fixed settings in the general config file.
-
-        # TODO: this setup can be done in commandapi.py, analogous to the command vpp_build_collection.
-        """
-        if output_dir and not isinstance(output_dir, Path):
-            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
-
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
-        if file_coll_cfg is None:
-            raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
-
-        collection_config = collection_config
-        metadata_collector = GeoTiffMetadataCollector.from_config(
-            collection_config=collection_config,
-            file_coll_cfg=file_coll_cfg,
-        )
-        asset_metadata_pipeline = AssetMetadataPipeline.from_config(
-            metadata_collector=metadata_collector,
-            collection_config=collection_config,
-            output_dir=output_dir,
-            overwrite=overwrite,
-            link_items=link_items,
-            item_postprocessor=item_postprocessor,
-        )
-        return GeoTiffPipeline(
-            metadata_collector=metadata_collector,
-            asset_metadata_pipeline=asset_metadata_pipeline,
-        )
-
-    def reset(self) -> None:
-        self._collection = None
-        self._collection_groups = {}
-        self._metadata_collector.reset()
-        self._asset_metadata_pipeline.reset()
-
-    def get_input_files(self) -> Iterable[Path]:
-        """Collect the input files for processing."""
-        return self._metadata_collector.get_input_files()
-
-    def get_asset_metadata(self) -> Iterable[AssetMetadata]:
-        """Generate the intermediate asset metadata objects, from the input files."""
-        self._metadata_collector.collect()
-        return self._metadata_collector.metadata_list
-
-    @property
-    def uses_collection_groups(self):
-        return self._asset_metadata_pipeline.uses_collection_groups is not None
-
-    def collect_stac_items(self):
-        """Generate the intermediate STAC Item objects."""
-        return self._asset_metadata_pipeline.collect_stac_items()
-
-    def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the intermediate metadata."""
-        return self._asset_metadata_pipeline.get_metadata_as_geodataframe()
-
-    def get_metadata_as_dataframe(self) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        return self._asset_metadata_pipeline.get_metadata_as_dataframe()
-
-    def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the STAC Items."""
-        return self._asset_metadata_pipeline.get_stac_items_as_geodataframe()
-
-    def get_stac_items_as_dataframe(self) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
-        return self._asset_metadata_pipeline.get_stac_items_as_dataframe()
-
-    def build_collection(self):
-        """Build the entire STAC collection."""
-        self.reset()
-        self._asset_metadata_pipeline.build_collection()
-
-    def get_collection_file_for_group(self, group: str | int):
-        return self._asset_metadata_pipeline.get_collection_file_for_group(group)
-
-    def build_grouped_collections(self):
-        self.reset()
-        self._asset_metadata_pipeline.build_grouped_collections()

@@ -19,7 +19,7 @@ from upath import UPath
 from pathlib import Path
 from typing import Optional, List
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, GeoTiffPipeline, AssetMetadataPipeline, AssetMetadata
+from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
@@ -27,7 +27,6 @@ from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 def build_collection(
     collection_id: Optional[str] = None,
     output_dir: Optional[Path] = None,
-
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
 
@@ -45,7 +44,6 @@ def build_collection(
         output_dir = output_dir / collection_id
 
     class CustomCollector(IMetadataCollector):
-
         def has_collected(self) -> bool:
             return collector.has_collected()
 
@@ -57,11 +55,12 @@ def build_collection(
             metadata_list = collector.metadata_list
 
             def update_metadata(metadata: AssetMetadata) -> AssetMetadata:
-                metadata.geometry_lat_lon = shapely.box(-180,-90,180,90)
-                metadata.bbox_lat_lon = BoundingBox.from_list([-180,-90,180,90], 4326)
+                metadata.geometry_lat_lon = shapely.box(-180, -90, 180, 90)
+                metadata.bbox_lat_lon = BoundingBox.from_list([-180, -90, 180, 90], 4326)
 
                 return metadata
-            return [update_metadata(m) for m in metadata_list ]
+
+            return [update_metadata(m) for m in metadata_list]
 
         def collect(self) -> None:
             collector.collect()
@@ -75,11 +74,10 @@ def build_collection(
     )
 
     def process_item(item):
-        parts = item.id.split("_")
-
         return item
 
     pipeline.item_postprocessor = process_item
     pipeline.build_collection()
 
-build_collection("agera5_monthly","./STAC_wip")
+
+build_collection("agera5_monthly", "./STAC_wip")

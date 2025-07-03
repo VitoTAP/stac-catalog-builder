@@ -2,7 +2,7 @@ import datetime as dt
 from math import log10
 from itertools import islice
 from pathlib import Path
-from typing import Iterable, List, Optional, Protocol, Tuple, Union
+from typing import Iterable, List, Optional, Protocol, Union
 from openeo.util import normalize_crs
 import rasterio
 from upath.implementations.cloud import S3Path
@@ -13,7 +13,7 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
 from stacbuilder.pathparsers import InputPathParser, InputPathParserFactory
-from stacbuilder.projections import reproject_bounding_box, project_polygon
+from stacbuilder.projections import project_polygon
 
 
 class IDataCollector(Protocol):
@@ -186,7 +186,9 @@ class MapGeoTiffToAssetMetadata:
         asset_meta.asset_path = asset_path
         asset_meta.asset_id = Path(asset_path).stem
         asset_meta.item_id = Path(asset_path).stem
-        asset_meta.datetime = dt.datetime.now(dt.timezone.utc)  # TODO VVVV Why do we take the current time?  get time from the asset name?
+        asset_meta.datetime = dt.datetime.now(
+            dt.timezone.utc
+        )  # TODO VVVV Why do we take the current time?  get time from the asset name?
 
         if self._href_modifier:
             asset_meta.href = self._href_modifier(asset_path)
@@ -217,16 +219,16 @@ class MapGeoTiffToAssetMetadata:
             # after decimals, which is defined to be between 0.1-1.0% of the resolution.
             # default is set to 6 decimals (approx single point float-precision)
             if isinstance(dataset.res[0], (float, int)):
-                precision = abs(int(log10(abs(dataset.res[0]*0.001))))
+                precision = abs(int(log10(abs(dataset.res[0] * 0.001))))
             else:
-                precision = 6   # default
+                precision = 6  # default
 
             # Get the projected bounding box of the dataset
             _bounds = [round(_bo, precision) for _bo in list(dataset.bounds)]  # round off data
             asset_meta.bbox_projected = BoundingBox.from_list(_bounds, epsg=proj_epsg)
 
             # Get the transform of the dataset
-            _transform = [round(_bo, precision) for _bo in list(dataset.transform)[:6]]    # round off data
+            _transform = [round(_bo, precision) for _bo in list(dataset.transform)[:6]]  # round off data
             asset_meta.transform = list(_transform)[0:6]
 
             # Project the geometry to EPSG:4326 (latlon) and get the bounding box
@@ -369,6 +371,7 @@ class GeoTiffMetadataCollector(IMetadataCollector):
         self._metadata_list = []
 
         import asyncio
+
         loop = asyncio.get_event_loop()
 
         async def fetch_metadata(file):
@@ -376,7 +379,5 @@ class GeoTiffMetadataCollector(IMetadataCollector):
 
         task_list = []
         for file in self.get_input_files():
-            task_list.append( fetch_metadata(file))
-        self._metadata_list = loop.run_until_complete(asyncio.gather( *task_list))
-
-
+            task_list.append(fetch_metadata(file))
+        self._metadata_list = loop.run_until_complete(asyncio.gather(*task_list))

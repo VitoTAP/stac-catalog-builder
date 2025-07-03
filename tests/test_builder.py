@@ -27,9 +27,9 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
-    GeoTiffPipeline,
     PostProcessSTACCollectionFile,
 )
+from stacbuilder.collector import GeoTiffMetadataCollector
 from stacbuilder.config import (
     AlternateHrefConfig,
     CollectionConfig,
@@ -163,14 +163,30 @@ def asset_metadata_pipeline(
 
 
 class TestGeoTiffPipeline:
-    def test_get_input_files(self, geotiff_pipeline: GeoTiffPipeline, geotiff_paths: List[Path]):
-        input_files = list(geotiff_pipeline.get_input_files())
+    @pytest.fixture(scope="class")
+    def geotiff_asset_metadata_pipeline(
+        self, collection_config_from_file, file_collector_config, collection_output_dir
+    ) -> AssetMetadataPipeline:
+        return AssetMetadataPipeline.from_config(
+            metadata_collector=GeoTiffMetadataCollector.from_config(
+                collection_config=collection_config_from_file,
+                file_coll_cfg=file_collector_config,
+            ),
+            collection_config=collection_config_from_file,
+            output_dir=collection_output_dir,
+            overwrite=False,
+        )
+
+    def test_get_input_files(self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline, geotiff_paths: List[Path]):
+        input_files = list(geotiff_asset_metadata_pipeline.get_input_files())
 
         assert sorted(input_files) == sorted(geotiff_paths)
 
     @pytest.mark.skip(reason="test files incorrect")
-    def test_get_asset_metadata(self, geotiff_pipeline: GeoTiffPipeline, basic_asset_metadata_list: List[Path]):
-        metadata_list = list(geotiff_pipeline.get_asset_metadata())
+    def test_get_metadata(
+        self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline, basic_asset_metadata_list: List[Path]
+    ):
+        metadata_list = list(geotiff_asset_metadata_pipeline.get_metadata())
 
         sorted_actual_metadata_list = sorted(metadata_list)
         sorted_expected_metadata_list = sorted(basic_asset_metadata_list)
@@ -184,34 +200,33 @@ class TestGeoTiffPipeline:
         assert expected_dicts == actual_dicts
         assert sorted_actual_metadata_list == sorted_expected_metadata_list
 
-    def test_build_collection(self, geotiff_pipeline: GeoTiffPipeline):
-        pipeline = geotiff_pipeline
-        assert pipeline.collection is None
+    def test_build_collection(self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline):
+        assert geotiff_asset_metadata_pipeline.collection is None
 
-        pipeline.build_collection()
+        geotiff_asset_metadata_pipeline.build_collection()
 
-        assert pipeline.collection is not None
-        assert pipeline.collection_file is not None
-        assert pipeline.collection_file.exists()
-        Collection.validate_all(pipeline.collection)
+        assert geotiff_asset_metadata_pipeline.collection is not None
+        assert geotiff_asset_metadata_pipeline.collection_file is not None
+        assert geotiff_asset_metadata_pipeline.collection_file.exists()
+        Collection.validate_all(geotiff_asset_metadata_pipeline.collection)
 
-        collection = Collection.from_file(pipeline.collection_file)
+        collection = Collection.from_file(geotiff_asset_metadata_pipeline.collection_file)
         collection.validate_all()
 
-    def test_build_grouped_collection(self, geotiff_pipeline_grouped: GeoTiffPipeline):
-        pipeline = geotiff_pipeline_grouped
-        assert pipeline.collection is None
+    def test_build_grouped_collection(self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline):
+        geotiff_asset_metadata_pipeline.reset()
+        assert geotiff_asset_metadata_pipeline.collection is None
 
-        pipeline.build_grouped_collections()
+        geotiff_asset_metadata_pipeline.build_grouped_collections()
 
-        assert pipeline.collection_groups is not None
-        assert pipeline.collection is None
+        assert geotiff_asset_metadata_pipeline.collection_groups is not None
+        assert geotiff_asset_metadata_pipeline.collection is None
 
         # Verify that each collection is written to its own separate file. (i.e. all paths are unique)
-        collection_files = set(coll.self_href for coll in pipeline.collection_groups.values())
-        assert len(collection_files) == len(pipeline.collection_groups)
+        collection_files = set(coll.self_href for coll in geotiff_asset_metadata_pipeline.collection_groups.values())
+        assert len(collection_files) == len(geotiff_asset_metadata_pipeline.collection_groups)
 
-        for coll in pipeline.collection_groups.values():
+        for coll in geotiff_asset_metadata_pipeline.collection_groups.values():
             # Each collection file must effectively exist.
             coll_path = Path(coll.self_href)
             coll_path.exists()
