@@ -54,6 +54,7 @@ dev = [
     "hatch>=1.14.1",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
+    "pytest-xdist",
     "requests-mock>=1.11.0",
 ]
 

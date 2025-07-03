@@ -1,11 +1,13 @@
 import pytest
 from pytest import approx
-
 from shapely.geometry import box
 
-from stacbuilder.projections import reproject_bounding_box, get_transform, project_polygon
 from stacbuilder.boundingbox import bbox_dict_to_list
-
+from stacbuilder.projections import (
+    get_transform,
+    project_polygon,
+    reproject_bounding_box,
+)
 
 BBOX_TABLE = [
     (
@@ -147,7 +149,7 @@ def test_reproject_bounding_box_raises_valueerror_when_to_crs_is_empty(
 ):
     """Verifies that argument checking works for to_crs."""
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError):
         # The coordinates to transform don't really matter for this test, only
         # the coordinate systems.
         reproject_bounding_box(
@@ -180,7 +182,7 @@ def test_reproject_bounding_box_raises_typeerror_when_bbox_components_wrong_type
     from_crs_epsg, west, south, east, north
 ):
     """Verifies that argument checking works for the coordinate components."""
-    with pytest.raises(TypeError) as exc:
+    with pytest.raises(TypeError):
         reproject_bounding_box(
             west=west,
             south=south,
@@ -214,7 +216,7 @@ def test_reproject_bounding_box_raises_valueerror_when_upper_and_lower_bound_swa
     The other corners are really different points and that gives different
     results when you transform them.
     """
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError):
         reproject_bounding_box(
             west=west,
             south=south,
@@ -229,11 +231,11 @@ class TestGetTransform:
     @pytest.mark.parametrize("to_crs_epsg", [3812, 4326])
     def test_get_transform_raises_valueerror_when_from_crs_is_empty(self, to_crs_epsg):
         """Verifies that argument checking works for from_crs."""
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ValueError):
             get_transform(from_crs=None, to_crs=to_crs_epsg)
 
     @pytest.mark.parametrize("from_crs_epsg", [3812, 4326])
     def test_get_transform_raises_valueerror_when_to_crs_is_empty(self, from_crs_epsg):
         """Verifies that argument checking works for to_crs."""
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ValueError):
             get_transform(from_crs=from_crs_epsg, to_crs=None)

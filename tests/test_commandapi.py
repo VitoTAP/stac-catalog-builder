@@ -1,12 +1,9 @@
-"""Tests for the stacbuilder.builder module
-"""
+"""Tests for the stacbuilder.builder module"""
 
 import json
 from pathlib import Path
 
 import pytest
-
-from stacbuilder.config import CollectionConfig
 
 from stacbuilder.commandapi import (
     build_collection,
@@ -18,6 +15,7 @@ from stacbuilder.commandapi import (
     postprocess_collection,
     validate_collection,
 )
+from stacbuilder.config import CollectionConfig
 
 
 class TestCommandAPI:

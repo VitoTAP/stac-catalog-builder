@@ -1,12 +1,19 @@
-from time import sleep
-import pystac
-from pathlib import Path
+import logging
 import pprint
 from getpass import getpass
-import logging
+from pathlib import Path
+from time import sleep
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import *
+from stacbuilder import (
+    build_collection,
+    list_asset_metadata,
+    list_input_files,
+    list_stac_items,
+    upload_to_stac_api,
+    validate_collection,
+)
+from stacbuilder.stacapi import AuthSettings, Settings
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
@@ -30,19 +37,17 @@ overwrite = True
 input_files = list_input_files(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
-    max_files=10  # Remove this in final workflow!
+    max_files=10,  # Remove this in final workflow!
 )
 print(f"Found {len(input_files)} input files. 5 first files:")
-for i in input_files[:5]: print(i) 
+for i in input_files[:5]:
+    print(i)
 
 # list meta data
 asset_metadata = list_asset_metadata(
-    collection_config_path=collection_config_path,
-    glob=tiffs_glob,
-    input_dir=tiff_input_path,
-    max_files=1
+    collection_config_path=collection_config_path, glob=tiffs_glob, input_dir=tiff_input_path, max_files=1
 )
-for k in asset_metadata: 
+for k in asset_metadata:
     pprint.pprint(k.to_dict())
 
 # def item_postprocessor(item: pystac.Item) -> pystac.Item:
@@ -60,7 +65,8 @@ stac_items, failed_files = list_stac_items(
     # item_postprocessor=item_postprocessor
 )
 print(f"Found {len(stac_items)} STAC items")
-if failed_files: print(f"Failed files: {failed_files}")
+if failed_files:
+    print(f"Failed files: {failed_files}")
 
 # print("First stac item:")
 # pprint.pprint(stac_items[0].to_dict())
@@ -88,21 +94,16 @@ auth_settings = AuthSettings(
     enabled=True,
     interactive=False,
     token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
-    authorization_url= "https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
+    authorization_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
     client_id="terracatalogueclient",
-    username = "vincent.verelst",
-    password = stac_api_pw,
+    username="vincent.verelst",
+    password=stac_api_pw,
 )
 settings = Settings(
     auth=auth_settings,
     stac_api_url="https://stac.openeo.vito.be/",
-    collection_auth_info={
-            "_auth": {
-                "read": ["anonymous"],
-                "write": ["stac-openeo-admin", "stac-openeo-editor"]
-            }
-        },
-    bulk_size=1000,  
+    collection_auth_info={"_auth": {"read": ["anonymous"], "write": ["stac-openeo-admin", "stac-openeo-editor"]}},
+    bulk_size=1000,
 )
 upload_to_stac_api(
     collection_path=test_output_path / "collection.json",

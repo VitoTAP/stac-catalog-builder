@@ -1,14 +1,18 @@
 import datetime as dt
 from pathlib import Path
 from typing import List
+
 import numpy as np
-from rasterio.io import DatasetWriter
-import rasterio
-
 import pytest
-from stacbuilder.collector import IMetadataCollector
+import rasterio
+from rasterio.io import DatasetWriter
 
-from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
+from stacbuilder.collector import IMetadataCollector
+from stacbuilder.config import (
+    CollectionConfig,
+    FileCollectorConfig,
+    InputPathParserConfig,
+)
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.pathparsers import RegexInputPathParser
 

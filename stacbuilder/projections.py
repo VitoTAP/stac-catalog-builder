@@ -2,21 +2,21 @@
 For converting bounding boxes to a different Coordinate Reference System.
 """
 
-from functools import lru_cache
 import logging
+from functools import lru_cache
 from typing import Any, Callable, List, Tuple
-from shapely.geometry import polygon, box
-from shapely import get_coordinates
 
 import pyproj
 import pyproj.exceptions
-
+from shapely import get_coordinates
+from shapely.geometry import box, polygon
 
 logger = logging.getLogger(__name__)
 
 
 XYCoordinate = Tuple[float, float]
 XYTransform = Callable[[float, float, bool], XYCoordinate]
+
 
 def reproject_bounding_box_old(
     west: float, south: float, east: float, north: float, from_crs: Any, to_crs: Any
@@ -80,8 +80,9 @@ def reproject_bounding_box_old(
 
     return [new_west, new_south, new_east, new_north]
 
+
 def reproject_bounding_box(
-        west: float, south: float, east: float, north: float, from_crs: Any, to_crs: Any
+    west: float, south: float, east: float, north: float, from_crs: Any, to_crs: Any
 ) -> List[float]:
     """Reproject a bounding box expressed as 4 coordinates, respectively
     the lower-left and upper-right corner or the bbox.
@@ -116,10 +117,9 @@ def reproject_bounding_box(
     if south >= north:
         raise ValueError(f"The value of 'south' should be smaller than 'north'. {south=}, {north=}")
 
-    transform = get_transform(from_crs=from_crs, to_crs=to_crs)
-
     bbox = box(west, south, east, north)
     return project_polygon(geometry=bbox, from_crs=from_crs, to_crs=to_crs).bounds
+
 
 def project_polygon(geometry: Any, from_crs: Any, to_crs: Any) -> Any:
     transform = get_transform(from_crs=from_crs, to_crs=to_crs)
@@ -127,6 +127,7 @@ def project_polygon(geometry: Any, from_crs: Any, to_crs: Any) -> Any:
     for point in get_coordinates(geometry):
         point_list.append(transform(*point))
     return polygon.Polygon(point_list)
+
 
 def get_transform(from_crs: Any, to_crs: Any) -> XYTransform:
     """Get a transform to reproject from "from_crs" to "to_crs".
@@ -136,6 +137,7 @@ def get_transform(from_crs: Any, to_crs: Any) -> XYTransform:
     """
     transformer = _get_transformer(from_crs=from_crs, to_crs=to_crs)
     return transformer.transform
+
 
 @lru_cache(maxsize=6)
 def _get_transformer(from_crs: Any, to_crs: Any) -> Any:

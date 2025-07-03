@@ -1,13 +1,13 @@
 import datetime as dt
-from math import log10
 from itertools import islice
+from math import log10
 from pathlib import Path
 from typing import Iterable, List, Optional, Protocol, Union
-from openeo.util import normalize_crs
-import rasterio
-from upath.implementations.cloud import S3Path
 
+import rasterio
+from openeo.util import normalize_crs
 from stactools.core.io import ReadHrefModifier
+from upath.implementations.cloud import S3Path
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.config import CollectionConfig, FileCollectorConfig

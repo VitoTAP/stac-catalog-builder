@@ -3,13 +3,14 @@
 # TODO: test coverage for AssetMetadata.from_geoseries
 
 import datetime as dt
-from dateutil.tz import tzoffset
 import re
-import pytest
-from shapely.geometry import Polygon, box
 
-from stacbuilder.metadata import AssetMetadata
+import pytest
+from dateutil.tz import tzoffset
+from shapely.geometry import box
+
 from stacbuilder.boundingbox import BoundingBox
+from stacbuilder.metadata import AssetMetadata
 
 
 class TestAssetMetadata:
@@ -185,13 +186,7 @@ class TestAssetMetadata:
             "type": "Polygon",
             "coordinates": (
                 # a single outer ring
-                (
-                    ((5.0, 51.0), 
-                     (5.0, 52.0),
-                     (4.0, 52.0),
-                     (4.0, 51.0),
-                     (5.0, 51.0))
-                ),
+                (((5.0, 51.0), (5.0, 52.0), (4.0, 52.0), (4.0, 51.0), (5.0, 51.0))),
             ),
         }
         assert meta.geometry_lat_lon_as_dict == expected

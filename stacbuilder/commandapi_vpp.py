@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
+import terracatalogueclient as tcc
 from pystac import Item
 
 from stacbuilder import AssetMetadata, AssetMetadataPipeline, CollectionConfig
-from stacbuilder.terracatalog import HRLVPPMetadataCollector, CollectionConfigBuilder
-import terracatalogueclient as tcc
+from stacbuilder.terracatalog import CollectionConfigBuilder, HRLVPPMetadataCollector
+
 
 def vpp_list_metadata(
     collection_id: Optional[str] = None,

@@ -6,42 +6,51 @@ This contains the classes that generate the STAC catalogs, collections and items
 # Standard libraries
 import datetime as dt
 import gc
-from http.client import RemoteDisconnected
 import inspect
 import json
 import logging
 import shutil
 import tempfile
 from functools import partial
+from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union
-
 
 # Third party libraries
 import geopandas as gpd
 import pandas as pd
-from pystac import Asset, CatalogType, Collection, Extent, Item, SpatialExtent, TemporalExtent
+from pystac import (
+    Asset,
+    CatalogType,
+    Collection,
+    Extent,
+    Item,
+    SpatialExtent,
+    TemporalExtent,
+)
 from pystac.errors import STACValidationError
-from pystac.layout import TemplateLayoutStrategy
+from pystac.extensions.eo import Band as EOBand
+from pystac.extensions.eo import EOExtension
+from pystac.extensions.file import FileExtension
 
 # TODO: add the GridExtension support again
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
-from pystac.extensions.file import FileExtension
-from pystac.extensions.eo import EOExtension, Band as EOBand
-from pystac.extensions.raster import RasterExtension, RasterBand
+from pystac.extensions.raster import RasterBand, RasterExtension
+from pystac.layout import TemplateLayoutStrategy
 
-# TODO: add datacube extension: https://github.com/VitoTAP/stac-catalog-builder/issues/19
-
-# Modules from this project
-from stacbuilder.exceptions import InvalidOperation, InvalidConfiguration
+from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import (
-    AssetConfig,
     AlternateHrefConfig,
+    AssetConfig,
     CollectionConfig,
 )
+
+# Modules from this project
+from stacbuilder.exceptions import InvalidConfiguration, InvalidOperation
 from stacbuilder.metadata import AssetMetadata, GeodataframeExporter
-from stacbuilder.collector import IMetadataCollector
+
+# TODO: add datacube extension: https://github.com/VitoTAP/stac-catalog-builder/issues/19
 
 
 CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
@@ -58,7 +67,7 @@ class AlternateHrefGenerator:
     AssetMetadataToURL = Callable[[AssetMetadata], str]
 
     def __init__(self):
-        self._callbacks: Dict[str, self.AssetMetadataToURL] = {}
+        self._callbacks: Dict[str, AlternateHrefGenerator.AssetMetadataToURL] = {}
 
     def register_callback(self, key, converter=AssetMetadataToURL):
         self._callbacks[key] = converter
@@ -157,7 +166,7 @@ class MapMetadataToSTACItem:
         super().__init__()
 
         # Settings: these are just data, not components we delegate work to.
-        self._item_assets_configs: item_assets_configs = item_assets_configs
+        self._item_assets_configs: Dict[str, AssetConfig] = item_assets_configs
         self._alternate_href_generator: Optional[AlternateHrefGenerator] = alternate_href_generator
 
     @property
@@ -229,17 +238,17 @@ class MapMetadataToSTACItem:
         assert len(set(a.proj_epsg for a in assets)) == 1, "All assets should have the same CRS"
         # To be on the safe side also check the that the corresponding projection transform
         # is the same for all assets.
-        assert (
-            len(set(to_tuple_or_none(a.transform) for a in assets)) == 1
-        ), "All assets should have the same projection transform"
+        assert len(set(to_tuple_or_none(a.transform) for a in assets)) == 1, (
+            "All assets should have the same projection transform"
+        )
 
         # All assets should have the same bounding box
-        assert (
-            len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1
-        ), "All assets should have the same lat-lon bounding box"
-        assert (
-            len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1
-        ), "All assets should have the same projected bounding box"
+        assert len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1, (
+            "All assets should have the same lat-lon bounding box"
+        )
+        assert len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1, (
+            "All assets should have the same projected bounding box"
+        )
 
         # All assets should also have the same shape (width and height in pixels)
         assert len(set(to_tuple_or_none(a.shape) for a in assets)) == 1, "All assets should have the same shape"

@@ -1,11 +1,15 @@
-"""
+""" """
 
-"""
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
+from stacbuilder import (
+    AssetMetadata,
+    AssetMetadataPipeline,
+    CollectionConfig,
+    FileCollectorConfig,
+)
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
 

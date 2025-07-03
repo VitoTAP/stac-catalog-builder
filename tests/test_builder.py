@@ -13,15 +13,14 @@ TODO: need coverage for PostProcessSTACCollectionFile
 Best to add unit tests in a bottom-up way.
 
 """
-import json
-from pathlib import Path
-import pprint
-from typing import List
 
+import json
+import pprint
+from pathlib import Path
+from typing import List
 
 import pytest
 from pystac.collection import Collection
-
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
@@ -36,7 +35,7 @@ from stacbuilder.config import (
     InputPathParserConfig,
 )
 from stacbuilder.exceptions import InvalidConfiguration
-from stacbuilder.metadata import AssetMetadata, RasterMetadata, BandMetadata
+from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
 from tests.conftest import MockMetadataCollector, MockPathParser
 
 

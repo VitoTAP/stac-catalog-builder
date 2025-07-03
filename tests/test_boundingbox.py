@@ -1,15 +1,13 @@
 import re
 
 import pytest
-
-from shapely.geometry import Polygon, box
-
+from shapely.geometry import box
 
 from stacbuilder.boundingbox import (
+    BoundingBox,
     bbox_dict_to_list,
     bbox_list_to_dict,
     to_bbox_dict,
-    BoundingBox,
 )
 
 
@@ -174,11 +172,11 @@ class TestBoundingBox:
             "type": "Polygon",
             "coordinates": (
                 (
-                    (30.0, 20.0), # south-east / LR / max_x, min_y
-                    (30.0, 40.0), # north-east / UR / max_x, max_y
-                    (10.0, 40.0), # north-west / UL / min_x, max_y
-                    (10.0, 20.0), # south-west / LL / min_x, min_y
-                    (30.0, 20.0) # close the ring: last point = first point
+                    (30.0, 20.0),  # south-east / LR / max_x, min_y
+                    (30.0, 40.0),  # north-east / UR / max_x, max_y
+                    (10.0, 40.0),  # north-west / UL / min_x, max_y
+                    (10.0, 20.0),  # south-west / LL / min_x, min_y
+                    (30.0, 20.0),  # close the ring: last point = first point
                 ),
             ),
         }

@@ -12,26 +12,25 @@ Rationale:
     to creating fake raster files, or fake API responses from a mock of the real API.
 """
 
-from dataclasses import dataclass
 import datetime as dt
 import json
+from dataclasses import dataclass
 from pathlib import Path
+
 # from types import NoneType
 from typing import Any, Dict, List, Optional, Tuple, Union
-
 
 import dateutil.parser
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pystac import Collection, Item
-from shapely.geometry import Polygon, shape, MultiPolygon, mapping
 from pystac.media_type import MediaType
+from shapely.geometry import MultiPolygon, Polygon, mapping, shape
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.exceptions import InvalidOperation
 from stacbuilder.pathparsers import InputPathParser
-
 
 BoundingBoxList = List[Union[float, int]]
 NoneType = type(None)
@@ -345,7 +344,7 @@ class AssetMetadata:
         if not self.geometry_lat_lon:
             return None
         return mapping(self.geometry_lat_lon)
-    
+
     @property
     def geometry_proj(self) -> Optional[Polygon]:
         return self._bbox_projected.as_polygon()
@@ -356,7 +355,7 @@ class AssetMetadata:
         if not self._bbox_projected:
             return None
         return mapping(self.geometry_proj)
-    
+
     @property
     def proj_geometry_as_wkt(self) -> Optional[str]:
         # TODO: [decide] convert this RO property to a method or not?
@@ -728,7 +727,7 @@ class GeodataframeExporter:
         gdf.to_csv(csv_path, sep="|")
 
         # TODO: Shapefile has too many problems with unsupported column types. Going to remove it (but in a separate branch/PR).
-        print(f"Saving shapefile to: {shapefile_path }")
+        print(f"Saving shapefile to: {shapefile_path}")
         gdf.to_file(shapefile_path)
 
         print(f"Saving geoparquet to: {parquet_path}")

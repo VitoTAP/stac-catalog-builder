@@ -2,16 +2,22 @@ import datetime as dt
 import json
 from pathlib import Path
 
-import pytest
 import pystac
+import pytest
 import shapely
-from pystac import Asset, Collection, Item, ItemCollection, Extent, SpatialExtent, TemporalExtent
+from pystac import (
+    Asset,
+    Collection,
+    Extent,
+    Item,
+    ItemCollection,
+    SpatialExtent,
+    TemporalExtent,
+)
 from yarl import URL
 
-
-from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 from stacbuilder.boundingbox import BoundingBox
-
+from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 
 API_BASE_URL = URL("http://test.stacapi.local")
 

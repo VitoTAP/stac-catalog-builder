@@ -7,24 +7,21 @@ functionality underneath without dealing directly with the CLI.
 
 The functions you find in this module should remain very simple.
 """
+
 import datetime as dt
 import json
 import logging
 import pprint
 from pathlib import Path
 
-
 import click
 import dateutil.parser
 import pydantic
 import pydantic.errors
 
-
-from stacbuilder import commandapi
-from stacbuilder import verify_openeo
+from stacbuilder import commandapi, verify_openeo
 from stacbuilder.config import CollectionConfig
 from stacbuilder.stacapi.config import get_stac_api_settings
-
 
 _logger = logging.getLogger(__name__)
 

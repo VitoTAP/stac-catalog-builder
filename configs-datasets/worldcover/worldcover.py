@@ -17,11 +17,17 @@ fsspec
 
 import configparser
 import os
-from upath import UPath
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
+from upath import UPath
+
+from stacbuilder import (
+    AssetMetadata,
+    AssetMetadataPipeline,
+    CollectionConfig,
+    FileCollectorConfig,
+)
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 
 
