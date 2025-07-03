@@ -6,7 +6,6 @@ from typing import Iterable, List, Optional, Protocol, Union
 
 import rasterio
 from openeo.util import normalize_crs
-from stactools.core.io import ReadHrefModifier
 from upath.implementations.cloud import S3Path
 
 from stacbuilder.boundingbox import BoundingBox
@@ -154,6 +153,24 @@ class IMetadataCollector(IDataCollector):
         return self._metadata_list
 
 
+class CreateAssetUrlFromPath:
+    """Implements stactools.core.io.ReadHrefModifier"""
+
+    def __init__(self, href_template: str, data_root: Path) -> None:
+        self.url_template = href_template
+        self.data_root = Path(data_root)
+
+    def __call__(self, asset_path: Path) -> str:
+        """This method must match the signature of ReadHrefModifier.
+        ReadHrefModifier is a type alias for Callable[[str], str]
+        """
+        return self.get_url(asset_path)
+
+    def get_url(self, asset_path: Path):
+        rel_path: Path = asset_path.relative_to(self.data_root)
+        return self.url_template.format(str(rel_path))
+
+
 class MapGeoTiffToAssetMetadata:
     """Extracts AssetMetadata from each GeoTIFF file.
 
@@ -163,7 +180,7 @@ class MapGeoTiffToAssetMetadata:
     def __init__(
         self,
         path_parser: InputPathParser,
-        href_modifier: Optional[ReadHrefModifier] = None,
+        href_modifier: Optional[CreateAssetUrlFromPath] = None,
     ) -> None:
         # Store dependencies: components that have to be provided to constructor
         self._path_parser = path_parser
@@ -257,24 +274,6 @@ class MapGeoTiffToAssetMetadata:
         asset_meta.file_size = file_stat.st_size
 
         return asset_meta
-
-
-class CreateAssetUrlFromPath:
-    """Implements stactools.core.io.ReadHrefModifier"""
-
-    def __init__(self, href_template: str, data_root: Path) -> None:
-        self.url_template = href_template
-        self.data_root = Path(data_root)
-
-    def __call__(self, asset_path: Path) -> str:
-        """This method must match the signature of ReadHrefModifier.
-        ReadHrefModifier is a type alias for Callable[[str], str]
-        """
-        return self.get_url(asset_path)
-
-    def get_url(self, asset_path: Path):
-        rel_path: Path = asset_path.relative_to(self.data_root)
-        return self.url_template.format(str(rel_path))
 
 
 class GeoTiffMetadataCollector(IMetadataCollector):
