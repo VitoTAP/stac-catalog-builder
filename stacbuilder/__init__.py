@@ -2,7 +2,6 @@ from stacbuilder._version import __version__
 from stacbuilder.commandapi import (
     build_collection,
     build_grouped_collections,
-    extract_item_bboxes,
     list_asset_metadata,
     list_input_files,
     list_stac_items,
@@ -17,7 +16,6 @@ __all__ = [
     "__version__",
     "build_collection",
     "build_grouped_collections",
-    "extract_item_bboxes",
     "list_input_files",
     "list_asset_metadata",
     "list_stac_items",

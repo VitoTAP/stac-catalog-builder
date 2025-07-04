@@ -42,7 +42,6 @@ class TestCommandAPI:
             input_dir=input_dir,
             output_dir=output_dir,
             overwrite=True,
-            save_dataframe=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
@@ -58,7 +57,6 @@ class TestCommandAPI:
             input_dir=input_dir,
             output_dir=output_dir,
             overwrite=True,
-            save_dataframe=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.

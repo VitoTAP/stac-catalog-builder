@@ -24,7 +24,7 @@ from stacbuilder.builder import (
 )
 from stacbuilder.collector import FileCollector, GeoTiffMetadataCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
-from stacbuilder.metadata import AssetMetadata, GeodataframeExporter
+from stacbuilder.metadata import AssetMetadata
 from stacbuilder.stacapi import Settings, Uploader
 
 log_level = logging.INFO
@@ -41,7 +41,6 @@ logging.getLogger("boto3").setLevel(logging.WARNING)
 __all__ = [
     "build_collection",
     "build_grouped_collections",
-    "extract_item_bboxes",
     "list_input_files",
     "list_asset_metadata",
     "list_stac_items",
@@ -60,7 +59,6 @@ def build_collection(
     output_dir: Path,
     overwrite: bool,
     max_files: Optional[int] = -1,
-    save_dataframe: Optional[bool] = False,
     link_items: bool = True,
     item_postprocessor: Optional[Callable] = None,
 ) -> None:
@@ -73,7 +71,6 @@ def build_collection(
     :param output_dir: Directory where the STAC collection will be saved.
     :param overwrite: Overwrite the output directory if it exists.
     :param max_files: Maximum number of files to process.
-    :param save_dataframe: Save the geodataframe of the STAC items.
     """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -98,9 +95,6 @@ def build_collection(
 
     pipeline.build_collection()
 
-    if save_dataframe:
-        GeodataframeExporter.export_item_bboxes(pipeline.collection)
-
 
 @deprecated(reason="use build_collection instead")
 def build_grouped_collections(
@@ -110,7 +104,6 @@ def build_grouped_collections(
     output_dir: Path,
     overwrite: bool,
     max_files: Optional[int] = -1,
-    save_dataframe: Optional[bool] = False,
 ) -> None:
     """
     Build a multiple STAC collections from a directory of files,
@@ -124,7 +117,6 @@ def build_grouped_collections(
     :param output_dir: Directory where the STAC collection will be saved.
     :param overwrite: Overwrite the output directory if it exists.
     :param max_files: Maximum number of files to process.
-    :param save_dataframe: Save the geodataframe of the STAC items.
     """
 
     collection_config_path = Path(collection_config_path).expanduser().absolute()
@@ -147,16 +139,6 @@ def build_grouped_collections(
     )
 
     pipeline.build_grouped_collections()
-
-    if save_dataframe:
-        for collection in pipeline.collection_groups.values():
-            GeodataframeExporter.export_item_bboxes(collection)
-
-
-def extract_item_bboxes(collection_file: Path):
-    """Extract the bounding boxes of the STAC items in the collection."""
-    collection = Collection.from_file(collection_file)
-    GeodataframeExporter.export_item_bboxes(collection)
 
 
 def list_input_files(
@@ -190,7 +172,6 @@ def list_asset_metadata(
     glob: str,
     input_dir: Path,
     max_files: Optional[int] = -1,
-    save_dataframe: bool = False,
 ) -> List[AssetMetadata]:
     """
     Return the AssetMetadata objects generated for each file.
@@ -201,7 +182,6 @@ def list_asset_metadata(
     :param glob: Glob pattern to match the files within the input_dir.
     :param input_dir: Root directory where the files are located.
     :param max_files: Maximum number of files to process.
-    :param save_dataframe: Save the geodataframe of the metadata.
     :return: List of AssetMetadata objects for each file.
     """
 
@@ -216,12 +196,6 @@ def list_asset_metadata(
         ),
     )
 
-    if save_dataframe:
-        df = pipeline.get_metadata_as_geodataframe()
-        # TODO: Want a better directory to save geodata, maybe use save_dataframe as path instead of flag.
-        out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-assetmetadata"
-        GeodataframeExporter.save_geodataframe(df, out_dir, "metadata_table")
-
     return pipeline.get_metadata()
 
 
@@ -230,7 +204,6 @@ def list_stac_items(
     glob: str,
     input_dir: Path,
     max_files: Optional[int] = -1,
-    save_dataframe: bool = False,
     item_postprocessor: Optional[Callable] = None,
 ) -> Tuple[List[Collection], List[Path]]:
     """
@@ -242,7 +215,6 @@ def list_stac_items(
     :param glob: Glob pattern to match the files within the input_dir.
     :param input_dir: Root directory where the files are located.
     :param max_files: Maximum number of files to process.
-    :param save_dataframe: Save the geodataframe of the STAC items.
     :return: Tuple containing a List of STAC items and a list of files for which no item could be generated.
     """
 
@@ -260,12 +232,6 @@ def list_stac_items(
         overwrite=False,
         item_postprocessor=item_postprocessor,
     )
-
-    if save_dataframe:
-        df = pipeline.get_stac_items_as_geodataframe()
-        # TODO: Want better directory to save geodata, maybe use save_dataframe as path instead of flag.
-        out_dir = Path("tmp") / coll_cfg.collection_id / "visualization_list-stac-items"
-        GeodataframeExporter.save_geodataframe(df, out_dir, "stac_items")
 
     stac_items = list(pipeline.collect_stac_items())
     files = list(pipeline.get_input_files())

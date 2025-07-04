@@ -13,7 +13,6 @@ Rationale:
 """
 
 import datetime as dt
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,12 +23,10 @@ import dateutil.parser
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from pystac import Collection, Item
 from pystac.media_type import MediaType
-from shapely.geometry import MultiPolygon, Polygon, mapping, shape
+from shapely.geometry import MultiPolygon, Polygon, mapping
 
 from stacbuilder.boundingbox import BoundingBox
-from stacbuilder.exceptions import InvalidOperation
 from stacbuilder.pathparsers import InputPathParser
 
 BoundingBoxList = List[Union[float, int]]
@@ -625,125 +622,3 @@ class AssetMetadata:
                 differences[key] = (self_dict[key], other_dict[key])
 
         return differences
-
-
-class GeodataframeExporter:
-    """Utility class to export metadata and STAC items as geopandas GeoDataframes.
-
-    TODO: This is currently a class with only static methods, perhaps a module would be beter.
-    """
-
-    @classmethod
-    def stac_items_to_geodataframe(cls, stac_item_list: List[Item]) -> gpd.GeoDataFrame:
-        if not stac_item_list:
-            raise InvalidOperation("stac_item_list is empty or None. Can not create a GeoDataFrame")
-
-        if not isinstance(stac_item_list, list):
-            stac_item_list = list(stac_item_list)
-
-        epsg = stac_item_list[0].properties.get("proj:epsg", 4326)
-        records = cls.convert_dict_records_to_strings(i.to_dict() for i in stac_item_list)
-        # TODO: limit the number of fields to what we need to see. Something like the code below.
-        #
-        # Not working yet, coming back to this but it is not a priority.
-        #
-        # it: Item
-        # records = cls.convert_records_to_strings(
-        #     (it.id, it.collection_id, it.bbox, it.datetime) for it in stac_item_list
-        # )
-        shapes = [shape(item.geometry) for item in stac_item_list]
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
-
-    @staticmethod
-    def stac_items_to_dataframe(stac_item_list: List[Item]) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
-        return pd.DataFrame.from_records(md.to_dict() for md in stac_item_list)
-
-    @classmethod
-    def metadata_to_geodataframe(cls, metadata_list: List[AssetMetadata]) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the intermediate metadata."""
-        if not metadata_list:
-            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
-
-        epsg = metadata_list[0].proj_epsg
-        geoms = [m.proj_bbox_as_polygon for m in metadata_list]
-        records = cls.convert_dict_records_to_strings(m.to_dict() for m in metadata_list)
-
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
-
-    @staticmethod
-    def metadata_to_dataframe(metadata_list: List[AssetMetadata]) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        if not metadata_list:
-            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
-
-        return pd.DataFrame.from_records(md.to_dict() for md in metadata_list)
-
-    @staticmethod
-    def convert_dict_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        out_records = [dict(rec) for rec in records]
-        for rec in out_records:
-            for key, val in rec.items():
-                if isinstance(val, dt.datetime):
-                    rec[key] = val.isoformat()
-                elif isinstance(val, list):
-                    rec[key] = json.dumps(val)
-                elif isinstance(val, (int, float, bool, str)):
-                    rec[key] = val
-                else:
-                    rec[key] = str(val)
-        return out_records
-
-    @staticmethod
-    def convert_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        temp_records = list(records)
-        out_records = []
-
-        for record in temp_records:
-            convert_record = []
-            for column in record:
-                if isinstance(column, dt.datetime):
-                    convert_record.append(column.isoformat())
-                elif isinstance(column, list):
-                    convert_record.append(json.dumps(column))
-                elif isinstance(column, (int, float, bool, str)):
-                    convert_record.append(column)
-                else:
-                    convert_record.append(str(column))
-            out_records.append(convert_record)
-        return out_records
-
-    @staticmethod
-    def save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
-        shp_dir = out_dir / "shp"
-        if not shp_dir.exists():
-            shp_dir.mkdir(parents=True)
-
-        csv_path = out_dir / f"{table_name}.pipe.csv"
-        shapefile_path = out_dir / f"shp/{table_name}.shp"
-        parquet_path = out_dir / f"{table_name}.parquet"
-
-        print(f"Saving pipe-separated CSV file to: {csv_path}")
-        gdf.to_csv(csv_path, sep="|")
-
-        # TODO: Shapefile has too many problems with unsupported column types. Going to remove it (but in a separate branch/PR).
-        print(f"Saving shapefile to: {shapefile_path}")
-        gdf.to_file(shapefile_path)
-
-        print(f"Saving geoparquet to: {parquet_path}")
-        gdf.to_parquet(parquet_path)
-
-    @staticmethod
-    def visualization_dir(collection: Collection):
-        collection_path = Path(collection.self_href)
-        return collection_path.parent / "tmp" / "visualization" / collection.id
-
-    @classmethod
-    def export_item_bboxes(cls, collection: Collection):
-        out_dir: Path = cls.visualization_dir(collection)
-        if not out_dir.exists():
-            out_dir.mkdir(parents=True)
-
-        items = collection.get_all_items()
-        gdf: gpd.GeoDataFrame = cls.stac_items_to_geodataframe(items)
-        cls.save_geodataframe(gdf, out_dir, "stac_item_bboxes")

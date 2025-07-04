@@ -66,7 +66,6 @@ def cli(verbose):
 )
 @click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
-@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
@@ -75,7 +74,7 @@ def cli(verbose):
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, save_dataframe):
+def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of GeoTIFF files."""
     commandapi.build_collection(
         collection_config_path=collection_config,
@@ -84,7 +83,6 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, sa
         output_dir=outputdir,
         overwrite=overwrite,
         max_files=max_files,
-        save_dataframe=save_dataframe,
     )
 
 
@@ -104,7 +102,6 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, sa
 )
 @click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
-@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
@@ -113,7 +110,7 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files, sa
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build_grouped_collections(glob, collection_config, overwrite, max_files, save_dataframe, inputdir, outputdir):
+def build_grouped_collections(glob, collection_config, overwrite, max_files, inputdir, outputdir):
     """Build a STAC collection from a directory of GeoTIFF files."""
     commandapi.build_grouped_collections(
         collection_config_path=collection_config,
@@ -122,7 +119,6 @@ def build_grouped_collections(glob, collection_config, overwrite, max_files, sav
         output_dir=outputdir,
         overwrite=overwrite,
         max_files=max_files,
-        save_dataframe=save_dataframe,
     )
 
 
@@ -154,12 +150,11 @@ def list_tiffs(glob, inputdir, max_files):
     help="Configuration file for the collection",
 )
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
-@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
 )
-def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
+def list_metadata(collection_config, glob, inputdir, max_files):
     """List intermediary asset metadata, one for each GeoTIFF.
 
     You can optionally save the metadata as a shapefile and geoparquet so you
@@ -170,7 +165,6 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
         glob=glob,
         input_dir=inputdir,
         max_files=max_files,
-        save_dataframe=save_dataframe,
     )
     if not metadata_list:
         print("No asset metadata found")
@@ -193,12 +187,11 @@ def list_metadata(collection_config, glob, inputdir, max_files, save_dataframe):
     help="Configuration file for the collection",
 )
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
-@click.option("-s", "--save-dataframe", is_flag=True, help="Also save the data to shapefile and geoparquet.")
 @click.argument(
     "inputdir",
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
 )
-def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
+def list_items(collection_config, glob, inputdir, max_files):
     """List generated STAC items.
 
     You can optionally save the metadata as a shapefile and geoparquet so you
@@ -209,7 +202,6 @@ def list_items(collection_config, glob, inputdir, max_files, save_dataframe):
         glob=glob,
         input_dir=inputdir,
         max_files=max_files,
-        save_dataframe=save_dataframe,
     )
     if not stac_items:
         print("No STAC items were generated")
@@ -236,13 +228,6 @@ def show_collection(collection_file):
 def validate(collection_file):
     """Run STAC validation on the collection file."""
     commandapi.validate_collection(collection_file)
-
-
-@cli.command
-@click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-def extract_item_bboxes(collection_file):
-    """Extract and save the bounding boxes of the STAC items in the collection, to both ShapeFile and GeoParquet format."""
-    commandapi.extract_item_bboxes(collection_file)
 
 
 @cli.command

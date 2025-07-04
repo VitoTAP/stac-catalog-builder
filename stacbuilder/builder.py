@@ -17,8 +17,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union
 
 # Third party libraries
-import geopandas as gpd
-import pandas as pd
 from pystac import (
     Asset,
     CatalogType,
@@ -48,7 +46,7 @@ from stacbuilder.config import (
 
 # Modules from this project
 from stacbuilder.exceptions import InvalidConfiguration, InvalidOperation
-from stacbuilder.metadata import AssetMetadata, GeodataframeExporter
+from stacbuilder.metadata import AssetMetadata
 
 # TODO: add datacube extension: https://github.com/VitoTAP/stac-catalog-builder/issues/19
 
@@ -1034,22 +1032,6 @@ class AssetMetadataPipeline:
             groups[latlon].append(metadata)
 
         return groups
-
-    def get_metadata_as_geodataframe(self) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the intermediate metadata."""
-        return GeodataframeExporter.metadata_to_geodataframe(list(self.get_metadata()))
-
-    def get_metadata_as_dataframe(self) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        return GeodataframeExporter.metadata_to_dataframe(list(self.get_metadata()))
-
-    def get_stac_items_as_geodataframe(self) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the STAC Items."""
-        return GeodataframeExporter.stac_items_to_geodataframe(list(self.collect_stac_items()))
-
-    def get_stac_items_as_dataframe(self) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
-        return GeodataframeExporter.stac_items_to_dataframe(list(self.collect_stac_items()))
 
     def build_collection(
         self,
