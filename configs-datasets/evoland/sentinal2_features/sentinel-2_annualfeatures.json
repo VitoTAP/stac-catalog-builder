@@ -1,0 +1,460 @@
+{
+    "collection_id": "LCFM_LSF-ANNUAL-S2_v100",
+    "title": "LCFM Annual Sentinel-2 feature composites",
+    "description": "Annual Sentinel-2 composites for the EVOLAND project",
+    "instruments": ["Sentinel-2"],
+    "keywords": [
+	"LCFM", "Sentinel-2", "Annual Composites", "Land Cover", "Forest Monitoring", "Copernicus"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Copernicous Land Monitoring Service (CLMS)",
+            "roles": [
+                "licensor",
+                "producer"
+            ],
+            "url": "https://land.copernicus.eu/"
+        },
+	{
+            "name": "VITO",
+            "roles": [
+                "processor"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/.*/.*/.*/.*/LCFM_LSF-ANNUAL_V100_(?P<item_id>(?P<year>\\d{4})_(?P<tile_id>(.*))_(.*))_(.*).tif$",
+            "period": "yearly",
+            "fixed_values": {
+		"asset_type": "Sentinel-2_AnnualFeatures"
+	    }
+	}
+    },
+    "item_assets": {
+        "Sentinel-2_AnnualFeatures": {
+            "title": "SENTINEL-2 Annual Features",
+            "description": "Annual features of Sentinel-2 computed by LCFM code.",
+            "eo_bands": [
+                {
+                    "name": "L2A-B02-P10",
+                    "description": "Sentinel-2 B02 P10"
+                },
+                {
+                    "name": "L2A-B02-P25",
+                    "description": "Sentinel-2 B02 P25"
+                },
+
+                {
+                    "name": "L2A-B02-P50",
+                    "description": "Sentinel-2 B02 P50"
+                },
+
+                {
+                    "name": "L2A-B02-P75",
+                    "description": "Sentinel-2 B02 P75"
+                },
+
+                {
+                    "name": "L2A-B02-P90",
+                    "description": "Sentinel-2 B02 P90"
+                },
+
+                {
+                    "name": "L2A-B03-P10",
+                    "description": "Sentinel-2 B03 P10"
+                },
+
+                {
+                    "name": "L2A-B03-P25",
+                    "description": "Sentinel-2 B03 P25"
+                },
+
+                {
+                    "name": "L2A-B03-P50",
+                    "description": "Sentinel-2 B03 P50"
+                },
+
+                {
+                    "name": "L2A-B03-P75",
+                    "description": "Sentinel-2 B03 P75"
+                },
+
+                {
+                    "name": "L2A-B03-P90",
+                    "description": "Sentinel-2 B03 P90"
+                },
+
+                {
+                    "name": "L2A-B04-P10",
+                    "description": "Sentinel-2 B04 P10"
+                },
+
+                {
+                    "name": "L2A-B04-P25",
+                    "description": "Sentinel-2 B04 P25"
+                },
+
+                {
+                    "name": "L2A-B04-P50",
+                    "description": "Sentinel-2 B04 P50"
+                },
+
+                {
+                    "name": "L2A-B04-P75",
+                    "description": "Sentinel-2 B04 P75"
+                },
+
+                {
+                    "name": "L2A-B04-P90",
+                    "description": "Sentinel-2 B04 P90"
+                },
+
+                {
+                    "name": "L2A-B08-P10",
+                    "description": "Sentinel-2 B08 P10"
+                },
+
+                {
+                    "name": "L2A-B08-P25",
+                    "description": "Sentinel-2 B08 P25"
+                },
+
+                {
+                    "name": "L2A-B08-P50",
+                    "description": "Sentinel-2 B08 P50"
+                },
+
+                {
+                    "name": "L2A-B08-P75",
+                    "description": "Sentinel-2 B08 P75"
+                },
+
+                {
+                    "name": "L2A-B08-P90",
+                    "description": "Sentinel-2 B08 P90"
+                },
+
+                {
+                    "name": "L2A-B11-P10",
+                    "description": "Sentinel-2 B11 P10"
+                },
+
+                {
+                    "name": "L2A-B11-P25",
+                    "description": "Sentinel-2 B11 P25"
+                },
+
+                {
+                    "name": "L2A-B11-P50",
+                    "description": "Sentinel-2 B11 P50"
+                },
+
+                {
+                    "name": "L2A-B11-P75",
+                    "description": "Sentinel-2 B11 P75"
+                },
+
+                {
+                    "name": "L2A-B11-P90",
+                    "description": "Sentinel-2 B11 P90"
+                },
+
+                {
+                    "name": "L2A-B12-P10",
+                    "description": "Sentinel-2 B12 P10"
+                },
+
+                {
+                    "name": "L2A-B12-P25",
+                    "description": "Sentinel-2 B12 P25"
+                },
+
+                {
+                    "name": "L2A-B12-P50",
+                    "description": "Sentinel-2 B12 P50"
+                },
+
+                {
+                    "name": "L2A-B12-P75",
+                    "description": "Sentinel-2 B12 P75"
+                },
+
+                {
+                    "name": "L2A-B12-P90",
+                    "description": "Sentinel-2 B12 P90"
+                },
+
+                {
+                    "name": "L2A-NDVI-P10",
+                    "description": "Sentinel-2 NDVI P10"
+                },
+
+                {
+                    "name": "L2A-NDVI-P25",
+                    "description": "Sentinel-2 NDVI P25"
+                },
+
+                {
+                    "name": "L2A-NDVI-P50",
+                    "description": "Sentinel-2 NDVI P50"
+                },
+
+                {
+                    "name": "L2A-NDVI-P75",
+                    "description": "Sentinel-2 NDVI P75"
+                },
+
+                {
+                    "name": "L2A-NDVI-P90",
+                    "description": "Sentinel-2 NDVI P90"
+                },
+		{
+		    "name": "LOI-QUALITY-MEAN",
+		    "description": "Mean quality of the LCFM LOI"
+		},
+		{
+		    "name": "LOI-QUALITY-MAX",
+		    "description": "Max quality of the LCFM LOI"
+		},
+		{
+		    "name": "L2A-OBS-NB",
+		    "description": "Number of observations for the Sentinel-2 L2A product"
+		}
+	    ],
+	    "raster_bands": [
+                {
+                    "name": "L2A-B02-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+                {
+                    "name": "L2A-B02-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B02-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B02-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B02-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B03-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B03-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B03-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B03-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B03-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B04-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B04-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B04-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B04-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B04-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B08-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B08-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B08-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B08-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B08-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B11-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B11-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B11-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B11-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B11-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B12-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B12-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B12-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B12-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-B12-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-NDVI-P10",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-NDVI-P25",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-NDVI-P50",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-NDVI-P75",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+
+                {
+                    "name": "L2A-NDVI-P90",
+                    "offset": 0,
+		    "scale": 0.0001
+                },
+		{
+		    "name": "LOI-QUALITY-MEAN",
+		    "offset": 0,
+		    "scale": 0.0001
+		},
+		{
+		    "name": "LOI-QUALITY-MAX",
+		    "offset": 0,
+		    "scale": 0.0001
+		},
+		{
+		    "name": "L2A-OBS-NB",
+		    "offset": 0,
+		    "scale": 1
+		}
+
+	    ]
+	}
+    },
+    "overrides": {
+    }
+}
