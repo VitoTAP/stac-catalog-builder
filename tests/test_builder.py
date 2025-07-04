@@ -28,7 +28,7 @@ from stacbuilder.builder import (
     AssetMetadataPipeline,
     PostProcessSTACCollectionFile,
 )
-from stacbuilder.collector import MetadataFromFileCollector
+from stacbuilder.collector import MetadataCollector
 from stacbuilder.config import (
     AlternateHrefConfig,
     CollectionConfig,
@@ -167,7 +167,7 @@ class TestGeoTiffPipeline:
         self, collection_config_from_file, file_collector_config, collection_output_dir
     ) -> AssetMetadataPipeline:
         return AssetMetadataPipeline.from_config(
-            metadata_collector=MetadataFromFileCollector.from_config(
+            metadata_collector=MetadataCollector.from_config(
                 collection_config=collection_config_from_file,
                 file_coll_cfg=file_collector_config,
             ),

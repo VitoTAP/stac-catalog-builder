@@ -22,7 +22,7 @@ from stacbuilder.builder import (
     AssetMetadataPipeline,
     PostProcessSTACCollectionFile,
 )
-from stacbuilder.collector import FileCollector, MetadataFromFileCollector
+from stacbuilder.collector import FileCollector, MetadataCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.stacapi import Settings, Uploader
@@ -79,7 +79,7 @@ def build_collection(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    metadata_collector = MetadataFromFileCollector.from_config(
+    metadata_collector = MetadataCollector.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
     )
@@ -126,7 +126,7 @@ def build_grouped_collections(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    metadata_collector = MetadataFromFileCollector.from_config(
+    metadata_collector = MetadataCollector.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
     )
@@ -190,7 +190,7 @@ def list_asset_metadata(
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
     pipeline = AssetMetadataPipeline.from_config(
         collection_config=coll_cfg,
-        metadata_collector=MetadataFromFileCollector.from_config(
+        metadata_collector=MetadataCollector.from_config(
             collection_config=coll_cfg,
             file_coll_cfg=file_coll_cfg,
         ),
@@ -221,7 +221,7 @@ def list_stac_items(
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-    metadata_collector = MetadataFromFileCollector.from_config(
+    metadata_collector = MetadataCollector.from_config(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
     )

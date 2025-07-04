@@ -56,6 +56,11 @@ class InputPathParserFactory:
 
     @classmethod
     def from_config(cls, config: InputPathParserConfig):
+        """Create an InputPathParser from a InputPathParserConfig.
+        Returns None if no input_path_parser is configured."""
+        if not config:
+            return None
+
         if config.classname not in cls._implementations:
             raise UnknownInputPathParserClass(config.classname)
 

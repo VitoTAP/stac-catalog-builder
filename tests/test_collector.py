@@ -1,6 +1,6 @@
 import pytest
 
-from stacbuilder.collector import MetadataFromFileCollector
+from stacbuilder.collector import MetadataCollector
 
 
 class TestGeoTiffMetadataCollector:
@@ -9,13 +9,13 @@ class TestGeoTiffMetadataCollector:
         self,
         collection_config_from_file,
         file_collector_config,
-    ) -> MetadataFromFileCollector:
-        return MetadataFromFileCollector.from_config(
+    ) -> MetadataCollector:
+        return MetadataCollector.from_config(
             collection_config=collection_config_from_file, file_coll_cfg=file_collector_config
         )
 
     def test_from_config(self, collection_config_from_file, file_collector_config):
-        amd_collector = MetadataFromFileCollector.from_config(
+        amd_collector = MetadataCollector.from_config(
             collection_config=collection_config_from_file, file_coll_cfg=file_collector_config
         )
 

@@ -24,7 +24,7 @@ from stacbuilder import (
     CollectionConfig,
     FileCollectorConfig,
 )
-from stacbuilder.collector import IMetadataCollector, MetadataFromFileCollector
+from stacbuilder.collector import IMetadataCollector, MetadataCollector
 
 
 def build_collection(
@@ -40,7 +40,7 @@ def build_collection(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    collector = MetadataFromFileCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    collector = MetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
