@@ -28,7 +28,7 @@ from stacbuilder import (
     CollectionConfig,
     FileCollectorConfig,
 )
-from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
+from stacbuilder.collector import IMetadataCollector, MetadataFromFileCollector
 
 
 def set_var_conf(var_name: str, conf_file: str):
@@ -68,7 +68,7 @@ def build_collection(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    collector = GeoTiffMetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    collector = MetadataFromFileCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()

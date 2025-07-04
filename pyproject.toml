@@ -40,6 +40,7 @@ dependencies = [
   "shapely==2.0.*",
   "yarl==1.9.*",
   "universal_pathlib",
+  "ipykernel>=6.29.5",
 ]
 
 [dependency-groups]

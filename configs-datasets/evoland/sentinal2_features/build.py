@@ -14,7 +14,7 @@ from stacbuilder import (
     validate_collection,
 )
 from stacbuilder.builder import AssetMetadataPipeline
-from stacbuilder.collector import GeoTiffMetadataCollector
+from stacbuilder.collector import MetadataFromFileCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.stacapi import (
     AuthSettings,
@@ -48,7 +48,7 @@ def build_collection(filepattern):
         output_path = Path(output_path).expanduser().absolute()
 
     # Define collector
-    collector = GeoTiffMetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    collector = MetadataFromFileCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
     # create pipeline
     pipeline: AssetMetadataPipeline = AssetMetadataPipeline.from_config(

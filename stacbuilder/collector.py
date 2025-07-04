@@ -2,7 +2,7 @@ import datetime as dt
 from itertools import islice
 from math import log10
 from pathlib import Path
-from typing import Iterable, List, Optional, Protocol, Union
+from typing import Iterable, List, Literal, Optional, Protocol, Union
 
 import rasterio
 from openeo.util import normalize_crs
@@ -13,6 +13,8 @@ from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
 from stacbuilder.pathparsers import InputPathParser, InputPathParserFactory
 from stacbuilder.projections import project_polygon
+
+FileType = Literal["GeoTiff"]
 
 
 class IDataCollector(Protocol):
@@ -45,45 +47,20 @@ class FileCollector(IDataCollector):
     See :meth: FileCollector.has_collected
     """
 
-    def __init__(
-        self, input_dir: Optional[Path] = None, glob: Optional[str] = "*", max_files: Optional[int] = -1
-    ) -> None:
-        #
-        # Settings: these are just data, not components we delegate work to.
-        #
-        # These are public members, or should have a public property.
-        self.input_dir: Path = input_dir
-        self.glob: str = glob
-        self.max_files: int = max_files
-        self._set_missing_fields_to_defaults()
-
-        # The result
-        self._input_files: List[Path] = None
-
-    def _set_missing_fields_to_defaults(self):
-        if not self.input_dir:
-            self.input_dir = None
-
-        if not self.glob:
-            self.glob = "*"
-
-        if not self.max_files:
-            self.max_files = -1
+    def __init__(self, input_dir: Optional[Path] = None, glob: str = "*", max_files: int = -1) -> None:
+        self.input_dir: Optional[Path] = input_dir
+        self.glob: str = glob or "*"
+        self.max_files: int = max_files if max_files is not None else -1
+        self._input_files: Optional[List[Path]] = None
 
     @staticmethod
     def from_config(config: FileCollectorConfig) -> "FileCollector":
-        """Use the configuration object to create a new FileCollector instance."""
-        collector = FileCollector()
-        collector.setup(config)
-        return collector
-
-    def setup(self, config: FileCollectorConfig):
-        """Read the settings for this instance from the configuration object."""
-        self.input_dir = config.input_dir
-        self.glob = config.glob
-        self.max_files = config.max_files
-        self._set_missing_fields_to_defaults()
-        self.reset()
+        """Create a FileCollector from a FileCollectorConfig."""
+        return FileCollector(
+            input_dir=config.input_dir,
+            glob=config.glob or "*",
+            max_files=config.max_files if config.max_files is not None else -1,
+        )
 
     def collect(self):
         input_files = (f for f in self.input_dir.glob(self.glob) if f.is_file())
@@ -184,7 +161,6 @@ class MapGeoTiffToAssetMetadata:
     ) -> None:
         # Store dependencies: components that have to be provided to constructor
         self._path_parser = path_parser
-        # TODO: remove MakeRelativeToCollection as default. This is a hack to test it quickly.
         self._href_modifier = href_modifier or None
 
     def to_metadata(
@@ -276,83 +252,66 @@ class MapGeoTiffToAssetMetadata:
         return asset_meta
 
 
-class GeoTiffMetadataCollector(IMetadataCollector):
+class MetadataFromFileCollector(IMetadataCollector):
     def __init__(
         self,
-        collection_config: CollectionConfig,
         file_collector: FileCollector,
+        metadata_mapper: MapGeoTiffToAssetMetadata,
     ):
         super().__init__()
-
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
         if file_collector is None:
             raise ValueError('Argument "file_collector" can not be None, must be a FileCollector instance.')
 
-        # Components / dependencies that must be provided
-        self._file_collector = file_collector
-
-        # Settings: these are just data, not components we delegate work to.
-        self._collection_config = collection_config
-
-        # Components / dependencies that we set up internally
-        self._geotiff_to_metadata_mapper: MapGeoTiffToAssetMetadata = None
-        self._path_parser: InputPathParser = None
-
-        self._setup_internals()
-
-    def _setup_internals(self):
-        href_modifier = None
-        collection_conf = self._collection_config
-
-        cfg_href_modifier = collection_conf.asset_href_modifier
-        if cfg_href_modifier:
-            href_modifier = CreateAssetUrlFromPath(
-                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
+        if metadata_mapper is None:
+            raise ValueError(
+                'Argument "metadata_mapper" can not be None, must be a MapGeoTiffToAssetMetadata instance.'
             )
 
-        path_parser = None
-        if collection_conf.input_path_parser:
-            path_parser = InputPathParserFactory.from_config(collection_conf.input_path_parser)
-
-        self._geotiff_to_metadata_mapper = MapGeoTiffToAssetMetadata(
-            path_parser=path_parser, href_modifier=href_modifier
-        )
+        self._file_collector = file_collector
+        self._metadata_mapper = metadata_mapper
 
     @staticmethod
     def from_config(
         collection_config: CollectionConfig,
         file_coll_cfg: FileCollectorConfig,
-    ) -> "GeoTiffMetadataCollector":
+        file_type: FileType = "GeoTiff",
+    ) -> "MetadataFromFileCollector":
         if collection_config is None:
             raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
 
         if file_coll_cfg is None:
             raise ValueError('Argument "file_coll_cfg" can not be None, must be a FileCollectorConfig instance.')
 
+        if not isinstance(file_type, str):
+            raise TypeError(f'Argument "file_type" must be a str, not {type(file_type)}.')
+
         file_collector = FileCollector.from_config(file_coll_cfg)
 
-        return GeoTiffMetadataCollector(
-            collection_config=collection_config,
-            file_collector=file_collector,
-        )
+        href_modifier = None
+        cfg_href_modifier = collection_config.asset_href_modifier
+        if cfg_href_modifier:
+            href_modifier = CreateAssetUrlFromPath(
+                data_root=cfg_href_modifier.data_root, href_template=cfg_href_modifier.url_template
+            )
 
-    @property
-    def collection_config(self) -> CollectionConfig:
-        return self._collection_config
+        path_parser = None
+        if collection_config.input_path_parser:
+            path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
+        match file_type.lower():
+            case "geotiff" | "geotif" | "tiff" | "tif":
+                metadata_mapper = MapGeoTiffToAssetMetadata(path_parser=path_parser, href_modifier=href_modifier)
+            case _:
+                raise ValueError(f'Unsupported file type: {file_type}. Supported types: ["GeoTiff"]')
+
+        return MetadataFromFileCollector(file_collector=file_collector, metadata_mapper=metadata_mapper)
 
     @property
     def file_collector(self) -> FileCollector:
         return self._file_collector
 
     @property
-    def path_parser(self) -> InputPathParser:
-        return self._path_parser
-
-    @property
-    def geotiff_to_metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
-        return self._geotiff_to_metadata_mapper
+    def metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
+        return self._metadata_mapper
 
     def reset(self) -> None:
         super().reset()
@@ -360,23 +319,17 @@ class GeoTiffMetadataCollector(IMetadataCollector):
 
     def get_input_files(self) -> Iterable[Path]:
         """Collect the input files for processing."""
-        if not self._file_collector.has_collected():
-            self._file_collector.collect()
+        if not self.file_collector.has_collected():
+            self.file_collector.collect()
 
-        for file in self._file_collector.input_files:
+        for file in self.file_collector.input_files:
             yield file
 
     def collect(self) -> None:
         self._metadata_list = []
 
-        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
 
-        loop = asyncio.get_event_loop()
-
-        async def fetch_metadata(file):
-            return await loop.run_in_executor(None, self._geotiff_to_metadata_mapper.to_metadata, file)
-
-        task_list = []
-        for file in self.get_input_files():
-            task_list.append(fetch_metadata(file))
-        self._metadata_list = loop.run_until_complete(asyncio.gather(*task_list))
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self.metadata_mapper.to_metadata, file) for file in self.get_input_files()]
+            self._metadata_list = [future.result() for future in futures]
