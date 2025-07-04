@@ -6,15 +6,13 @@ Normally these are paths to GeoTIFF files, but this could include other file for
 import abc
 import calendar
 import datetime as dt
-from enum import Enum
 import logging
 import re
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
-
 from stacbuilder.config import InputPathParserConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +56,11 @@ class InputPathParserFactory:
 
     @classmethod
     def from_config(cls, config: InputPathParserConfig):
+        """Create an InputPathParser from a InputPathParserConfig.
+        Returns None if no input_path_parser is configured."""
+        if not config:
+            return None
+
         if config.classname not in cls._implementations:
             raise UnknownInputPathParserClass(config.classname)
 
@@ -96,16 +99,14 @@ class NoopInputPathParser(InputPathParser):
         return {}
 
 
+# Type alias for the callables we need, what signature the function/method must have.
 TypeConverter = Callable[[str], Any]
-"""Type alias for the callables we need, what signature the function/method must have."""
 
+# Type alias for the converting functions.
+# These convert strings extracted from the path into a more useful time.
+# For example a year, month or day can be converted to an integer, or an entire
+# date could be converted to datetime.
 TypeConverterMapping = Dict[str, TypeConverter]
-"""Type alias for the converting functions.
-
-These convert strings extracted from the path into a more useful time.
-For example a year, month or day can be converted to an integer, or an entire
-date could be converted to datetime.
-"""
 
 
 class RegexInputPathParser(InputPathParser):

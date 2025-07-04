@@ -1,8 +1,16 @@
-from pathlib import Path
 import pprint
+from pathlib import Path
+from shutil import rmtree
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import *
+from stacbuilder import (
+    build_collection,
+    list_asset_metadata,
+    list_input_files,
+    list_stac_items,
+    load_collection,
+    validate_collection,
+)
 
 containing_folder = Path(__file__).parent
 
@@ -12,7 +20,7 @@ collection_config_path = containing_folder / "config-collection.json"
 
 # Input Paths
 tiff_input_path = Path("/dataCOPY/MTDA/MODIS/GLASS_FAPAR/tiff_collection_months_sd")
-tiffs_glob = '*.tif'
+tiffs_glob = "*.tif"
 
 # Output Paths
 output_path = containing_folder / "results"
@@ -22,48 +30,34 @@ publish_output_path = Path("/dataCOPY/MTDA/MODIS/GLASS_FAPAR/tiff_collection_mon
 overwrite = True
 
 
-
 # list input files
-input_files = list_input_files(
-    glob=tiffs_glob,
-    input_dir=tiff_input_path,
-    max_files=None
-)
+input_files = list_input_files(glob=tiffs_glob, input_dir=tiff_input_path, max_files=None)
 print(f"Found {len(input_files)} input files. 5 first files:")
-for i in input_files[:5]: print(i)
-
-
+for i in input_files[:5]:
+    print(i)
 
 
 # list meta data
 asset_metadata = list_asset_metadata(
-    collection_config_path=collection_config_path,
-    glob=tiffs_glob,
-    input_dir=tiff_input_path,
-    max_files=5
+    collection_config_path=collection_config_path, glob=tiffs_glob, input_dir=tiff_input_path, max_files=5
 )
 for k in asset_metadata:
     pprint.pprint(k.to_dict())
 
 
-
 # list items
 stac_items, failed_files = list_stac_items(
-    collection_config_path=collection_config_path,
-    glob=tiffs_glob,
-    input_dir=tiff_input_path,
-    max_files=0
+    collection_config_path=collection_config_path, glob=tiffs_glob, input_dir=tiff_input_path, max_files=0
 )
 print(f"Found {len(stac_items)} STAC items")
-if failed_files: print(f"Failed files: {failed_files}")
-
+if failed_files:
+    print(f"Failed files: {failed_files}")
 
 
 print("First stac item:")
 stac_items[0]
 
 
-from shutil import rmtree
 rmtree(test_output_path)
 
 
@@ -86,12 +80,8 @@ build_collection(
 )
 
 
-
 # show collection
-load_collection(
-    collection_file=publish_output_path / "collection.json"
-)
-
+load_collection(collection_file=publish_output_path / "collection.json")
 
 
 # validate collection

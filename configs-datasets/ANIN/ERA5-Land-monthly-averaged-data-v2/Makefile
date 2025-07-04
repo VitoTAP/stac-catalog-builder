@@ -237,7 +237,6 @@ build-collection:
 		-c $(COLLECTION_CONFIG) \
 		--overwrite \
 		--max-files $(MAX_TIFF_FILES) \
-		--save-dataframe \
 		$(TIFF_INPUT_DIR) \
 		$(TEST_OUTPUT_DIR)
 
@@ -294,11 +293,6 @@ show-collection:
 ## Load and display the contents of the STAC collection file.
 	$(PYTHON) stacbuilder show-collection "$(TEST_OUTPUT_DIR)/collection.json"
 
-
-.PHONY: extract-item-bboxes
-extract-item-bboxes:
-## Load and display the contents of the STAC collection file.
-	$(PYTHON) stacbuilder extract-item-bboxes "$(TEST_OUTPUT_DIR)/collection.json"
 
 
 .PHONY: validate

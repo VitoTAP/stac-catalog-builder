@@ -7,16 +7,12 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-
 import openeo
-from openeo.rest.datacube import DataCube
-from openeo.util import rfc3339
-from openeo.rest.job import BatchJob, JobFailedException, JobResults
-
-
 import pystac
+from openeo.rest.datacube import DataCube
+from openeo.rest.job import BatchJob, JobFailedException, JobResults
+from openeo.util import rfc3339
 from pystac import Collection, Item
-
 
 DEFAULT_BACKEND = "openeo-dev.vito.be"
 

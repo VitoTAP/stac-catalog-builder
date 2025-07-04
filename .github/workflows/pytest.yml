@@ -1,4 +1,4 @@
-name: Run Pre-commit and Pytest
+name: Pytest
 
 on:
   push:

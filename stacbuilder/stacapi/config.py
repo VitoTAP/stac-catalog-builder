@@ -1,8 +1,7 @@
-from pydantic import BaseModel
-
 from typing import Any, Optional
 
 from dynaconf import Dynaconf
+from pydantic import BaseModel
 
 
 class AuthSettings(BaseModel):

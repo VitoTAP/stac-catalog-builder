@@ -1,21 +1,19 @@
-import logging
+import concurrent.futures
 import inspect
 import itertools
+import logging
 from pathlib import Path
 from time import sleep
 from typing import Iterable
-import concurrent.futures
 
 import pystac
 from pystac import Collection, Item
 from requests.auth import AuthBase
 from yarl import URL
 
-
 from stacbuilder.stacapi.auth import get_auth
 from stacbuilder.stacapi.config import Settings
 from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
-
 
 _logger = logging.getLogger(__name__)
 

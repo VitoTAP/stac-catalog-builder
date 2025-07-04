@@ -1,12 +1,9 @@
-"""Tests for the stacbuilder.builder module
-"""
+"""Tests for the stacbuilder.builder module"""
 
 import json
 from pathlib import Path
 
 import pytest
-
-from stacbuilder.config import CollectionConfig
 
 from stacbuilder.commandapi import (
     build_collection,
@@ -18,6 +15,7 @@ from stacbuilder.commandapi import (
     postprocess_collection,
     validate_collection,
 )
+from stacbuilder.config import CollectionConfig
 
 
 class TestCommandAPI:
@@ -44,7 +42,6 @@ class TestCommandAPI:
             input_dir=input_dir,
             output_dir=output_dir,
             overwrite=True,
-            save_dataframe=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
@@ -60,7 +57,6 @@ class TestCommandAPI:
             input_dir=input_dir,
             output_dir=output_dir,
             overwrite=True,
-            save_dataframe=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.

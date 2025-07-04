@@ -1,17 +1,18 @@
 # %%
-from upath import UPath
-from pathlib import Path
 import pprint
 from getpass import getpass
+from pathlib import Path
+
+from upath import UPath
 
 # run pip install -e . in the root directory to install this package
 from stacbuilder import (
     build_collection,
-    validate_collection,
-    upload_to_stac_api,
-    list_input_files,
     list_asset_metadata,
+    list_input_files,
     list_stac_items,
+    upload_to_stac_api,
+    validate_collection,
 )
 from stacbuilder.stacapi.config import AuthSettings, Settings
 

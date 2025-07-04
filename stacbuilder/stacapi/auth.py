@@ -1,15 +1,12 @@
 import logging
 
-
 import requests.auth
 from requests_auth import (
     OAuth2AuthorizationCodePKCE,
     OAuth2ResourceOwnerPasswordCredentials,
 )
 
-
 from stacbuilder.stacapi.config import AuthSettings
-
 
 logger = logging.getLogger(__name__)
 

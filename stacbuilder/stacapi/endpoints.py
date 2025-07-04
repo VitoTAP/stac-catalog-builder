@@ -1,17 +1,13 @@
 import logging
 from typing import Iterable
 
-from pystac import Collection, Item, ItemCollection
-
-from yarl import URL
-
 import requests
 import requests.status_codes
+from pystac import Collection, Item, ItemCollection
 from requests.auth import AuthBase
-
+from yarl import URL
 
 from stacbuilder.exceptions import InvalidOperation
-
 
 _logger = logging.getLogger(__name__)
 

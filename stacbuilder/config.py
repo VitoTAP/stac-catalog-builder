@@ -11,15 +11,11 @@ import enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
-
+from openeo.util import dict_no_none
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pystac import MediaType
-from pystac.provider import ProviderRole, Provider
 from pystac.extensions.item_assets import AssetDefinition
-
-
-from openeo.util import dict_no_none
-
+from pystac.provider import Provider, ProviderRole
 
 DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
     ProviderRole.PRODUCER,
