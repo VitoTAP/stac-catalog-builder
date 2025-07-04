@@ -15,7 +15,6 @@ from stacbuilder import (
 )
 from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
 import pystac
-from time import sleep
 import geopandas as gpd
 
 
@@ -107,4 +106,3 @@ upload_to_stac_api(
     collection_path=output_path / "collection.json",
     settings=settings,
 )
-

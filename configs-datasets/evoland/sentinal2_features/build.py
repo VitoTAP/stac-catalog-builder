@@ -1,6 +1,6 @@
 """Build a STAC collection for LCFM sentinel 2 features for a group of UTM regions from GeoTIFF files.
    Needs LCFM shapefile from https://github.com/VITO-RS-Vegetation/lcfm-shapefiles/ to match the tiles.
-   Adjust the path in line 61
+   Adjust the path in line 62
 """
 
 from pathlib import Path
