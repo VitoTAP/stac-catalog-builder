@@ -1,24 +1,28 @@
 """Build a STAC collection and upload for land cover maps from GeoTIFF files.
-   Needs LCFM shapefile from https://github.com/VITO-RS-Vegetation/lcfm-shapefiles/ to match the tiles.
-   Adjust the path in line 61
+Needs LCFM shapefile from https://github.com/VITO-RS-Vegetation/lcfm-shapefiles/ to match the tiles.
+Adjust the path in line 61
 """
 
 from pathlib import Path
+
+import geopandas as gpd
+import pystac
+
 from stacbuilder import (
-    CollectionConfig,
-    FileCollectorConfig,
-    AssetMetadataPipeline,
+    upload_to_stac_api,
     validate_collection,
+)
+from stacbuilder.builder import AssetMetadataPipeline
+from stacbuilder.collector import GeoTiffMetadataCollector
+from stacbuilder.config import CollectionConfig, FileCollectorConfig
+from stacbuilder.stacapi import (
     AuthSettings,
     Settings,
-    upload_to_stac_api,
 )
-from stacbuilder.collector import GeoTiffMetadataCollector
-import pystac
-import geopandas as gpd
 
-
-data_input_path = Path("/vitodata/vegteam_lcfm_openeo/projects/evoland/MAP/v008-m10-c84-r08/blocks/").expanduser().absolute()
+data_input_path = (
+    Path("/vitodata/vegteam_lcfm_openeo/projects/evoland/MAP/v008-m10-c84-r08/blocks/").expanduser().absolute()
+)
 configfile = "land_cover_map.json"
 overwrite = False
 filepattern = "*/*/*/*/*/*.tif"
@@ -28,8 +32,8 @@ matching_tiffs = list(data_input_path.glob(filepattern))
 noofassets = len(matching_tiffs)
 print(f"Found {noofassets} assets matching the pattern {filepattern} in {data_input_path}")
 if noofassets == 0:
-   print("There are no assets")
-   exit()
+    print("There are no assets")
+    exit()
 
 # Collection configuration
 collection_config_path = Path(configfile).expanduser().absolute()
@@ -61,16 +65,18 @@ pipeline: AssetMetadataPipeline = AssetMetadataPipeline.from_config(
 tilesfilename = "lcfm_shapefiles/data/LCFM_100p_S2-reduced-tiles.fgb"  # Adjust the path as needed
 tiles = gpd.read_file(tilesfilename)
 
+
 def add_properties(item):
-   # add grid extension
+    # add grid extension
     ext = pystac.extensions.grid.GridExtension.ext(item, add_if_missing=True)
     dff = tiles[tiles.tile == item.id.split("_")[1]]
     # item dff.west.values[0]
     coords = item.properties["proj:bbox"]
-    easting = int((coords[0] - dff.west.values[0])/10)
-    northing = int((coords[1] - dff.south.values[0])/10)
+    easting = int((coords[0] - dff.west.values[0]) / 10)
+    northing = int((coords[1] - dff.south.values[0]) / 10)
     ext.apply(code=f"MGRS-{item.id.split('_')[1]}{easting:04}{northing:04}")
     return item
+
 
 pipeline.item_postprocessor = add_properties
 pipeline.build_collection()
@@ -93,12 +99,7 @@ auth_settings = AuthSettings(
 settings = Settings(
     auth=auth_settings,
     stac_api_url="https://stac.openeo.vito.be/",
-    collection_auth_info={
-        "_auth": {
-            "read": ["anonymous"],
-            "write": ["stac-openeo-admin", "stac-openeo-editor"]
-        }
-    },
+    collection_auth_info={"_auth": {"read": ["anonymous"], "write": ["stac-openeo-admin", "stac-openeo-editor"]}},
     bulk_size=1000,  # Number of items to upload in a single request
 )
 

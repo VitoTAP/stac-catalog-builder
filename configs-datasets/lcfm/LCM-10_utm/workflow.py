@@ -1,15 +1,18 @@
-from time import sleep
-import pystac
-from upath import UPath
-from pathlib import Path
 import pprint
-from getpass import getpass
+from pathlib import Path
 
+import pystac
 from shapely.geometry import LineString, MultiPolygon, Polygon
 from shapely.ops import split
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import *
+from stacbuilder import (
+    build_collection,
+    list_asset_metadata,
+    list_input_files,
+    list_stac_items,
+    validate_collection,
+)
 
 # Collection configuration
 catalog_version = "v0.1"
@@ -131,7 +134,7 @@ def item_postprocessor(item: pystac.Item) -> pystac.Item:
     if tile.startswith("01") or tile.startswith("60"):
         polygon = Polygon(item.geometry["coordinates"][0])
         polygon = fix_antimeridian_split(polygon)
-        if type(polygon) == MultiPolygon:
+        if polygon is MultiPolygon:
             item.geometry["coordinates"] = [
                 polygon.__geo_interface__["coordinates"][0][0],
                 polygon.__geo_interface__["coordinates"][1][0],
