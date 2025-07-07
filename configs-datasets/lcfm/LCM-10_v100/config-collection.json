@@ -1,0 +1,28 @@
+{
+    "collection_id": "lcfm-lcm-10",
+    "title": "LCFM LCM 10 v100",
+    "description": "LCFM Land Cover Map 10m v100",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/LCFM_LCM-10_V100_(?P<year>\\d{4})_(?P<tile_id>[A-Z]\\d{2}[A-Z]\\d{3})_MAP.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "MAP"
+            }
+        }
+    },
+    "item_assets": {
+        "MAP": {
+            "title": "MAP",
+            "description": "Per pixel land cover map at 10 m resolution"
+        }
+    },
+    "overrides": {}
+}
