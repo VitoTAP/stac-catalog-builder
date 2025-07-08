@@ -15,7 +15,7 @@ from stacbuilder.metadata import AssetMetadata
 
 class TestAssetMetadata:
     def test_constructor_sets_defaults(self):
-        meta = AssetMetadata(extract_href_info=None)
+        meta = AssetMetadata()
 
         assert meta.asset_id is None
         assert meta.item_id is None
@@ -41,8 +41,6 @@ class TestAssetMetadata:
 
         assert meta.proj_geometry_as_wkt is None
 
-        assert meta.version == "1.0.0"
-
         assert meta.datetime is None
         assert meta.start_datetime is None
         assert meta.end_datetime is None
@@ -52,6 +50,8 @@ class TestAssetMetadata:
         assert meta.day is None
 
         assert meta.file_size is None
+
+        assert meta.bands == []
 
         expected_dict = {
             "asset_id": None,
@@ -74,7 +74,7 @@ class TestAssetMetadata:
             "bbox_projected": None,
             "geometry_lat_lon": None,
             "transform": None,
-            "raster_metadata": None,
+            "bands": [],
             "file_size": None,
         }
 
@@ -181,7 +181,7 @@ class TestAssetMetadata:
 
     def test_geometry_dict(self):
         meta = AssetMetadata()
-        meta.geometry_lat_lon = BoundingBox(4.0, 51.0, 5.0, 52.0, 4326).as_polygon()
+        meta.bbox_projected = BoundingBox(4.0, 51.0, 5.0, 52.0, 4326)
         expected = {
             "type": "Polygon",
             "coordinates": (

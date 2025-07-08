@@ -15,27 +15,22 @@ Rationale:
 import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
-
-# from types import NoneType
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import dateutil.parser
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pystac.media_type import MediaType
-from shapely.geometry import MultiPolygon, Polygon, mapping
+from shapely.geometry import Polygon, mapping
 
 from stacbuilder.boundingbox import BoundingBox
-from stacbuilder.pathparsers import InputPathParser
-
-BoundingBoxList = List[Union[float, int]]
-NoneType = type(None)
+from stacbuilder.projections import project_polygon
 
 
 @dataclass
 class BandMetadata:
-    """This class is temporary, will be refactored.
+    """
     Right now the focus is just to get the data out of rasterio.
     We do want a data structure that has everything we need for these extensions:
     eo:bands and raster:bands.
@@ -58,19 +53,6 @@ class BandMetadata:
         if self.units:
             result["units"] = self.units
         return result
-
-
-# TODO: Eliminate RasterMetadata if possible and keep only the bands.
-@dataclass
-class RasterMetadata:
-    shape: Tuple[int, int]
-    bands: List[BandMetadata]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "shape": self.shape,
-            "bands": [b.to_dict() for b in self.bands],
-        }
 
 
 class AssetMetadata:
@@ -118,33 +100,49 @@ class AssetMetadata:
 
     def __init__(
         self,
-        extract_href_info: Optional[InputPathParser] = None,
+        href: Optional[str] = None,
+        original_href: Optional[str] = None,
+        asset_path: Optional[Path] = None,
+        asset_id: Optional[str] = None,
+        item_id: Optional[str] = None,
+        asset_type: Optional[str] = None,
+        datetime: Optional[dt.datetime] = None,
+        start_datetime: Optional[dt.datetime] = None,
+        end_datetime: Optional[dt.datetime] = None,
+        bbox_lat_lon: Optional[BoundingBox] = None,
+        bbox_projected: Optional[BoundingBox] = None,
+        proj_epsg: Optional[int] = None,
+        geometry_lat_lon: Optional[Polygon] = None,
+        transform: Optional[List[float]] = None,
+        shape: Optional[List[int]] = None,
+        file_size: Optional[int] = None,
+        bands: List[BandMetadata] = [],
+        title: Optional[str] = None,
+        collection_id: Optional[str] = None,
+        tile_id: Optional[str] = None,
+        item_href: Optional[str] = None,
+        media_type: Optional[MediaType] = None,
+        stac_version: str = "1.0.0",
     ):
         # original and modified path/href
-        self._href: Optional[str] = None
-        self._original_href: Optional[str] = None
+        self._href: Optional[str] = href
+        self._original_href: Optional[str] = original_href
 
         # Very often the input will be a (Posix) path to an asset file, for now only GeoTIFFs.
         # When we start to support using URLs to convert those assets to STAC items, then
         # `self._asset_path` could be None, or it could be set to the local path that the
         # openEO server needs to access.
-        self._asset_path: Optional[Path] = None
-
-        # components to convert data
-        self._extract_href_info = extract_href_info
-
-        # The raw dictionary of data extracted from the href
-        self._info_from_href: Dict[str, Any] = None
+        self._asset_path: Optional[Path] = asset_path
 
         #
         # Essential asset info: what asset is it and what STAC item does it belong to
         # What bands does it contain or correspond to.
         #
 
-        self._asset_id: Optional[str] = None
+        self._asset_id: Optional[str] = asset_id
         """The asset ID normally corresponds to the file, unless the InputPathParser provides a value to override it."""
 
-        self._item_id: Optional[str] = None
+        self._item_id: Optional[str] = item_id
         """Which STAC item this asset belongs to.
         When a STAC item bundles multiple assets then the InputPathParser in extract_href_info
         must provide a value for item_id.
@@ -154,80 +152,53 @@ class AssetMetadata:
         """
 
         # We use asset_type to find the corresponding asset definition config in the CollectionConfig
-        self._asset_type: Optional[str] = None
+        self._asset_type: Optional[str] = asset_type
 
         # Temporal extent
         # everything to do with the date + time and temporal extent this asset corresponds to.
-        self._datetime = None
-        self._start_datetime: Optional[dt.datetime] = None
-        self._end_datetime: Optional[dt.datetime] = None
+        self._datetime = datetime
+        self._start_datetime: Optional[dt.datetime] = start_datetime
+        self._end_datetime: Optional[dt.datetime] = end_datetime
 
         # The bounding boxes, in latitude-longitude and also the projected version.
-        self._bbox_lat_lon: Optional[BoundingBox] = None
-        self._bbox_projected: Optional[BoundingBox] = None
-        self._proj_epsg: Optional[int] = None
+        self._bbox_lat_lon: Optional[BoundingBox] = bbox_lat_lon
+        self._bbox_projected: Optional[BoundingBox] = bbox_projected
+        self._proj_epsg: Optional[int] = proj_epsg
 
         # The geometry is sometimes provided by the source data, and its coordinates
         # might have more decimals than we get in the bounding box.
         # TODO How to deal with this duplicate data in a consistent and understandable way?
-        self._geometry_lat_lon: Optional[Polygon] = None
+        self._geometry_lat_lon: Optional[Polygon] = geometry_lat_lon
 
         # Affine transform as the raster file states it, in case we need it for CRS conversions.
-        self.transform: Optional[List[float]] = None
+        self.transform: Optional[List[float]] = transform
 
         # Raster shape in pixels
-        self.shape: Optional[List[int]] = None
+        self.shape: Optional[List[int]] = shape
 
         # file size, corresponds to file:size from FileInfo STAC extension
-        self.file_size: Optional[int] = None
+        self.file_size: Optional[int] = file_size
 
         # Tags in the raster.
         self.tags: List[str] = []
 
-        self.raster_metadata: Optional[RasterMetadata] = None
+        self.bands: List[BandMetadata] = bands
 
-        self.title: Optional[str] = None
-        self.collection_id: Optional[str] = None
-        self.tile_id: Optional[str] = None
-        self.item_href: Optional[str] = None
-        self.media_type: Optional[MediaType] = None
+        self.title: Optional[str] = title
+        self.collection_id: Optional[str] = collection_id
+        self.tile_id: Optional[str] = tile_id
+        self.item_href: Optional[str] = item_href
+        self.media_type: Optional[MediaType] = media_type
 
-        # TODO: add some properties that need to trickle up to the collection level, or not?
-        # These properties are really at the collection level, but in HRL VPP
-        # we might have to extract them from the products.
-        # Have to figure out what is the best way to handle this.
+        self._stac_version: str = stac_version
+
         # self.platforms: Optional[List[str]] = None
         # self.instruments: Optional[List[str]] = None
         # self.missions: Optional[List[str]] = None
 
-    def process_href_info(self):
-        """Fills in metadata fields with values extracted from the asset's file path or href.
-        We receive the values as a dictionary, from the InputPathParser.
-
-        TODO: Generalize process_href_info, so the data can come from any source, not only from hrefs/paths.
-            Rationale:
-            - Essentially process_href_info only fills in a known set of fields, copying data from
-                a dict that we extracted from any source we want.
-            - Where we get the dictionary does not matter, as long as we can provide that information somehow.
-            - This set of fields are things we that AssetMetadata can not automatically derive.
-                They have to be received from the source data, but we support more than one source.
-                Currently we have two sources: OpenSearch and GeoTIFF files.
-                Likely, netCDF will  next.
-            - We don't have to keep this method, just the principle that we get a set of key-value pairs
-                from something that processes source data, and have a more standardized mechanism
-                to update the AssetMetadata object with that data.
-        """
-        href_info = self._extract_href_info.parse(self.href)
-        self._info_from_href = href_info
-        for key, value in href_info.items():
-            # Ignore keys that do not match any attribute that should come from the href.
-            if key in self.PROPS_FROM_HREFS:
-                setattr(self, key, value)
-
     @property
     def version(self) -> str:
-        # TODO: make name more specific: check what this version is about (STAC version most likely)
-        return "1.0.0"
+        return self._stac_version
 
     @property
     def href(self) -> Optional[str]:
@@ -279,6 +250,10 @@ class AssetMetadata:
 
     @property
     def bbox_lat_lon(self) -> Optional[BoundingBox]:
+        if not self._bbox_lat_lon:
+            self._bbox_lat_lon = (
+                BoundingBox.from_list(self.geometry_lat_lon.bounds, epsg=4326) if self.geometry_lat_lon else None
+            )
         return self._bbox_lat_lon
 
     @bbox_lat_lon.setter
@@ -287,7 +262,7 @@ class AssetMetadata:
 
     @property
     def bbox_as_list(self) -> Optional[List[float]]:
-        if not self._bbox_lat_lon:
+        if not self.bbox_lat_lon:
             return None
         return self._bbox_lat_lon.to_list()
 
@@ -314,26 +289,22 @@ class AssetMetadata:
 
     @proj_epsg.setter
     def proj_epsg(self, value: Optional[int]) -> None:
-        if not isinstance(value, (int, NoneType)):
+        if not (value is None or isinstance(value, int)):
             raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
         self._proj_epsg = value
 
     @property
     def geometry_lat_lon(self) -> Polygon:
         # If a value was not set explicitly, then derive it from
-        # bbox_lat_lon, if possible.
-        if not self._geometry_lat_lon and self._bbox_lat_lon:
-            self._geometry_lat_lon = self._bbox_lat_lon.as_polygon()
-        return self._geometry_lat_lon
-
-    @geometry_lat_lon.setter
-    def geometry_lat_lon(self, geometry: Polygon):
-        if not isinstance(geometry, (Polygon, MultiPolygon, NoneType)):
-            raise TypeError(
-                "geometry must be of type shapely.geometry.Polygon, shapely.geometry.MultiPolygon or else be None "
-                + f"but the type is {type(geometry)}, {geometry=}"
+        # bbox_projected, if possible.
+        # Explanation for this can be found here: https://github.com/VitoTAP/stac-catalog-builder/issues/46
+        if not self._geometry_lat_lon:
+            self._geometry_lat_lon = (
+                project_polygon(geometry=self.geometry_proj, from_crs=self.proj_epsg, to_crs=4326)
+                if self.bbox_projected
+                else None
             )
-        self._geometry_lat_lon = geometry
+        return self._geometry_lat_lon
 
     @property
     def geometry_lat_lon_as_dict(self) -> Optional[Dict[str, Any]]:
@@ -462,8 +433,8 @@ class AssetMetadata:
             "bbox_projected": self.bbox_projected.to_dict() if self.bbox_projected else None,
             "transform": self.transform,
             "geometry_lat_lon": self.geometry_lat_lon,
-            "raster_metadata": self.raster_metadata.to_dict() if self.raster_metadata else None,
             "file_size": self.file_size,
+            "bands": [band.to_dict() for band in self.bands],
         }
         # Include internal information for debugging.
         if include_internal:
@@ -479,6 +450,12 @@ class AssetMetadata:
         """
         media_type_map = {mt.value: mt for mt in MediaType}
         return media_type_map.get(mime_string)
+
+    def update_from_dict(self, data: Dict[str, Any]) -> None:
+        """Update the metadata from a dictionary."""
+        for key, value in data.items():
+            if key in self.PROPS_FROM_HREFS:
+                setattr(self, key, value)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AssetMetadata":
@@ -507,17 +484,7 @@ class AssetMetadata:
         metadata.shape = data.get("shape")
         metadata.tags = data.get("tags")
 
-        bbox_dict = data.get("bbox_lat_lon")
-        if bbox_dict:
-            bbox = BoundingBox.from_dict(bbox_dict)
-            assert bbox.epsg in (4326, None)
-            metadata.bbox_lat_lon = bbox
-        else:
-            metadata.bbox_lat_lon = None
-
         metadata.transform = data.get("transform")
-
-        metadata.geometry_lat_lon = data.get("geometry_lat_lon") or data.get("geometry")
 
         proj_bbox_dict = data.get("bbox_projected")
         if proj_bbox_dict:
@@ -525,8 +492,6 @@ class AssetMetadata:
             metadata.bbox_projected = proj_bbox
         else:
             metadata.bbox_projected = None
-
-        metadata.raster_metadata = data.get("raster_metadata")
 
         return metadata
 
@@ -577,7 +542,6 @@ class AssetMetadata:
                 self.shape == other.shape,
                 self.file_size == other.file_size,
                 self.tags == other.tags,
-                self.raster_metadata == other.raster_metadata,
                 self.title == other.title,
                 self.collection_id == other.collection_id,
                 self.tile_id == other.tile_id,

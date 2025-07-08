@@ -61,6 +61,8 @@ _logger = logging.getLogger(__name__)
 class AlternateHrefGenerator:
     """Generates the alternate links for assets."""
 
+    # TODO this class should be merged with CreateAssetUrlFromPath, but that class is used in the mapper and this one is used in the builder.
+
     # Type alias for the specific callable that AlternateHrefGenerator needs.
     AssetMetadataToURL = Callable[[AssetMetadata], str]
 
@@ -229,13 +231,9 @@ class MapMetadataToSTACItem:
         #
         # Do some sanity checks on the asset metadata.
         # There can be multiple assets in a STAC item and we want them to be consistent.
-        # For example:
-        # It is not really possible to say what the CRS of the STAC item is when the assets have a mix of different CRSs.
-        #
+
         # All assets should have the same CRS
         assert len(set(a.proj_epsg for a in assets)) == 1, "All assets should have the same CRS"
-        # To be on the safe side also check the that the corresponding projection transform
-        # is the same for all assets.
         assert len(set(to_tuple_or_none(a.transform) for a in assets)) == 1, (
             "All assets should have the same projection transform"
         )
@@ -261,17 +259,6 @@ class MapMetadataToSTACItem:
         item_proj.geometry = first_asset.geometry_proj_as_dict
         item_proj.transform = first_asset.transform
         item_proj.shape = first_asset.shape
-
-        # TODO: support optional parts: grid extension is recommended if we are indeed on a grid, but
-        #    that is not always the case.
-        #
-        # The tile ID is not always the format that GridExtension expects.
-        #   We would need a way to customize extracting that tile ID for the specific dataset.
-        # TODO: investigate when/when not to include the GridExtension.
-        #
-        # if metadata.tile_id:
-        #     grid = GridExtension.ext(item, add_if_missing=True)
-        #     grid.code = metadata.tile_id
 
         asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
         if asset_config.eo_bands:
@@ -307,17 +294,13 @@ class MapMetadataToSTACItem:
             file_info = FileExtension.ext(asset, add_if_missing=True)
             file_info.size = metadata.file_size
 
-        if metadata.raster_metadata:
+        if metadata.bands:
             asset_raster = RasterExtension.ext(asset, add_if_missing=True)
             raster_bands = []
-
-            # TODO: HACK: making assumptions here that each band in the raster appears in the same order as in our config.
-            #   Would be better if we could identify the band by name,
-            #   but the raster metadata may not even have any band names.
             if not asset_config.raster_bands:
                 # There is no information to fill in default values for raster:bands
                 # Just fill in what we do have.
-                for band_md in metadata.raster_metadata.bands:
+                for band_md in metadata.bands:
                     new_band: RasterBand = RasterBand.create(
                         data_type=band_md.data_type,
                         nodata=band_md.nodata,

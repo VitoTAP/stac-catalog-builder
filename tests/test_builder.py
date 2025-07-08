@@ -35,7 +35,7 @@ from stacbuilder.config import (
     InputPathParserConfig,
 )
 from stacbuilder.exceptions import InvalidConfiguration
-from stacbuilder.metadata import AssetMetadata, BandMetadata, RasterMetadata
+from stacbuilder.metadata import AssetMetadata, BandMetadata
 from tests.conftest import MockMetadataCollector, MockPathParser
 
 
@@ -120,12 +120,10 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
     md.file_size = asset_path.stat().st_size
 
     bbox_dict = {"east": 240.0, "epsg": 4326, "north": 0.0, "south": 180.0, "west": 0.0}
-    md.bbox_lat_lon = BoundingBox.from_dict(bbox_dict)
     md.bbox_projected = BoundingBox.from_dict(bbox_dict)
     md.transform = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
 
-    band = BandMetadata(data_type="float64", index=0, nodata=None)
-    md.raster_metadata = RasterMetadata(shape=md.shape, bands=[band])
+    md.bands = [BandMetadata(data_type="float64", index=0, nodata=None)]
     return md
 
 
