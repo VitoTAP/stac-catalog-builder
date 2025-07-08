@@ -14,6 +14,7 @@ Best to add unit tests in a bottom-up way.
 
 """
 
+import datetime as dt
 import json
 import pprint
 from pathlib import Path
@@ -94,36 +95,33 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
 
     """
 
-    md = AssetMetadata()
     path_parser = MockPathParser()
-
-    md.asset_id = asset_path.stem
     asset_path_data = path_parser.parse(asset_path)
 
     prefix_length = len("observations_")
     end_length = len("_2000-01-01.tif")
-    md.asset_type = asset_path.name[prefix_length:-end_length]
-
-    md.item_id = asset_path_data["item_id"]
-
-    md.asset_path = asset_path
-    md.href = asset_path
-    md.original_href = asset_path
-    md.collection_id = asset_path_data["collection_id"]
-
-    md.datetime = asset_path_data["datetime"]
-    md.start_datetime = asset_path_data["start_datetime"]
-    md.end_datetime = asset_path_data["end_datetime"]
-    md.shape = (180, 240)
-    md.tags = {"AREA_OR_POINT": "Area"}
-
-    md.file_size = asset_path.stat().st_size
+    asset_type = asset_path.name[prefix_length:-end_length]
 
     bbox_dict = {"east": 240.0, "epsg": 4326, "north": 0.0, "south": 180.0, "west": 0.0}
-    md.bbox_projected = BoundingBox.from_dict(bbox_dict)
-    md.transform = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
 
-    md.bands = [BandMetadata(data_type="float64", index=0, nodata=None)]
+    md = AssetMetadata(
+        asset_id=asset_path.stem,
+        asset_type=asset_type,
+        item_id=asset_path_data["item_id"],
+        asset_path=asset_path,
+        href=str(asset_path),
+        original_href=str(asset_path),
+        collection_id=asset_path_data["collection_id"],
+        datetime=asset_path_data["datetime"],
+        start_datetime=asset_path_data["start_datetime"],
+        end_datetime=asset_path_data["end_datetime"],
+        shape=(180, 240),
+        tags={"AREA_OR_POINT": "Area"},
+        file_size=asset_path.stat().st_size,
+        bbox_projected=BoundingBox.from_dict(bbox_dict),
+        transform=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        bands=[BandMetadata(data_type="float64", index=0, nodata=None)],
+    )
     return md
 
 
@@ -284,7 +282,14 @@ class TestAlternateLinksGenerator:
     @pytest.fixture
     def simple_asset_metadata(self) -> AssetMetadata:
         """A very simple AssetMetadata with minimal data"""
-        asset_md = AssetMetadata()
+        asset_md = AssetMetadata(
+            asset_id="asset123",
+            item_id="item456",
+            collection_id="collection789",
+            asset_path=Path("/data/collection789/item456/asset123.tif"),
+            datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
+            bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
+        )
         asset_md.asset_id = "asset123"
         asset_md.item_id = "item456"
         asset_md.collection_id = "collection789"

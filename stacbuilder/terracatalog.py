@@ -768,14 +768,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         asset_metadata.start_datetime = product.beginningDateTime
         asset_metadata.end_datetime = product.endingDateTime
 
-        # TODO: should we also process the following attributes of product?
-        #   - product.alternates
-        #   - product.geojson
-        #   - product.geometry
-        #   - product.previews
-        #   - product.related
-        #   - product.properties
-
         # TODO: should we also process the following keys in the product.properties dict?
         # 'acquisitionInformation': [{'acquisitionParameters': {'acquisitionType': 'NOMINAL', 'beginningDateTime': '2017-04-01T00:00:00.000Z', 'endingDateTime': '2017-04-01T23:59:59.999Z', 'tileId': 'E09N27'},
         #                             'platform': {'platformSerialIdentifier': 'S2A, S2B', 'platformShortName': 'SENTINEL-2'}}],

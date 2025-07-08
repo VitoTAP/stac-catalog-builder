@@ -102,17 +102,7 @@ class MapGeoTiffToAssetMetadata:
         if not isinstance(asset_path, (Path, str)):
             raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
 
-        # Init arguments for AssetMetadata
-        asset_metadata = AssetMetadata()
-
-        asset_metadata.asset_path = asset_path
-        if self._href_modifier:
-            asset_metadata.href = self._href_modifier(asset_path)
-        else:
-            asset_metadata.href = str(asset_path)
-        asset_metadata.original_href = asset_path
-        asset_metadata.asset_id = Path(asset_path).stem
-        asset_metadata.item_id = Path(asset_path).stem
+        modified_href = self._href_modifier(asset_path) if self._href_modifier else str(asset_path)
 
         # check for s3 path and adjust the file path.
         if isinstance(asset_path, S3Path):
@@ -122,7 +112,7 @@ class MapGeoTiffToAssetMetadata:
 
         with rasterio.open(_asset_path) as dataset:
             assert isinstance(dataset, rasterio.DatasetReader), "Dataset must be a rasterio DatasetReader"
-            asset_metadata.shape = dataset.shape
+            shape = dataset.shape
 
             # Get the EPSG code of the dataset
 
@@ -133,7 +123,6 @@ class MapGeoTiffToAssetMetadata:
                 proj_epsg = dataset.crs.to_epsg()
             else:
                 proj_epsg = 4326  # Default to WGS 84 if no EPSG code is found
-            asset_metadata.proj_epsg = proj_epsg
 
             # round of values defined in terms of number of digits to keep
             # after decimals, which is defined to be between 0.1-1.0% of the resolution.
@@ -145,11 +134,11 @@ class MapGeoTiffToAssetMetadata:
 
             # Get the projected bounding box of the dataset
             _bounds = [round(_bo, precision) for _bo in list(dataset.bounds)]  # round off data
-            asset_metadata.bbox_projected = BoundingBox.from_list(_bounds, epsg=proj_epsg)
+            bbox_projected = BoundingBox.from_list(_bounds, epsg=proj_epsg)
 
             # Get the transform of the dataset
             _transform = [round(_bo, precision) for _bo in list(dataset.transform)[:6]]  # round off data
-            asset_metadata.transform = list(_transform)[0:6]
+            transform = list(_transform)[0:6]
 
             bands = []
             tags = dataset.tags() or {}
@@ -158,15 +147,28 @@ class MapGeoTiffToAssetMetadata:
                 # TODO: if tags contains unit, add the unit
                 band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
                 bands.append(band_md)
-            asset_metadata.bands = bands
-
-            # TODO: Decide: do we really need the raster tags.
-            asset_metadata.tags = dataset.tags()
 
         file_stat = asset_path.stat()
-        asset_metadata.file_size = file_stat.st_size
 
         href_info = self.process_href_info(str(asset_path))
-        asset_metadata.update_from_dict(href_info)
+
+        # Prepare the arguments for AssetMetadata, allowing href_info to override or add fields
+        asset_metadata_args = dict(
+            asset_path=asset_path,
+            href=modified_href,
+            original_href=str(asset_path),
+            asset_id=Path(asset_path).stem,
+            item_id=Path(asset_path).stem,
+            shape=shape,
+            proj_epsg=proj_epsg,
+            bbox_projected=bbox_projected,
+            transform=transform,
+            bands=bands,
+            file_size=file_stat.st_size,
+            tags=tags,
+        )
+        asset_metadata_args.update(href_info)  # href_info can override or add fields
+
+        asset_metadata = AssetMetadata(**asset_metadata_args)
 
         return asset_metadata

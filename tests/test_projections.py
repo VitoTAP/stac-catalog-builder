@@ -88,6 +88,7 @@ def test_reproject_bounding_box_returns_expected_latlong_bbox(from_crs_epsg, bbo
     assert new_north == approx(52.0, abs=abs_tolerance)
 
     bbox = box(west, south, east, north)
+
     new_bbox = project_polygon(bbox, from_crs_epsg, 4326).bounds
 
     assert new_bbox == approx([new_west, new_south, new_east, new_north], abs=abs_tolerance)

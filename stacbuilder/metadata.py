@@ -15,12 +15,13 @@ Rationale:
 import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional
 
 import dateutil.parser
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, ConfigDict, field_validator
 from pystac.media_type import MediaType
 from shapely.geometry import Polygon, mapping
 
@@ -55,8 +56,13 @@ class BandMetadata:
         return result
 
 
-class AssetMetadata:
+class AssetMetadata(BaseModel):
     """Intermediate metadata that models the properties we actually use."""
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+    )
 
     # This is metadata of an asset that belongs to a STAC item, not really the metadata of one STAC item.
     # (Realizing this now when reviewing the code, this class has been roughly the same since the earliest versions of the tool)
@@ -84,8 +90,7 @@ class AssetMetadata:
     # - Metadata from the raster about the bands,
     #       for the EO and Raster STAC extensions (eo:bands and raster:bands)
     # TODO: will probably also need the spatial resolution.
-
-    PROPS_FROM_HREFS = [
+    PROPS_FROM_HREFS: ClassVar[List[str]] = [
         "item_id",
         "asset_id",
         "collection_id",
@@ -97,313 +102,195 @@ class AssetMetadata:
         "tile_id",
         "item_href",
     ]
+    # The asset_id is the unique identifier for the asset.
+    asset_id: str
 
-    def __init__(
-        self,
-        href: Optional[str] = None,
-        original_href: Optional[str] = None,
-        asset_path: Optional[Path] = None,
-        asset_id: Optional[str] = None,
-        item_id: Optional[str] = None,
-        asset_type: Optional[str] = None,
-        datetime: Optional[dt.datetime] = None,
-        start_datetime: Optional[dt.datetime] = None,
-        end_datetime: Optional[dt.datetime] = None,
-        bbox_lat_lon: Optional[BoundingBox] = None,
-        bbox_projected: Optional[BoundingBox] = None,
-        proj_epsg: Optional[int] = None,
-        geometry_lat_lon: Optional[Polygon] = None,
-        transform: Optional[List[float]] = None,
-        shape: Optional[List[int]] = None,
-        file_size: Optional[int] = None,
-        bands: List[BandMetadata] = [],
-        title: Optional[str] = None,
-        collection_id: Optional[str] = None,
-        tile_id: Optional[str] = None,
-        item_href: Optional[str] = None,
-        media_type: Optional[MediaType] = None,
-        stac_version: str = "1.0.0",
-    ):
-        # original and modified path/href
-        self._href: Optional[str] = href
-        self._original_href: Optional[str] = original_href
+    # href is the path to the asset. At least one of the following needs to be set:
+    href: str = None
+    original_href: str = None
+    asset_path: Path = None
 
-        # Very often the input will be a (Posix) path to an asset file, for now only GeoTIFFs.
-        # When we start to support using URLs to convert those assets to STAC items, then
-        # `self._asset_path` could be None, or it could be set to the local path that the
-        # openEO server needs to access.
-        self._asset_path: Optional[Path] = asset_path
+    # Which STAC item this asset belongs to.
+    # When a STAC item bundles multiple assets then the InputPathParser in extract_href_info
+    # must provide a value for item_id.
+    # However, when each asset corresponds to one STAC item then asset_id and item_id will
+    # be identical. So if we don't get an explicit value for item_id we assume it is the same as
+    # asset_id.
+    item_id: str = None
 
-        #
-        # Essential asset info: what asset is it and what STAC item does it belong to
-        # What bands does it contain or correspond to.
-        #
+    # We use asset_type to find the corresponding asset definition config in the CollectionConfig
+    asset_type: Optional[str] = None
 
-        self._asset_id: Optional[str] = asset_id
-        """The asset ID normally corresponds to the file, unless the InputPathParser provides a value to override it."""
+    # Temporal information of the asset. Only datetime is required, but we can also have
+    # start_datetime and end_datetime.
+    datetime: dt.datetime
+    start_datetime: Optional[dt.datetime] = None
+    end_datetime: Optional[dt.datetime] = None
 
-        self._item_id: Optional[str] = item_id
-        """Which STAC item this asset belongs to.
-        When a STAC item bundles multiple assets then the InputPathParser in extract_href_info
-        must provide a value for item_id.
-        However, when each asset corresponds to one STAC item then asset_id and item_id will
-        be identical. So if we don't get an explicit value for item_id we assume it is the same as
-        asset_id.
+    # The bounding boxes and geometries, in latitude-longitude and also the projected version.
+    # At least one of these must be set. If bbox_projected is not set, then proj_epsg must also be set.
+    bbox_lat_lon: BoundingBox = None
+    bbox_projected: BoundingBox = None
+    geometry_lat_lon: Polygon = None
+    geometry_proj: Polygon = None
+    proj_epsg: int = None
+
+    # Affine transform as the raster file states it, in case we need it for CRS conversions.
+    transform: Optional[List[float]] = None
+
+    # Raster shape in pixels
+    shape: Optional[List[int]] = None
+
+    # file size, corresponds to file:size from FileInfo STAC extension
+    file_size: Optional[int] = None
+
+    # Tags in the raster.
+    tags: dict[str, str] = {}
+
+    # The bands in the raster file.
+    bands: List[BandMetadata] = []
+
+    # TODO check which of thises fields are actually used
+    title: Optional[str] = None
+    collection_id: Optional[str] = None
+    tile_id: Optional[str] = None
+    # TODO remove item_href, it is not used in the STAC spec.
+    item_href: Optional[str] = None
+    media_type: Optional[MediaType] = None
+
+    # TODO remove this, should be defined in collection config
+    stac_version: str = "1.0.0"
+
+    # platforms: Optional[List[str]] = None
+    # instruments: Optional[List[str]] = None
+    # missions: Optional[List[str]] = None
+
+    @field_validator("geometry_lat_lon", "geometry_proj")
+    @classmethod
+    def validate_geometry(cls, v):
+        """Validate that geometry fields are Polygon instances."""
+        if v is not None and not isinstance(v, Polygon):
+            raise ValueError(f"Geometry must be a Polygon instance, got {type(v)}")
+        return v
+
+    @field_validator("datetime", "start_datetime", "end_datetime")
+    @classmethod
+    def validate_datetime_fields(cls, v):
+        """Validate and convert datetime fields on every assignment."""
+        if v is None:
+            return v
+        return check_datetime(v)
+
+    def model_post_init(self, context: Any):
         """
+        Pydantic method to overwrite that is ran after init of a new AssetMetadata instance.
+        Run some checks on the properties that are set and infer some properties"""
+        if not any([self.asset_id, self.item_id, self.collection_id]):
+            raise ValueError("At least one of asset_id, item_id, or collection_id must be set.")
+        if not self.asset_path:
+            self.asset_path = Path(self.original_href)
+        if not self.href:
+            self.href = str(self.asset_path)
+        if not self.original_href:
+            self.original_href = str(self.href)
 
-        # We use asset_type to find the corresponding asset definition config in the CollectionConfig
-        self._asset_type: Optional[str] = asset_type
+        if not self.item_id:
+            self.item_id = self.asset_id
 
-        # Temporal extent
-        # everything to do with the date + time and temporal extent this asset corresponds to.
-        self._datetime = datetime
-        self._start_datetime: Optional[dt.datetime] = start_datetime
-        self._end_datetime: Optional[dt.datetime] = end_datetime
+        self._ensure_geoms()
 
-        # The bounding boxes, in latitude-longitude and also the projected version.
-        self._bbox_lat_lon: Optional[BoundingBox] = bbox_lat_lon
-        self._bbox_projected: Optional[BoundingBox] = bbox_projected
-        self._proj_epsg: Optional[int] = proj_epsg
+    def _ensure_geoms(self):
+        """Ensure that the geometries and bounding boxes are set correctly based on the available properties."""
+        if self.bbox_projected:  # base case when bbox_projected is set
+            if not self.proj_epsg:
+                self.proj_epsg = self.bbox_projected.epsg
 
-        # The geometry is sometimes provided by the source data, and its coordinates
-        # might have more decimals than we get in the bounding box.
-        # TODO How to deal with this duplicate data in a consistent and understandable way?
-        self._geometry_lat_lon: Optional[Polygon] = geometry_lat_lon
+            if not self.geometry_proj:
+                self.geometry_proj = self.bbox_projected.as_polygon()
 
-        # Affine transform as the raster file states it, in case we need it for CRS conversions.
-        self.transform: Optional[List[float]] = transform
+            if not self.geometry_lat_lon:
+                self.geometry_lat_lon = project_polygon(
+                    geometry=self.geometry_proj, from_crs=self.proj_epsg, to_crs=4326
+                )
 
-        # Raster shape in pixels
-        self.shape: Optional[List[int]] = shape
+            if not self.bbox_lat_lon:
+                self.bbox_lat_lon = BoundingBox.from_list(self.geometry_lat_lon.bounds, epsg=4326)
+        elif not self.proj_epsg:
+            raise ValueError("proj_epsg must be set if bbox_projected is not set.")
+        elif self.bbox_lat_lon:  # base case when bbox_lat_lon is set
+            if not self.geometry_lat_lon:
+                self.geometry_lat_lon = self.bbox_lat_lon.as_polygon()
 
-        # file size, corresponds to file:size from FileInfo STAC extension
-        self.file_size: Optional[int] = file_size
+            if not self.geometry_proj:
+                self.geometry_proj = project_polygon(
+                    geometry=self.geometry_lat_lon, from_crs=4326, to_crs=self.proj_epsg
+                )
 
-        # Tags in the raster.
-        self.tags: List[str] = []
-
-        self.bands: List[BandMetadata] = bands
-
-        self.title: Optional[str] = title
-        self.collection_id: Optional[str] = collection_id
-        self.tile_id: Optional[str] = tile_id
-        self.item_href: Optional[str] = item_href
-        self.media_type: Optional[MediaType] = media_type
-
-        self._stac_version: str = stac_version
-
-        # self.platforms: Optional[List[str]] = None
-        # self.instruments: Optional[List[str]] = None
-        # self.missions: Optional[List[str]] = None
-
-    @property
-    def version(self) -> str:
-        return self._stac_version
-
-    @property
-    def href(self) -> Optional[str]:
-        return self._href
-
-    @href.setter
-    def href(self, value: str) -> None:
-        self._href = str(value)
-
-    @property
-    def original_href(self) -> Optional[str]:
-        return self._original_href
-
-    @original_href.setter
-    def original_href(self, value: str) -> None:
-        self._original_href = str(value)
-
-    @property
-    def asset_path(self) -> Optional[Path]:
-        return self._asset_path
-
-    @asset_path.setter
-    def asset_path(self, value: Union[Path, str]) -> None:
-        self._asset_path = Path(value) if value else None
-
-    @property
-    def asset_id(self) -> Optional[str]:
-        return self._asset_id
-
-    @asset_id.setter
-    def asset_id(self, value: str) -> None:
-        self._asset_id = value
-
-    @property
-    def item_id(self) -> Optional[str]:
-        return self._item_id
-
-    @item_id.setter
-    def item_id(self, value: str) -> None:
-        self._item_id = value
-
-    @property
-    def asset_type(self) -> Optional[str]:
-        return self._asset_type
-
-    @asset_type.setter
-    def asset_type(self, value: str) -> None:
-        self._asset_type = value
-
-    @property
-    def bbox_lat_lon(self) -> Optional[BoundingBox]:
-        if not self._bbox_lat_lon:
-            self._bbox_lat_lon = (
-                BoundingBox.from_list(self.geometry_lat_lon.bounds, epsg=4326) if self.geometry_lat_lon else None
+            self.bbox_projected = BoundingBox.from_list(self.geometry_proj.bounds, epsg=self.proj_epsg)
+        elif self.geometry_proj:
+            self.bbox_projected = BoundingBox.from_list(self.geometry_proj.bounds, epsg=self.proj_epsg)
+            self._ensure_geoms()
+        elif self.geometry_lat_lon:
+            self.bbox_lat_lon = BoundingBox.from_list(self.geometry_lat_lon.bounds, epsg=4326)
+            self._ensure_geoms()
+        else:
+            raise ValueError(
+                "At least one of bbox_lat_lon, bbox_projected, geometry_lat_lon, or geometry_proj must be set."
             )
-        return self._bbox_lat_lon
-
-    @bbox_lat_lon.setter
-    def bbox_lat_lon(self, bbox: BoundingBox) -> None:
-        self._bbox_lat_lon = bbox
 
     @property
     def bbox_as_list(self) -> Optional[List[float]]:
         if not self.bbox_lat_lon:
             return None
-        return self._bbox_lat_lon.to_list()
-
-    @property
-    def bbox_projected(self) -> Optional[BoundingBox]:
-        return self._bbox_projected
-
-    @bbox_projected.setter
-    def bbox_projected(self, bbox: BoundingBox) -> None:
-        self._bbox_projected = bbox
-        if bbox and bbox.epsg:
-            self._proj_epsg = bbox.epsg
+        return self.bbox_lat_lon.to_list()
 
     @property
     def proj_bbox_as_list(self) -> Optional[List[float]]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        if not self.bbox_projected:
             return None
-        return self._bbox_projected.to_list()
-
-    @property
-    def proj_epsg(self) -> Optional[int]:
-        return self._proj_epsg
-
-    @proj_epsg.setter
-    def proj_epsg(self, value: Optional[int]) -> None:
-        if not (value is None or isinstance(value, int)):
-            raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
-        self._proj_epsg = value
-
-    @property
-    def geometry_lat_lon(self) -> Polygon:
-        # If a value was not set explicitly, then derive it from
-        # bbox_projected, if possible.
-        # Explanation for this can be found here: https://github.com/VitoTAP/stac-catalog-builder/issues/46
-        if not self._geometry_lat_lon:
-            self._geometry_lat_lon = (
-                project_polygon(geometry=self.geometry_proj, from_crs=self.proj_epsg, to_crs=4326)
-                if self.bbox_projected
-                else None
-            )
-        return self._geometry_lat_lon
+        return self.bbox_projected.to_list()
 
     @property
     def geometry_lat_lon_as_dict(self) -> Optional[Dict[str, Any]]:
-        # TODO: [decide] convert this RO property to a method or not?
         if not self.geometry_lat_lon:
             return None
         return mapping(self.geometry_lat_lon)
 
     @property
-    def geometry_proj(self) -> Optional[Polygon]:
-        return self._bbox_projected.as_polygon()
-
-    @property
     def geometry_proj_as_dict(self) -> Optional[Dict[str, Any]]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        if not self.bbox_projected:
             return None
         return mapping(self.geometry_proj)
 
     @property
     def proj_geometry_as_wkt(self) -> Optional[str]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        if not self.bbox_projected:
             return None
-        return self._bbox_projected.as_wkt()
+        return self.bbox_projected.as_wkt()
 
     @property
     def proj_bbox_as_polygon(self) -> Optional[Polygon]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        if not self.bbox_projected:
             return None
-        return self._bbox_projected.as_polygon()
-
-    @property
-    def datetime(self) -> Optional[dt.datetime]:
-        return self._datetime
-
-    @datetime.setter
-    def datetime(self, value) -> None:
-        self._datetime = self.check_datetime(value)
-
-    @classmethod
-    def check_datetime(cls, value) -> dt.datetime:
-        if isinstance(value, dt.datetime):
-            return value
-
-        if isinstance(value, dt.date):
-            return cls.convert_date_to_datetime(value)
-
-        if isinstance(value, str):
-            # if not value.endswith("Z") and not "+" in value:
-            #     converted_value = value + "Z"
-            # else:
-            #     converted_value = value
-            converted_value = dateutil.parser.parse(value)
-            if not isinstance(converted_value, dt.datetime):
-                return cls.convert_date_to_datetime(converted_value)
-            else:
-                return converted_value
-
-        raise TypeError(f"Can not convert this time to datetime: type={type(value)}, {value=}")
-
-    @staticmethod
-    def convert_date_to_datetime(value: dt.date) -> dt.datetime:
-        return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)
-
-    @property
-    def start_datetime(self) -> Optional[dt.datetime]:
-        return self._start_datetime
-
-    @start_datetime.setter
-    def start_datetime(self, value: dt.datetime) -> None:
-        self._start_datetime = self.check_datetime(value)
-
-    @property
-    def end_datetime(self) -> Optional[dt.datetime]:
-        return self._end_datetime
-
-    @end_datetime.setter
-    def end_datetime(self, value: dt.datetime) -> None:
-        self._end_datetime = self.check_datetime(value)
+        return self.bbox_projected.as_polygon()
 
     @property
     def year(self) -> Optional[int]:
-        if not self._datetime:
+        if not self.datetime:
             return None
-        return self._datetime.year
+        return self.datetime.year
 
     @property
     def month(self) -> Optional[int]:
-        if not self._datetime:
+        if not self.datetime:
             return None
-        return self._datetime.month
+        return self.datetime.month
 
     @property
     def day(self) -> Optional[int]:
-        if not self._datetime:
+        if not self.datetime:
             return None
-        return self._datetime.day
+        return self.datetime.day
 
     def to_dict(self, include_internal=False) -> Dict[str, Any]:
         """Convert to a dictionary for troubleshooting (output) or for other processing.
@@ -586,3 +473,31 @@ class AssetMetadata:
                 differences[key] = (self_dict[key], other_dict[key])
 
         return differences
+
+
+def check_datetime(value) -> dt.datetime:
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is None:
+            # If the datetime has no timezone, assume it is UTC.
+            value = value.replace(tzinfo=dt.UTC)
+        return value
+
+    if isinstance(value, dt.date):
+        return convert_date_to_datetime(value)
+
+    if isinstance(value, str):
+        # if not value.endswith("Z") and not "+" in value:
+        #     converted_value = value + "Z"
+        # else:
+        #     converted_value = value
+        converted_value = dateutil.parser.parse(value)
+        if not isinstance(converted_value, dt.datetime):
+            return convert_date_to_datetime(converted_value)
+        else:
+            return converted_value
+
+    raise TypeError(f"Can not convert this time to datetime: type={type(value)}, {value=}")
+
+
+def convert_date_to_datetime(value: dt.date) -> dt.datetime:
+    return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)
