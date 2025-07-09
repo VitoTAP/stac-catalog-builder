@@ -231,33 +231,6 @@ def validate(collection_file):
 
 
 @cli.command
-@click.option(
-    "-o",
-    "--outputdir",
-    required=False,
-    type=click.Path(dir_okay=True, file_okay=False),
-)
-@click.option(
-    "-c",
-    "--collection-config",
-    type=click.Path(exists=True, dir_okay=False, file_okay=True),
-    help="Configuration file for the collection",
-)
-@click.argument("collection_file", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-def post_process(outputdir, collection_config, collection_file):
-    """Run only the postprocessing.
-
-    Optionally saves the postprocessing result as a separate collection so you
-    can re-run easily.
-    You make have to do that many times when debugging postpreocessing
-    and waiting for collections to be build is annoying.
-    """
-    commandapi.postprocess_collection(
-        collection_file=collection_file, collection_config_path=collection_config, output_dir=outputdir
-    )
-
-
-@cli.command
 @click.option("-b", "--backend-url", type=click.STRING, help="URL for openEO backend", default="openeo-dev.vito.be")
 @click.option(
     "-o",

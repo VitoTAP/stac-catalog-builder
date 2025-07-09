@@ -112,10 +112,6 @@ Collection configuration file: corresponds to class `CollectionConfig`.
     },
 
     // See .stacbuilder/config.py,  class: CollectionConfig
-    // This dictionary allows us to fill in or overwrite some fields with values
-    // that we just want to give a fixed value. This is done at the very end of
-    // the process in a post-processing step.
-    "overrides": {}
 }
 ```
 

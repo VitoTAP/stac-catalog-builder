@@ -8,14 +8,12 @@ TODO: need coverage for MapMetadataToSTACItem
 TODO: need coverage for MapGeoTiffToSTACItem
 TODO: need coverage for STACCollectionBuilder
 TODO: need coverage for GroupMetadataByYear and GroupMetadataByAttribute
-TODO: need coverage for PostProcessSTACCollectionFile
 
 Best to add unit tests in a bottom-up way.
 
 """
 
 import datetime as dt
-import json
 import pprint
 from pathlib import Path
 from typing import List
@@ -27,7 +25,6 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
-    PostProcessSTACCollectionFile,
 )
 from stacbuilder.collector import MetadataCollector
 from stacbuilder.config import (
@@ -438,120 +435,3 @@ class TestAlternateLinksGenerator:
     def test_from_config_raises_invalidconfiguration_when_s3bucket_missing(self, config):
         with pytest.raises(InvalidConfiguration):
             AlternateHrefGenerator.from_config(config)
-
-
-class TestPostProcessSTACCollectionFile:
-    @pytest.fixture
-    def collection_config_file(self, data_dir) -> Path:
-        return data_dir / "config/config-test-collection.json"
-
-    @pytest.fixture
-    def collection_config_file_no_overrides(self, tmp_path, collection_config_file) -> CollectionConfig:
-        temp_config_path: Path = tmp_path / "collection-config.json"
-        temp_config = CollectionConfig.from_json_file(collection_config_file)
-        temp_config.overrides = None
-        temp_config_path.write_text(temp_config.model_dump_json())
-        return temp_config_path
-
-    def test_override_collection_components(self):
-        overrides = {
-            "simple-added-value": "simple",
-            "key:A/key:B": "new value",
-            "ACME": {"anvil": "heavy"},
-            "the/answer/to/everything": 42,
-        }
-
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=overrides)
-        data = {
-            "key:A": {"key:B": "to be replaced"},
-            "ACME": "a fictitious manufacturer of anvils",
-            "one": 1,
-            "two": "two",
-            "three": 3.0,
-        }
-
-        post_processor._override_collection_components(data)
-
-        # Keys that should be overwritten or added.
-        assert data["simple-added-value"] == "simple"
-        assert data["key:A"] == {"key:B": "new value"}
-        assert data["ACME"] == {"anvil": "heavy"}
-        assert data["the"] == {"answer": {"to": {"everything": 42}}}
-
-        # Keys that should be left unchanged.
-        assert data["one"] == 1
-        assert data["two"] == "two"
-        assert data["three"] == 3.0
-
-    def test_process_collection_applies_overrides(self, asset_metadata_pipeline, tmp_path):
-        asset_metadata_pipeline.build_collection()
-
-        assert asset_metadata_pipeline.collection_file.exists()
-
-        overrides = {"level_1/level_2": {"test_key": "test_value"}}
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=overrides)
-
-        collection_file = asset_metadata_pipeline.collection_file
-        post_proc_dir = tmp_path / "post-processed"
-        post_processed_coll_path = post_proc_dir / "collection.json"
-        post_processor.process_collection(collection_file=collection_file, output_dir=post_proc_dir)
-
-        # Check that the overrides were applied
-        collection_as_dict = None
-        with open(post_processed_coll_path, "r", encoding="utf8") as f:
-            collection_as_dict = json.load(f)
-
-        assert "level_1" in collection_as_dict
-        assert "level_2" in collection_as_dict["level_1"]
-        assert collection_as_dict["level_1"]["level_2"] == {"test_key": "test_value"}
-
-    @pytest.mark.parametrize("overrides", [None, {}])
-    def test_process_collection_only_copies_files_when_no_overrides(self, overrides, asset_metadata_pipeline, tmp_path):
-        """There are no overrides to apply but the files and directories should be copied to the new output directory.
-        The collection filess should have identical contents.
-        """
-        asset_metadata_pipeline.build_collection()
-
-        assert asset_metadata_pipeline.collection_file.exists()
-
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=overrides)
-
-        collection_file = asset_metadata_pipeline.collection_file
-        post_proc_dir = tmp_path / "post-processed"
-        post_processed_coll_path = post_proc_dir / "collection.json"
-        post_processor.process_collection(collection_file=collection_file, output_dir=post_proc_dir)
-
-        original_contents = json.loads(collection_file.read_text(encoding="utf8"))
-        processed_contents = json.loads(post_processed_coll_path.read_text(encoding="utf8"))
-        assert original_contents == processed_contents
-
-    @pytest.mark.parametrize("overrides", [None, {}])
-    def test_process_collection_is_noop_when_no_overrides_and_in_place(
-        self, overrides, asset_metadata_pipeline, tmp_path
-    ):
-        """
-        The files should be left alone in this case, because there are no overrides,
-        and the post-processing should be done in-place (i.e. it won't be copied to a new directory).
-
-        That means, before and after the postprocessing, both the files modification time
-        and its contents should be identical.
-        """
-        asset_metadata_pipeline.build_collection()
-
-        assert asset_metadata_pipeline.collection_file.exists()
-
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=overrides)
-
-        collection_file: Path = asset_metadata_pipeline.collection_file
-        original_contents = json.loads(collection_file.read_text(encoding="utf8"))
-        stats_before = collection_file.stat()
-        modified_time_before = stats_before.st_mtime_ns
-
-        post_processor.process_collection(collection_file=collection_file, output_dir=None)
-
-        stats_after = collection_file.stat()
-        modified_time_after = stats_after.st_mtime_ns
-        assert modified_time_after == modified_time_before
-
-        processed_contents = json.loads(collection_file.read_text(encoding="utf8"))
-        assert processed_contents == original_contents

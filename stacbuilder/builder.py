@@ -7,9 +7,7 @@ This contains the classes that generate the STAC catalogs, collections and items
 import datetime as dt
 import gc
 import inspect
-import json
 import logging
-import shutil
 import tempfile
 from functools import partial
 from http.client import RemoteDisconnected
@@ -17,6 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union
 
 # Third party libraries
+import deprecated
 from pystac import (
     Asset,
     CatalogType,
@@ -634,162 +633,51 @@ class STACCollectionBuilder:
         _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
 
 
-class PostProcessSTACCollectionFile:
-    """Takes an existing STAC collection file and runs optional postprocessing steps.
-
-    Sometimes there are situations where we need to fix small things quickly, and the easiest way
-    is to do some post processing. For example overriding proj:bbox in at the collection level.
-    This is what the PostProcessSTACCollectionFile is for.
-
-    Most of this could be done by hand, but making it part of the pipeline and the configuration file
-    makes it reproducible, and easy to repeat.
-
-
-    Until recently processing included 2 steps, but now it has been reduced to one step, applying some simple overrides.
-
-    These are specific key-value pairs in the JSON file, that we just fill in or overwrite
-    with fixed values, after generating the collection file.
-    These keys and values are read from the collection config file or CollectionConfig object.
-    """
-
-    def __init__(self, collection_overrides: Optional[Dict[str, Any]]) -> None:
-        # Settings
-        self._collection_overrides = collection_overrides or {}
-
-    @property
-    def collection_overrides(self) -> Optional[Dict[str, Any]]:
-        return self._collection_overrides
-
-    def process_collection(self, collection_file: Path, output_dir: Optional[Path] = None):
-        process_in_place = self.is_in_place_processing(collection_file, output_dir)
-
-        if not self.collection_overrides:
-            _logger.info(
-                "There is nothing to postprocess because no collection overrides are specified in "
-                + "self.collection_overrides."
-            )
-            # If this is postprocessing is performed in-place on the collection file then we don't need to apply any changes.
-            # But if an output_dir was specified we still need to copy the files to the new directory.
-            # (Unless output_dir actually points to where the collection is located)
-            if process_in_place:
-                # Nothing left to do.
-                return
-
-        if not process_in_place:
-            self._create_post_proc_directory_structure(collection_file, output_dir, copy_files=True)
-
-        new_coll_file = self.get_converted_collection_path(collection_file, output_dir)
-        data = self._load_collection_as_dict(new_coll_file)
-        self._override_collection_components(data)
-        self._save_collection_as_dict(data, new_coll_file)
-
-    def is_in_place_processing(self, collection_file: Path, output_dir: Path) -> bool:
-        return not output_dir or (output_dir.exists() and collection_file.parent.samefile(output_dir))
-
-    def get_converted_collection_path(self, collection_file, output_dir) -> Path:
-        if self.is_in_place_processing(collection_file, output_dir):
-            return collection_file
-        else:
-            return output_dir / collection_file.name
-
-    def get_converted_item_paths(self, collection_file: Path, output_dir: Path):
-        item_paths = self.get_item_paths_for_coll_file(collection_file)
-        if self.is_in_place_processing(collection_file, output_dir):
-            return item_paths
-
-        relative_paths = [ip.relative_to(collection_file.parent) for ip in item_paths]
-        return [output_dir / rp for rp in relative_paths]
-
-    def get_item_paths_for_collection(self, collection: Collection) -> List[Path]:
-        items = collection.get_all_items()
-        return [Path(item.self_href) for item in items]
-
-    def get_item_paths_for_coll_file(self, collection_file: Path) -> List[Path]:
-        collection = Collection.from_file(collection_file)
-        return self.get_item_paths_for_collection(collection)
-
-    def _create_post_proc_directory_structure(
-        self, collection_file: Path, output_dir: Optional[Path] = None, copy_files: bool = False
-    ):
-        if self.is_in_place_processing(collection_file, output_dir):
-            raise InvalidOperation(
-                "Can not create identical directory structure when post-processing is executed in place."
-                + f"{collection_file=}, {output_dir=}"
-            )
-
-        # Overwriting => remove and re-create the old directory
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-
-        # Replicate the entire directory structure, so also the subfolders where items are grouped,
-        # as specified by the layout_strategy_item_template in CollectionConfig
-        output_dir.mkdir(parents=True)
-        new_item_paths = self.get_converted_item_paths(collection_file, output_dir)
-
-        sub_directories = set(p.parent for p in new_item_paths)
-        for sub_dir in sub_directories:
-            if not sub_dir.exists():
-                sub_dir.mkdir(parents=True)
-
-        # Also copy the relevant files if requested.
-        if copy_files:
-            collection_converted_file = self.get_converted_collection_path(collection_file, output_dir)
-            shutil.copy2(collection_file, collection_converted_file)
-            item_paths = self.get_item_paths_for_coll_file(collection_file)
-            for old_path, new_path in zip(item_paths, new_item_paths):
-                shutil.copy2(old_path, new_path)
-
-    def _override_collection_components(self, data: Dict[str, Any]) -> None:
-        overrides = self.collection_overrides
-
-        for key, new_value in overrides.items():
-            key_path = key.split("/")
-            deepest_key = key_path[-1]
-            sub_dict = data
-
-            for sub_key in key_path[:-1]:
-                if sub_key not in sub_dict:
-                    sub_dict[sub_key] = {}
-                sub_dict = sub_dict[sub_key]
-            sub_dict[deepest_key] = new_value
-
-    @staticmethod
-    def _load_collection_as_dict(coll_file: Path) -> dict:
-        with open(coll_file, "r") as f_in:
-            return json.load(f_in)
-
-    @staticmethod
-    def _save_collection_as_dict(data: Dict[str, Any], coll_file: Path) -> None:
-        with open(coll_file, "w") as f_out:
-            json.dump(data, f_out, indent=2)
-
-
 class AssetMetadataPipeline:
     """Converts AssetMetadata to STAC collections."""
 
     def __init__(
         self,
         metadata_collector: IMetadataCollector,
+        collection_config: CollectionConfig,
         output_dir: Path,
         overwrite: Optional[bool] = False,
         link_items: Optional[bool] = True,
-        chunked: bool = False,
         item_postprocessor: Optional[Callable] = None,
     ) -> None:
+        if output_dir and not isinstance(output_dir, Path):
+            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
+
+        if collection_config is None:
+            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
+
+        if metadata_collector is None or not isinstance(metadata_collector, IMetadataCollector):
+            raise ValueError(
+                'Argument "metadata_collector" can not be None, must be a IMetadataCollector implementation.'
+            )
         # Settings: these are just data, not components we delegate work to.
         self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
-        self._collection_dir: Path = None
+        self._collection_dir: Path = self._output_base_dir
         self._overwrite: bool = bool(overwrite)
         self._link_items = bool(link_items)
+        self._collection_config: CollectionConfig = collection_config
 
         # Components / dependencies that must be provided
         self._metadata_collector: IMetadataCollector = metadata_collector
 
         # Components / dependencies that we set up internally
-        self._meta_to_stac_item_mapper: MapMetadataToSTACItem = None
+        self._meta_to_stac_item_mapper: MapMetadataToSTACItem = MapMetadataToSTACItem(
+            item_assets_configs=self.item_assets_configs,
+            alternate_href_generator=AlternateHrefGenerator.from_config(self.collection_config.alternate_links),
+        )
         self._func_find_item_group: Optional[Callable[[Item], str]] = None
 
-        self._collection_builder: STACCollectionBuilder = None
+        self._collection_builder: STACCollectionBuilder = STACCollectionBuilder(
+            collection_config=self._collection_config,
+            overwrite=self._overwrite,
+            output_dir=self._collection_dir,
+            link_items=self._link_items,
+        )
 
         self._item_postprocessor: Optional[Callable] = item_postprocessor
 
@@ -798,6 +686,9 @@ class AssetMetadataPipeline:
         self._collection_groups: Dict[Hashable, Collection] = {}
 
     @staticmethod
+    @deprecated.deprecated(
+        "Use AssetMetadataPipeline() instead. This method will be removed in a future version.",
+    )
     def from_config(
         metadata_collector: IMetadataCollector,
         collection_config: CollectionConfig,
@@ -807,86 +698,18 @@ class AssetMetadataPipeline:
         item_postprocessor: Optional[Callable] = None,
     ) -> "AssetMetadataPipeline":
         """Creates a AssetMetadataPipeline from configurations."""
-        if output_dir and not isinstance(output_dir, Path):
-            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
-
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
-        pipeline = AssetMetadataPipeline(
-            metadata_collector=None, output_dir=None, overwrite=False, item_postprocessor=item_postprocessor
-        )
-        pipeline._setup(
+        return AssetMetadataPipeline(
             metadata_collector=metadata_collector,
             collection_config=collection_config,
             output_dir=output_dir,
             overwrite=overwrite,
             link_items=link_items,
+            item_postprocessor=item_postprocessor,
         )
-        return pipeline
-
-    def _setup(
-        self,
-        metadata_collector: IMetadataCollector,
-        collection_config: CollectionConfig,
-        output_dir: Optional[Path] = None,
-        overwrite: Optional[bool] = False,
-        link_items: Optional[bool] = True,
-    ) -> None:
-        """Set up an existing instance using the specified dependencies and configuration settings."""
-
-        if metadata_collector is None:
-            raise ValueError(
-                'Argument "metadata_collector" can not be None, must be a IMetadataCollector implementation.'
-            )
-
-        if collection_config is None:
-            raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
-
-        # Dependencies or components that we delegate work to.
-        self._metadata_collector = metadata_collector
-
-        # Settings: these are just data, not components we delegate work to.
-        self._collection_config = collection_config
-        self._output_base_dir = self._get_output_dir_or_default(output_dir)
-        self._overwrite = overwrite
-        self._link_items = bool(link_items)
-
-        self._setup_internals()
 
     @staticmethod
     def _get_output_dir_or_default(output_dir: Path | str | None) -> Path:
         return Path(output_dir) if output_dir else Path(tempfile.gettempdir())
-
-    def _setup_internals(
-        self,
-        group: str | int | None = None,
-    ) -> None:
-        """Setup the internal components based on the components that we receive via dependency injection."""
-
-        self._meta_to_stac_item_mapper = MapMetadataToSTACItem(
-            item_assets_configs=self.item_assets_configs,
-            alternate_href_generator=AlternateHrefGenerator.from_config(self.collection_config.alternate_links),
-        )
-
-        # The default way we group items into multiple collections is by year
-        # Currently we don't use any other ways to create a group of collections.
-        self._func_find_item_group = lambda item: item.datetime.year
-
-        if group and not self.uses_collection_groups:
-            raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
-
-        if group:
-            self._collection_dir = self.get_collection_file_for_group(group)
-        else:
-            self._collection_dir = self._output_base_dir
-
-        self._collection_builder = STACCollectionBuilder(
-            collection_config=self._collection_config,
-            overwrite=self._overwrite,
-            output_dir=self._collection_dir,
-            link_items=self._link_items,
-        )
 
     @property
     def collection(self) -> Collection | None:
@@ -1018,7 +841,6 @@ class AssetMetadataPipeline:
 
     def build_collection(
         self,
-        chunks: Optional[int] = None,
     ):
         """Build the entire STAC collection."""
         self._log_progress_message("START: build_collection")
@@ -1030,18 +852,38 @@ class AssetMetadataPipeline:
         self._collection_builder.save_collection()
         self._collection = self._collection_builder.collection
 
-        coll_file = self._collection_builder.collection_file
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
-        post_processor.process_collection(coll_file)
-
         self._log_progress_message("DONE: build_collection")
         # self._collection = None
+
+    def _setup_internals_for_group(
+        self,
+        group: str | int,
+    ) -> None:
+        """Setup the internal components based on the components that we receive via dependency injection."""
+        # The default way we group items into multiple collections is by year
+        # Currently we don't use any other ways to create a group of collections.
+        if group is None:
+            raise ValueError("Argument 'group' can not be None. It must be a string or an integer.")
+
+        if not self.uses_collection_groups:
+            raise InvalidOperation("You can only use collection groups when the pipeline is configured for grouping.")
+
+        self._collection_dir = self.get_collection_file_for_group(group)
+
+        self._collection_builder = STACCollectionBuilder(
+            collection_config=self._collection_config,
+            overwrite=self._overwrite,
+            output_dir=self._collection_dir,
+            link_items=self._link_items,
+        )
 
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)
 
     def build_grouped_collections(self):
         self._log_progress_message("START: build_grouped_collections")
+
+        self._func_find_item_group = lambda item: item.datetime.year  # Default grouping by year
 
         self.reset()
 
@@ -1056,7 +898,7 @@ class AssetMetadataPipeline:
         self._root_collection_builder.create_empty_collection()
 
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
-            self._setup_internals(group=group)
+            self._setup_internals_for_group(group=group)
 
             self._collection_builder.build_collection(stac_items=metadata_list, group=group)
             self._root_collection_builder.collection.add_child(self._collection_builder.collection)
@@ -1065,13 +907,6 @@ class AssetMetadataPipeline:
         self._root_collection_builder.normalize_hrefs()
         self._root_collection_builder.collection.update_extent_from_items()
         self._root_collection_builder.save_collection()
-
-        # post process
-        post_processor = PostProcessSTACCollectionFile(collection_overrides=self._collection_config.overrides)
-        post_processor.process_collection(self._root_collection_builder.collection_file)
-        for group in self._collection_groups.keys():
-            coll_file = Path(self._collection_groups[group].self_href)
-            post_processor.process_collection(coll_file)
 
         self._log_progress_message("DONE: build_grouped_collections")
 

@@ -20,7 +20,6 @@ from pystac import Collection
 
 from stacbuilder.builder import (
     AssetMetadataPipeline,
-    PostProcessSTACCollectionFile,
 )
 from stacbuilder.collector import FileCollector, MetadataCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
@@ -44,7 +43,6 @@ __all__ = [
     "list_input_files",
     "list_asset_metadata",
     "list_stac_items",
-    "postprocess_collection",
     "load_collection",
     "validate_collection",
     "upload_to_stac_api",
@@ -238,28 +236,6 @@ def list_stac_items(
     failed_files = [files[i] for i, item in enumerate(stac_items) if item is None]
 
     return stac_items, failed_files
-
-
-def postprocess_collection(
-    collection_file: Path,
-    collection_config_path: Path,
-    output_dir: Optional[Path] = None,
-) -> None:
-    """
-    Run only the post-processing step, on an existing STAC collection.
-
-    Mainly intended to troubleshoot the postprocessing so you don't have to
-    regenerate the entire set every time.
-
-    :param collection_file: Path to the STAC collection file.
-    :param collection_config_path: Path to the collection configuration file.
-    :param output_dir: Directory where the STAC collection will be saved.
-    """
-    collection_config_path = Path(collection_config_path).expanduser().absolute()
-    coll_cfg = CollectionConfig.from_json_file(collection_config_path)
-
-    postprocessor = PostProcessSTACCollectionFile(collection_overrides=coll_cfg.overrides)
-    postprocessor.process_collection(collection_file=collection_file, output_dir=output_dir)
 
 
 def load_collection(

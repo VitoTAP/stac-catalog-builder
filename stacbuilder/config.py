@@ -275,17 +275,7 @@ class CollectionConfig(BaseModel):
 
     # TODO: general links (urls) that are often quite specific to the dataset, such as "about", or a link to a document that describes the dataset, etc.
 
-    # A set of specific fields we want to give a fixed value at the end.
-    # So this could override values that were generated.
-    # For example I have used to to correct the collection's extent as a
-    # temporary fix when there was something wrong, and to add a projected BBox as well.
-    # This is done at the very end in the post-processing step of the builder.
-    overrides: Optional[Dict[str, Any]] = None
-
     # TODO: to simplify the use we want to include the config for the input files and output directory.
-    #   This will help us to ditch the makefiles that automate commands with lots of options,
-    #   which mainly consists of these paths.
-    #   For now we leave it out and just earmark this spot to added it here.
     # input_files_config: Optional[FileCollectorConfig] = None
 
     @classmethod
