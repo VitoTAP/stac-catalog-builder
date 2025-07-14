@@ -64,7 +64,6 @@ def cli(verbose):
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
     help="Configuration file for the collection",
 )
-@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 @click.argument(
     "inputdir",
@@ -74,14 +73,13 @@ def cli(verbose):
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
+def build(glob, collection_config, inputdir, outputdir, max_files):
     """Build a STAC collection from a directory of GeoTIFF files."""
     commandapi.build_collection(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
         output_dir=outputdir,
-        overwrite=overwrite,
         max_files=max_files,
     )
 
@@ -100,7 +98,6 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
     help="Configuration file for the collection",
 )
-@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
 @click.option("-m", "--max-files", type=int, default=-1, help="Stop processing after this maximum number of files.")
 @click.argument(
     "inputdir",
@@ -110,14 +107,13 @@ def build(glob, collection_config, overwrite, inputdir, outputdir, max_files):
     "outputdir",
     type=click.Path(dir_okay=True, file_okay=False),
 )
-def build_grouped_collections(glob, collection_config, overwrite, max_files, inputdir, outputdir):
+def build_grouped_collections(glob, collection_config, max_files, inputdir, outputdir):
     """Build a STAC collection from a directory of GeoTIFF files."""
     commandapi.build_grouped_collections(
         collection_config_path=collection_config,
         glob=glob,
         input_dir=inputdir,
         output_dir=outputdir,
-        overwrite=overwrite,
         max_files=max_files,
     )
 
@@ -332,14 +328,12 @@ def check_openeo_job(job_id: str):
     type=click.STRING,
     help="Split collection's temporal extent using this frequency. Allowed values are the Pandas frequency abbreviations",
 )
-@click.option("--overwrite", is_flag=True, help="Replace the entire output directory when it already exists")
-def vpp_build(collection: str, max_products: int, outputdir: Path, overwrite: bool, frequency: str):
+def vpp_build(collection: str, max_products: int, outputdir: Path, frequency: str):
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
     commandapi.vpp_build_collection(
         collection_id=collection,
         max_products=max_products,
         output_dir=outputdir,
-        overwrite=overwrite,
         query_by_frequency=frequency,
     )
 

@@ -98,8 +98,6 @@ Options:
   -g, --glob TEXT               glob pattern for collecting the geotiff files.
                                 Example: */*.tif
   -c, --collection-config FILE  Configuration file for the collection
-  --overwrite                   Replace the entire output directory when it
-                                already exists
   -m, --max-files INTEGER       Stop processing after this maximum number of
                                 files.
   --help                        Show this message and exit.

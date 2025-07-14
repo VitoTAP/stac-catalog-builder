@@ -44,7 +44,6 @@ assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 # Output Paths
 output_path = Path(__file__).parent.resolve() / "results"
 stac_output_path = output_path / collection_name
-overwrite = True
 
 tiffs_glob = "*.tif"  # CLCBB*/ WAW*/
 
@@ -59,7 +58,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=stac_output_path,
-    overwrite=overwrite,
     link_items=False,
 )
 # validate collection

@@ -24,7 +24,6 @@ tiffs_glob = "*/*.tif"
 
 # Output Paths
 output_path = Path("results") / catalog_version
-overwrite = True
 
 
 # list input files
@@ -71,7 +70,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=output_path,
-    overwrite=overwrite,
     item_postprocessor=postprocess_item,
 )
 

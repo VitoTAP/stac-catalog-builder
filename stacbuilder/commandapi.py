@@ -55,7 +55,6 @@ def build_collection(
     glob: str,
     input_dir: Path,
     output_dir: Path,
-    overwrite: bool,
     max_files: Optional[int] = -1,
     link_items: bool = True,
     item_postprocessor: Optional[Callable] = None,
@@ -67,7 +66,6 @@ def build_collection(
     :param glob: Glob pattern to match the files within the input_dir.
     :param input_dir: Root directory where the files are located.
     :param output_dir: Directory where the STAC collection will be saved.
-    :param overwrite: Overwrite the output directory if it exists.
     :param max_files: Maximum number of files to process.
     """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
@@ -86,7 +84,6 @@ def build_collection(
         collection_config=coll_cfg,
         metadata_collector=metadata_collector,
         output_dir=output_dir,
-        overwrite=overwrite,
         link_items=link_items,
         item_postprocessor=item_postprocessor,
     )
@@ -100,7 +97,6 @@ def build_grouped_collections(
     glob: str,
     input_dir: Path,
     output_dir: Path,
-    overwrite: bool,
     max_files: Optional[int] = -1,
 ) -> None:
     """
@@ -113,7 +109,6 @@ def build_grouped_collections(
     :param glob: Glob pattern to match the files within the input_dir.
     :param input_dir: Root directory where the files are located.
     :param output_dir: Directory where the STAC collection will be saved.
-    :param overwrite: Overwrite the output directory if it exists.
     :param max_files: Maximum number of files to process.
     """
 
@@ -133,7 +128,6 @@ def build_grouped_collections(
         collection_config=coll_cfg,
         metadata_collector=metadata_collector,
         output_dir=output_dir,
-        overwrite=overwrite,
     )
 
     pipeline.build_grouped_collections()
@@ -182,19 +176,16 @@ def list_asset_metadata(
     :param max_files: Maximum number of files to process.
     :return: List of AssetMetadata objects for each file.
     """
-
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
     file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-    pipeline = AssetMetadataPipeline.from_config(
+    collector = MetadataCollector.from_config(
         collection_config=coll_cfg,
-        metadata_collector=MetadataCollector.from_config(
-            collection_config=coll_cfg,
-            file_coll_cfg=file_coll_cfg,
-        ),
+        file_coll_cfg=file_coll_cfg,
     )
+    collector.collect()
 
-    return pipeline.get_metadata()
+    return collector.metadata_list
 
 
 def list_stac_items(
@@ -226,13 +217,11 @@ def list_stac_items(
     pipeline = AssetMetadataPipeline.from_config(
         collection_config=coll_cfg,
         metadata_collector=metadata_collector,
-        output_dir=None,
-        overwrite=False,
         item_postprocessor=item_postprocessor,
     )
 
     stac_items = list(pipeline.collect_stac_items())
-    files = list(pipeline.get_input_files())
+    files = list(metadata_collector.get_input_files())
     failed_files = [files[i] for i, item in enumerate(stac_items) if item is None]
 
     return stac_items, failed_files

@@ -8,11 +8,10 @@ import datetime as dt
 import gc
 import inspect
 import logging
-import tempfile
 from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
-from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Hashable, Iterable, List, Optional, Tuple
 
 # Third party libraries
 import deprecated
@@ -26,11 +25,8 @@ from pystac import (
     TemporalExtent,
 )
 from pystac.errors import STACValidationError
-from pystac.extensions.eo import Band as EOBand
 from pystac.extensions.eo import EOExtension
 from pystac.extensions.file import FileExtension
-
-# TODO: add the GridExtension support again
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.raster import RasterBand, RasterExtension
@@ -45,12 +41,8 @@ from stacbuilder.config import (
 
 # Modules from this project
 from stacbuilder.exceptions import InvalidConfiguration, InvalidOperation
-from stacbuilder.metadata import AssetMetadata
+from stacbuilder.metadata import AssetMetadata, BandMetadata
 
-# TODO: add datacube extension: https://github.com/VitoTAP/stac-catalog-builder/issues/19
-
-
-CLASSIFICATION_SCHEMA = "https://stac-extensions.github.io/classification/v1.0.0/schema.json"
 ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
 
 
@@ -59,8 +51,6 @@ _logger = logging.getLogger(__name__)
 
 class AlternateHrefGenerator:
     """Generates the alternate links for assets."""
-
-    # TODO this class should be merged with CreateAssetUrlFromPath, but that class is used in the mapper and this one is used in the builder.
 
     # Type alias for the specific callable that AlternateHrefGenerator needs.
     AssetMetadataToURL = Callable[[AssetMetadata], str]
@@ -151,10 +141,10 @@ class AlternateHrefGenerator:
         return alt_link_gen
 
 
-class MapMetadataToSTACItem:
-    """Converts AssetMetadata objects to STAC Items.
-
-    TODO: find better name for item_assets_configs, maybe asset_definition_configs.
+class ItemBuilder:
+    """
+    Converts AssetMetadata objects to STAC Items.
+    This class is used to create STAC Items from AssetMetadata objects.
     """
 
     def __init__(
@@ -162,45 +152,48 @@ class MapMetadataToSTACItem:
         item_assets_configs: Dict[str, AssetConfig],
         alternate_href_generator: Optional[AlternateHrefGenerator] = None,
     ) -> None:
-        super().__init__()
-
         # Settings: these are just data, not components we delegate work to.
-        self._item_assets_configs: Dict[str, AssetConfig] = item_assets_configs
+        self.item_assets_configs: Dict[str, AssetConfig] = item_assets_configs
         self._alternate_href_generator: Optional[AlternateHrefGenerator] = alternate_href_generator
 
-    @property
-    def item_assets_configs(self) -> Dict[str, AssetConfig]:
-        return self._item_assets_configs
-
-    def create_alternate_links(self, metadata: AssetMetadata) -> Dict[str, Any]:
-        """Create the alternate links."""
-        if not self._alternate_href_generator:
-            return None
-
-        if not metadata.asset_path:
-            return None
-
-        return self._alternate_href_generator.get_alternates(metadata)
-
     def create_item(self, assets: List[AssetMetadata]) -> Item:
-        def is_known_asset_type(metadata: AssetMetadata) -> bool:
-            return metadata.asset_type in self.item_assets_configs
+        """
+        Create a STAC Item from a list of AssetMetadata objects. All assets should have the same item_id and consistent metadata.
 
-        known_assets = [a for a in assets if is_known_asset_type(a)]
+        :param assets: List of AssetMetadata objects.
+        :return: A STAC Item object.
+        """
+
+        known_assets = [a for a in assets if a.asset_type in self.item_assets_configs]
         if not known_assets:
             error_msg = (
                 "None of the assets is defined in collection configuration. "
                 + f"{[a.asset_type for a in assets]} not found in {list(self.item_assets_configs.keys())}"
             )
-
             _logger.warning(error_msg)
             return None
 
-        # Ensure that the asset are all for the same STAC item
-        assert len(set(a.item_id for a in assets)) == 1
-        assert len(set(a.item_href for a in assets)) == 1
+        first_asset = known_assets[0]  # The first asset is used to create the item.
 
-        first_asset = known_assets[0]
+        # Ensure that all assets have consistent metadata for common properties
+        assert all(a.item_id == first_asset.item_id for a in known_assets), "All assets should have the same item_id"
+        assert all(a.item_href == first_asset.item_href for a in known_assets), (
+            "All assets should have the same item_href"
+        )
+        assert all(a.proj_epsg == first_asset.proj_epsg for a in known_assets), (
+            "All assets should have the same proj_epsg"
+        )
+        assert all(a.transform == first_asset.transform for a in known_assets), (
+            "All assets should have the same transform"
+        )
+        assert all(a.bbox_as_list == first_asset.bbox_as_list for a in known_assets), (
+            "All assets should have the same lat-lon bounding box"
+        )
+        assert all(a.proj_bbox_as_list == first_asset.proj_bbox_as_list for a in known_assets), (
+            "All assets should have the same projected bounding box"
+        )
+        assert all(a.shape == first_asset.shape for a in known_assets), "All assets should have the same shape"
+
         item = Item(
             href=first_asset.item_href,
             id=first_asset.item_id,
@@ -214,69 +207,36 @@ class MapMetadataToSTACItem:
 
         item.common_metadata.created = dt.datetime.now(dt.timezone.utc)
 
-        # TODO: support summaries: these fields are recommended but they are also not always relevant or present.
-        #   Originally defined in a module with only constants but now we work with configuration
-        #   or extracting it from the source.
-        #   This is part of https://github.com/VitoTAP/stac-catalog-builder/issues/18
-        # item.common_metadata.mission = constants.MISSION
-        # item.common_metadata.platform = constants.PLATFORM
-        # item.common_metadata.instruments = constants.INSTRUMENTS
-
-        def to_tuple_or_none(value) -> Union[Tuple, None]:
-            if value is None:
-                return None
-            return tuple(value)
-
-        #
-        # Do some sanity checks on the asset metadata.
-        # There can be multiple assets in a STAC item and we want them to be consistent.
-
-        # All assets should have the same CRS
-        assert len(set(a.proj_epsg for a in assets)) == 1, "All assets should have the same CRS"
-        assert len(set(to_tuple_or_none(a.transform) for a in assets)) == 1, (
-            "All assets should have the same projection transform"
-        )
-
-        # All assets should have the same bounding box
-        assert len(set(to_tuple_or_none(a.bbox_as_list) for a in assets)) == 1, (
-            "All assets should have the same lat-lon bounding box"
-        )
-        assert len(set(to_tuple_or_none(a.proj_bbox_as_list) for a in assets)) == 1, (
-            "All assets should have the same projected bounding box"
-        )
-
-        # All assets should also have the same shape (width and height in pixels)
-        assert len(set(to_tuple_or_none(a.shape) for a in assets)) == 1, "All assets should have the same shape"
-
-        for metadata in assets:
-            item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
-
+        # Add the projection extension
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-        if metadata.proj_epsg:
+        if first_asset.proj_epsg:
             item_proj.epsg = first_asset.proj_epsg
         item_proj.bbox = first_asset.proj_bbox_as_list
         item_proj.geometry = first_asset.geometry_proj_as_dict
         item_proj.transform = first_asset.transform
         item_proj.shape = first_asset.shape
 
-        asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
-        if asset_config.eo_bands:
-            EOExtension.add_to(item)
-            if len(assets) == 1:
-                item_eo = EOExtension.ext(item, add_if_missing=True)
-                eo_bands = []
+        # Can always be done on asset level but leaving it here for now.
+        # asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
+        # if asset_config.eo_bands:
+        #     item_eo = EOExtension.ext(item, add_if_missing=True)
+        #     eo_bands = []
 
-                # TODO: detect if the band is an Electro-Optical one.
-                # TODO: https://github.com/VitoTAP/stac-catalog-builder/issues/29 set band's common_name property if common band, and wavelenght info when available
-                for band_cfg in asset_config.eo_bands:
-                    new_band: EOBand = EOBand.create(
-                        name=band_cfg.name,
-                        description=band_cfg.description,
-                    )
-                    eo_bands.append(new_band)
-                item_eo.apply(eo_bands)
+        #     # TODO: https://github.com/VitoTAP/stac-catalog-builder/issues/29 set band's common_name property if common band, and wavelenght info when available
+        #     for band_cfg in asset_config.eo_bands:
+        #         new_band: EOBand = EOBand.create(
+        #             name=band_cfg.name,
+        #             description=band_cfg.description,
+        #             common_name=band_cfg.common_name,
+        #             wavelength=band_cfg.wavelength,
+        #         )
+        #         eo_bands.append(new_band)
+        #     item_eo.apply(eo_bands)
 
-        item.stac_extensions.append(CLASSIFICATION_SCHEMA)
+        for metadata in assets:
+            item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
+
+        # item.stac_extensions.append(CLASSIFICATION_SCHEMA)
         item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
 
         return item
@@ -289,6 +249,7 @@ class MapMetadataToSTACItem:
         asset.set_owner(item)
         asset.media_type = metadata.media_type
 
+        # file extension
         if metadata.file_size:
             file_info = FileExtension.ext(asset, add_if_missing=True)
             file_info.size = metadata.file_size
@@ -309,16 +270,15 @@ class MapMetadataToSTACItem:
             else:
                 # The default values for raster:bands are available in the configuration
                 for i, raster_bands_config in enumerate(asset_config.raster_bands):
-                    band_md = metadata.raster_metadata.bands[i]
+                    band_md: BandMetadata = metadata.bands[i]
 
                     new_band: RasterBand = RasterBand.create(
-                        # TODO: need to get this information via rasterio as much as possible.
                         data_type=band_md.data_type or raster_bands_config.data_type,
                         nodata=band_md.nodata or raster_bands_config.nodata,
                         unit=band_md.units or raster_bands_config.unit,
                     )
                     if raster_bands_config.sampling is not None:
-                        new_band.sampling = raster_bands_config.sampling.__str__()
+                        new_band.sampling = str(raster_bands_config.sampling)
 
                     if raster_bands_config.offset is not None:
                         new_band.offset = raster_bands_config.offset
@@ -334,8 +294,8 @@ class MapMetadataToSTACItem:
 
         # Add the alternate links for the Alternate-Asset extension
         # see: https://github.com/stac-extensions/alternate-assets
-        if metadata.asset_path:
-            alternate_links = self.create_alternate_links(metadata)
+        if metadata.asset_path and self._alternate_href_generator:
+            alternate_links = self._alternate_href_generator.get_alternates(metadata)
             if alternate_links:
                 asset.extra_fields.update(alternate_links)
 
@@ -359,27 +319,22 @@ class MapMetadataToSTACItem:
         return self.item_assets_configs[asset_type]
 
 
-class STACCollectionBuilder:
+class CollectionBuilder:
     """Creates a STAC Collection from STAC Items."""
 
     def __init__(
         self,
         collection_config: CollectionConfig,
-        output_dir: Path,
-        overwrite: bool = False,
+        output_dir: Optional[Path] = None,
         link_items: Optional[bool] = True,
     ) -> None:
         # Settings: these are just data, not components we delegate work to.
         self._collection_config = collection_config
 
-        if not output_dir:
-            raise ValueError(
-                'Value for "output_dir" must be a Path instance. It can not be None or the empty string.'
-                + f"{output_dir=!r}"
-            )
-        self._output_dir = Path(output_dir)
+        self._output_dir = output_dir
+        if self._output_dir and not isinstance(self._output_dir, Path):
+            self._output_dir = Path(self._output_dir).expanduser().absolute()
 
-        self._overwrite_output = bool(overwrite)
         self._link_items = bool(link_items)
 
         # The result
@@ -392,23 +347,12 @@ class STACCollectionBuilder:
 
     @property
     def output_dir(self) -> Path:
-        """The directory where we should save "collection.json.
-
-        (and the items as well, but those tend to be in subdirectories)
         """
+        The directory where the collection and the items should be saved
+        """
+        if not self._output_dir:
+            raise InvalidOperation("Output directory is not set.")
         return self._output_dir
-
-    @output_dir.setter
-    def output_dir(self, directory: Path) -> None:
-        self._output_dir = Path(directory)
-
-    @property
-    def overwrite_output(self) -> bool:
-        return self._overwrite_output
-
-    @overwrite_output.setter
-    def overwrite_output(self, value: bool) -> None:
-        self._overwrite_output = bool(value)
 
     @property
     def link_items(self) -> bool:
@@ -507,14 +451,14 @@ class STACCollectionBuilder:
         day = f"{item.datetime.day:02}"
         return self.stac_item_dir() / year / month / day / f"{item.id}.json"
 
-    def normalize_hrefs(self, skip_unresolved: bool = False):
+    def normalize_hrefs(self):
         layout_template = self._collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
 
         out_dir_str = self.output_dir.as_posix()
         if out_dir_str.endswith("/"):
             out_dir_str = out_dir_str[-1]
-        self._collection.normalize_hrefs(root_href=out_dir_str, strategy=strategy, skip_unresolved=skip_unresolved)
+        self._collection.normalize_hrefs(root_href=out_dir_str, strategy=strategy, skip_unresolved=False)
 
     def validate_collection(self, collection: Collection):
         """Run STAC validation on the collection."""
@@ -582,7 +526,6 @@ class STACCollectionBuilder:
         item_assets_ext.item_assets = self._get_item_assets_definitions()
 
         RasterExtension.add_to(collection)
-        collection.stac_extensions.append(CLASSIFICATION_SCHEMA)
         EOExtension.add_to(collection)
 
         # TODO: Add support for custom links in the collection, like there was in the early scripts.
@@ -634,14 +577,17 @@ class STACCollectionBuilder:
 
 
 class AssetMetadataPipeline:
-    """Converts AssetMetadata to STAC collections."""
+    """
+    Creates a STAC Collection and Items from AssetMetadata. This class is the main entry point for the STAC catalog builder.
+
+    The AssetMetadata is collected by the IMetadataCollector implementation, which is passed to the constructor.
+    """
 
     def __init__(
         self,
         metadata_collector: IMetadataCollector,
         collection_config: CollectionConfig,
-        output_dir: Path,
-        overwrite: Optional[bool] = False,
+        output_dir: Optional[Path] = None,
         link_items: Optional[bool] = True,
         item_postprocessor: Optional[Callable] = None,
     ) -> None:
@@ -656,34 +602,31 @@ class AssetMetadataPipeline:
                 'Argument "metadata_collector" can not be None, must be a IMetadataCollector implementation.'
             )
         # Settings: these are just data, not components we delegate work to.
-        self._output_base_dir: Path = self._get_output_dir_or_default(output_dir)
-        self._collection_dir: Path = self._output_base_dir
-        self._overwrite: bool = bool(overwrite)
+        self._collection_dir: Path = output_dir
         self._link_items = bool(link_items)
-        self._collection_config: CollectionConfig = collection_config
+        self.collection_config: CollectionConfig = collection_config
 
         # Components / dependencies that must be provided
-        self._metadata_collector: IMetadataCollector = metadata_collector
+        self.metadata_collector: IMetadataCollector = metadata_collector
 
         # Components / dependencies that we set up internally
-        self._meta_to_stac_item_mapper: MapMetadataToSTACItem = MapMetadataToSTACItem(
+        self.item_builder: ItemBuilder = ItemBuilder(
             item_assets_configs=self.item_assets_configs,
             alternate_href_generator=AlternateHrefGenerator.from_config(self.collection_config.alternate_links),
         )
         self._func_find_item_group: Optional[Callable[[Item], str]] = None
 
-        self._collection_builder: STACCollectionBuilder = STACCollectionBuilder(
-            collection_config=self._collection_config,
-            overwrite=self._overwrite,
+        self.collection_builder: CollectionBuilder = CollectionBuilder(
+            collection_config=self.collection_config,
             output_dir=self._collection_dir,
             link_items=self._link_items,
         )
 
-        self._item_postprocessor: Optional[Callable] = item_postprocessor
+        self.item_postprocessor: Optional[Callable] = item_postprocessor
 
         # results
-        self._collection: Optional[Collection] = None
-        self._collection_groups: Dict[Hashable, Collection] = {}
+        self.collection: Optional[Collection] = None
+        self.collection_groups: Dict[Hashable, Collection] = {}
 
     @staticmethod
     @deprecated.deprecated(
@@ -693,7 +636,6 @@ class AssetMetadataPipeline:
         metadata_collector: IMetadataCollector,
         collection_config: CollectionConfig,
         output_dir: Optional[Path] = None,
-        overwrite: Optional[bool] = False,
         link_items: Optional[bool] = True,
         item_postprocessor: Optional[Callable] = None,
     ) -> "AssetMetadataPipeline":
@@ -702,90 +644,35 @@ class AssetMetadataPipeline:
             metadata_collector=metadata_collector,
             collection_config=collection_config,
             output_dir=output_dir,
-            overwrite=overwrite,
             link_items=link_items,
             item_postprocessor=item_postprocessor,
         )
-
-    @staticmethod
-    def _get_output_dir_or_default(output_dir: Path | str | None) -> Path:
-        return Path(output_dir) if output_dir else Path(tempfile.gettempdir())
-
-    @property
-    def collection(self) -> Collection | None:
-        return self._collection
 
     @property
     def collection_file(self) -> Path | None:
         if not self.collection:
             return None
-
         return Path(self.collection.self_href)
 
     @property
-    def collection_groups(self) -> Dict[Hashable, Collection] | None:
-        return self._collection_groups
-
-    @property
-    def collection_config(self) -> CollectionConfig:
-        return self._collection_config
-
-    @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
-        return self._collection_config.item_assets or {}
-
-    @property
-    def collection_builder(self) -> STACCollectionBuilder:
-        return self._collection_builder
-
-    @property
-    def meta_to_stac_item_mapper(self) -> MapMetadataToSTACItem:
-        return self._meta_to_stac_item_mapper
-
-    @property
-    def item_postprocessor(self) -> Optional[Callable]:
-        return self._item_postprocessor
-
-    @item_postprocessor.setter
-    def item_postprocessor(self, callable: Callable) -> None:
-        self._item_postprocessor = callable
+        return self.collection_config.item_assets or {}
 
     def reset(self) -> None:
-        self._collection = None
-        self._collection_groups = {}
+        """Reset the internal state of the pipeline."""
+        self.collection = None
+        self.collection_groups = {}
 
     def get_metadata(self) -> Iterable[AssetMetadata]:
-        """Generate the intermediate metadata objects, from the input files."""
-        self._metadata_collector.collect()
-        return self._metadata_collector.metadata_list
-
-    def get_input_files(self) -> List[Path]:
-        """Get the input files that were used to collect the metadata."""
-        return self._metadata_collector.get_input_files()
-
-    @property
-    def uses_collection_groups(self):
-        return self._func_find_item_group is not None
-
-    def group_stac_items_by(self) -> Dict[int, List[Item]]:
-        groups: Dict[int, AssetMetadata] = {}
-        iter_items = self.collect_stac_items()
-
-        for item in iter_items:
-            group = self._func_find_item_group(item)
-
-            if group not in groups:
-                groups[group] = []
-
-            groups[group].append(item)
-
-        return groups
+        """Tells the metadata collector to collect the metadata and return it."""
+        self.metadata_collector.collect()
+        return self.metadata_collector.metadata_list
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
         self._log_progress_message("START: collect_stac_items")
 
-        groups = self.group_metadata_by_item_id(self.get_metadata())
+        groups = self._group_metadata_by_item_id(self.get_metadata())
         num_groups = len(groups)
 
         progress_chunk_size = 10_000
@@ -795,23 +682,25 @@ class AssetMetadataPipeline:
                 self._log_progress_message(
                     f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%})"
                 )
-            sub_groups = self.split_group_by_latlon(
+            sub_groups = self._split_group_by_latlon(
                 assets
-            )  # Check that all the assets have the same lat-lon bounding box
+            )  # Ensure that all the assets have the same lat-lon bounding box
             for sub_group_assets in sub_groups.values():
-                stac_item = self._meta_to_stac_item_mapper.create_item(sub_group_assets)
+                stac_item = self.item_builder.create_item(sub_group_assets)
                 if stac_item:
-                    if self._item_postprocessor is not None:
-                        stac_item = self._item_postprocessor(stac_item)
+                    if self.item_postprocessor is not None:
+                        stac_item = self.item_postprocessor(stac_item)
                     yield stac_item
+
+        # Clean up the memory
         del groups
-        self._metadata_collector.reset()
+        self.metadata_collector.reset()
         gc.collect()
         self._log_progress_message("DONE: collect_stac_items")
 
-    def group_metadata_by_item_id(self, iter_metadata) -> Dict[int, List[Item]]:
+    def _group_metadata_by_item_id(self, iter_metadata) -> Dict[int, List[Item]]:
         self._log_progress_message("START: group_metadata_by_item_id")
-        groups: Dict[int, AssetMetadata] = {}
+        groups: Dict[str, AssetMetadata] = {}
 
         for metadata in iter_metadata:
             item_id = metadata.item_id
@@ -824,7 +713,7 @@ class AssetMetadataPipeline:
         self._log_progress_message("DONE: group_metadata_by_item_id")
         return groups
 
-    def split_group_by_latlon(self, metadata_list: List[AssetMetadata]) -> Dict[Tuple[int, int], List[AssetMetadata]]:
+    def _split_group_by_latlon(self, metadata_list: List[AssetMetadata]) -> Dict[Tuple[int, int], List[AssetMetadata]]:
         """Split the metadata into groups, based on the lat-lon bounding box."""
         groups: Dict[Tuple[int, int], List[AssetMetadata]] = {}
 
@@ -845,15 +734,26 @@ class AssetMetadataPipeline:
         """Build the entire STAC collection."""
         self._log_progress_message("START: build_collection")
 
+        assert self._collection_dir, "Collection directory must be set before building the collection."
+
         self.reset()
 
-        self._collection_builder.build_collection(self.collect_stac_items())
-        self._collection_builder.normalize_hrefs()
-        self._collection_builder.save_collection()
-        self._collection = self._collection_builder.collection
+        # This calls the item builder to create STAC Items from AssetMetadata.
+        item_generator = self.collect_stac_items()
+
+        # This passes the STAC Items to the collection builder to create a STAC Collection.
+        self.collection_builder.build_collection(item_generator)
+
+        #
+        self.collection_builder.normalize_hrefs()
+        self.collection_builder.save_collection()
+        self.collection = self.collection_builder.collection
 
         self._log_progress_message("DONE: build_collection")
-        # self._collection = None
+
+    ####################################################
+    # Code below is specific to the grouped collections.
+    ####################################################
 
     def _setup_internals_for_group(
         self,
@@ -870,29 +770,49 @@ class AssetMetadataPipeline:
 
         self._collection_dir = self.get_collection_file_for_group(group)
 
-        self._collection_builder = STACCollectionBuilder(
-            collection_config=self._collection_config,
-            overwrite=self._overwrite,
+        self.collection_builder = CollectionBuilder(
+            collection_config=self.collection_config,
             output_dir=self._collection_dir,
             link_items=self._link_items,
         )
 
+    @property
+    def uses_collection_groups(self):
+        return self._func_find_item_group is not None
+
     def get_collection_file_for_group(self, group: str | int):
         return self._output_base_dir / str(group)
+
+    def group_stac_items_by(self) -> Dict[int, List[Item]]:
+        """Group the STAC items by calling the function that is set in _func_find_item_group."""
+        groups: Dict[int, AssetMetadata] = {}
+        iter_items = self.collect_stac_items()
+
+        for item in iter_items:
+            group = self._func_find_item_group(item)
+
+            if group not in groups:
+                groups[group] = []
+
+            groups[group].append(item)
+
+        return groups
 
     def build_grouped_collections(self):
         self._log_progress_message("START: build_grouped_collections")
 
+        assert self._collection_dir, "Collection directory must be set before building grouped collections."
+
         self._func_find_item_group = lambda item: item.datetime.year  # Default grouping by year
+        self._output_base_dir = self._collection_dir
 
         self.reset()
 
         if not self.uses_collection_groups:
             raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
 
-        self._root_collection_builder = STACCollectionBuilder(
-            collection_config=self._collection_config,
-            overwrite=self._overwrite,
+        self._root_collection_builder = CollectionBuilder(
+            collection_config=self.collection_config,
             output_dir=self._output_base_dir,
         )
         self._root_collection_builder.create_empty_collection()
@@ -900,9 +820,9 @@ class AssetMetadataPipeline:
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
             self._setup_internals_for_group(group=group)
 
-            self._collection_builder.build_collection(stac_items=metadata_list, group=group)
-            self._root_collection_builder.collection.add_child(self._collection_builder.collection)
-            self._collection_groups[group] = self._collection_builder.collection
+            self.collection_builder.build_collection(stac_items=metadata_list, group=group)
+            self._root_collection_builder.collection.add_child(self.collection_builder.collection)
+            self.collection_groups[group] = self.collection_builder.collection
 
         self._root_collection_builder.normalize_hrefs()
         self._root_collection_builder.collection.update_extent_from_items()

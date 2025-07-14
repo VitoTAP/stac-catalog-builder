@@ -68,12 +68,16 @@ class EOBandConfig(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    # TODO: the EO extension calls this common_name, maybe we should use that instead of 'name'
-    #   https://github.com/stac-extensions/eo#band-object
-    #   See GH issue: https://github.com/VitoTAP/stac-catalog-builder/issues/29
     name: str = Field(description="common_name of the band.")
 
     description: str = Field(description="Description of the band.")
+    common_name: Optional[str] = Field(
+        default=None, description="Common name of the band, such as 'red', 'green', 'blue', etc."
+    )
+    wavelength: Optional[float] = Field(
+        default=None,
+        description=("Wavelength of the band in nanometers. " + "This is a float value, e.g. 665.0 for the red band."),
+    )
 
 
 class SamplingType(enum.StrEnum):
@@ -241,6 +245,7 @@ class AlternateHrefConfig(BaseModel):
     add_S3: bool = False
     s3_bucket: Optional[str] = None
     s3_root_path: Optional[str] = None
+    # TODO add validation for s3_bucket and s3_root_path if add_S3 is True
 
 
 class CollectionConfig(BaseModel):

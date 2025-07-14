@@ -23,7 +23,6 @@ from stacbuilder.stacapi import (
 
 data_input_path = Path("/vitodata/vegteam_lcfm_features_2020/LCFM/LSF-ANNUAL/v100/blocks/").expanduser().absolute()
 configfile = "sentinel-2_annualfeatures.json"
-overwrite = False
 
 
 def build_collection(filepattern):
@@ -56,7 +55,6 @@ def build_collection(filepattern):
         collection_config=coll_cfg,
         output_dir=output_path,
         link_items=False,
-        overwrite=overwrite,
     )
 
     # postprocessor to add new properties into items

@@ -76,7 +76,6 @@ def build_collection(
         metadata_collector=CustomCollector(),
         collection_config=coll_cfg,
         output_dir=output_dir,
-        overwrite=True,
         link_items=False,
     )
 

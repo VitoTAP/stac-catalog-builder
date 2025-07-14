@@ -27,7 +27,6 @@ output_path = containing_folder / "results"
 test_output_path = output_path / "test" / catalog_version
 test_output_path.mkdir(parents=True, exist_ok=True)
 publish_output_path = Path("/dataCOPY/MTDA/MODIS/GLASS_FAPAR/tiff_collection_months_sd/STAC_catalogs/v0.2/")
-overwrite = True
 
 
 # list input files
@@ -67,7 +66,6 @@ rmtree(test_output_path)
 #     glob=tiffs_glob,
 #     input_dir=tiff_input_path,
 #     output_dir=publish_output_path,
-#     overwrite=overwrite,
 # )
 
 # build collection
@@ -76,7 +74,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=publish_output_path,
-    overwrite=overwrite,
 )
 
 

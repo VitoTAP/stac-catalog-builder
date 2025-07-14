@@ -26,8 +26,6 @@ def vpp_list_metadata(
     pipeline = AssetMetadataPipeline.from_config(
         metadata_collector=collector,
         collection_config=coll_cfg,
-        output_dir=None,
-        overwrite=False,
     )
     return list(pipeline.get_metadata())
 
@@ -50,8 +48,6 @@ def vpp_list_stac_items(
     pipeline = AssetMetadataPipeline.from_config(
         metadata_collector=collector,
         collection_config=coll_cfg,
-        output_dir=None,
-        overwrite=False,
     )
     return list(pipeline.collect_stac_items())
 
@@ -59,7 +55,6 @@ def vpp_list_stac_items(
 def vpp_build_collection(
     collection_id: Optional[str] = None,
     output_dir: Optional[Path] = None,
-    overwrite: Optional[bool] = False,
     max_products: Optional[int] = -1,
     query_by_frequency: str = "QS",
     item_postprocessor=None,
@@ -80,17 +75,14 @@ def vpp_build_collection(
         metadata_collector=collector,
         collection_config=coll_cfg,
         output_dir=output_dir,
-        overwrite=overwrite,
         link_items=False,
+        item_postprocessor=item_postprocessor,
     )
-    if item_postprocessor:
-        pipeline.item_postprocessor = item_postprocessor
     pipeline.build_collection()
 
 
 def vpp_build_all_collections(
     output_dir: Path,
-    overwrite: bool,
     max_products: Optional[int] = -1,
     query_by_frequency: str = "QS",
 ) -> None:
@@ -110,7 +102,6 @@ def vpp_build_all_collections(
             metadata_collector=collector,
             collection_config=coll_cfg,
             output_dir=output_dir,
-            overwrite=overwrite,
         )
 
         pipeline.build_collection()

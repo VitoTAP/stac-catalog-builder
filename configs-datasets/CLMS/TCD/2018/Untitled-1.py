@@ -31,7 +31,6 @@ tiffs_glob = "*/*/*_03035_v020.tif"
 output_path = Path("results")
 test_output_path = output_path / "test" / catalog_version
 publish_output_path = output_path / "publish" / catalog_version
-overwrite = True
 
 # %%
 # list input files
@@ -80,7 +79,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=test_output_path,
-    overwrite=overwrite,
     link_items=False,
     item_postprocessor=item_postprocessor,
 )

@@ -30,7 +30,6 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
-            overwrite=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
@@ -45,7 +44,6 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
-            overwrite=True,
         )
         # TODO: how to verify the output? For now this is just a smoke test.
         #   The underlying functionality can actually be tested more directly.
@@ -61,7 +59,6 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
-            overwrite=True,
         )
         collection_file = output_dir / "collection.json"
         return collection_file
@@ -97,7 +94,6 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
-            overwrite=True,
         )
         collection_file = output_dir / "collection.json"
         load_collection(collection_file=collection_file)
@@ -114,7 +110,6 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
-            overwrite=True,
         )
         collection_file = output_dir / "collection.json"
         validate_collection(collection_file=collection_file)

@@ -235,7 +235,6 @@ build-collection:
 		-v build \
 		-g "$(GLOB_PATTERN)" \
 		-c $(COLLECTION_CONFIG) \
-		--overwrite \
 		--max-files $(MAX_TIFF_FILES) \
 		$(TIFF_INPUT_DIR) \
 		$(TEST_OUTPUT_DIR)
@@ -248,7 +247,6 @@ build-grouped-collections:
 		-v build-grouped-collections \
 		-g "$(GLOB_PATTERN)" \
 		-c $(COLLECTION_CONFIG) \
-		--overwrite \
 		--max-files $(MAX_TIFF_FILES) \
 		$(TIFF_INPUT_DIR) \
 		$(TEST_OUTPUT_DIR)

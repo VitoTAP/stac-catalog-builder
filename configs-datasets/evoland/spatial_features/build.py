@@ -24,7 +24,6 @@ data_input_path = (
     Path("/vitodata/vegteam_lcfm_openeo/projects/evoland/spatial-features/v008-m10-c84/blocks/").expanduser().absolute()
 )
 configfile = "spatial_features.json"
-overwrite = False
 filepattern = "*/*/*/*/*/*.tif"
 
 # Find tiff files and print
@@ -56,7 +55,6 @@ pipeline: AssetMetadataPipeline = AssetMetadataPipeline.from_config(
     collection_config=coll_cfg,
     output_dir=output_path,
     link_items=False,
-    overwrite=overwrite,
 )
 
 # postprocessor to add new properties into items

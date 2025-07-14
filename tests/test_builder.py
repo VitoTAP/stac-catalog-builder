@@ -166,11 +166,14 @@ class TestGeoTiffPipeline:
             ),
             collection_config=collection_config_from_file,
             output_dir=collection_output_dir,
-            overwrite=False,
         )
 
     def test_get_input_files(self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline, geotiff_paths: List[Path]):
-        input_files = list(geotiff_asset_metadata_pipeline.get_input_files())
+        # TODO move to test_collector.py
+        file_collector = geotiff_asset_metadata_pipeline.metadata_collector.file_collector
+        assert file_collector is not None
+        file_collector.collect()
+        input_files = list(file_collector.input_files)
 
         assert sorted(input_files) == sorted(geotiff_paths)
 

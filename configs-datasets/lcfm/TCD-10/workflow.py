@@ -25,7 +25,6 @@ tiffs_glob = "*/*/2020/*_MAP.tif"
 output_path = Path(__file__).parent.resolve() / "results"
 test_output_path = output_path / "test" / catalog_version
 publish_output_path = output_path / "publish" / catalog_version
-overwrite = True
 
 
 # list input files
@@ -83,7 +82,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=test_output_path,
-    overwrite=overwrite,
     link_items=False,
     item_postprocessor=item_postprocessor,
 )
