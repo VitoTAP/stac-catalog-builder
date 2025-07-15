@@ -86,10 +86,8 @@ class AssetMetadata(BaseModel):
     #   - geometry of the bounding box
     # - raster shape (height & width in pixels)
     # - raster tags
-    #    TODO: Do we use raster tags in the STAC Items or collections? If not, can we remove this?
     # - Metadata from the raster about the bands,
     #       for the EO and Raster STAC extensions (eo:bands and raster:bands)
-    # TODO: will probably also need the spatial resolution.
     PROPS_FROM_HREFS: ClassVar[List[str]] = [
         "item_id",
         "asset_id",
@@ -149,9 +147,6 @@ class AssetMetadata(BaseModel):
     # The bands in the raster file.
     bands: List[BandMetadata] = []
 
-    # TODO check which of these fields are actually used
-    title: Optional[str] = None
-    collection_id: Optional[str] = None
     tile_id: Optional[str] = None
     media_type: Optional[MediaType] = None
 
@@ -179,8 +174,8 @@ class AssetMetadata(BaseModel):
         """
         Pydantic method to overwrite that is ran after init of a new AssetMetadata instance.
         Run some checks on the properties that are set and infer some properties"""
-        if not any([self.asset_id, self.item_id, self.collection_id]):
-            raise ValueError("At least one of asset_id, item_id, or collection_id must be set.")
+        if not any([self.asset_id, self.item_id]):
+            raise ValueError("At least one of asset_id or item_id must be set.")
         if not self.asset_path:
             self.asset_path = Path(self.original_href)
         if not self.href:
@@ -296,9 +291,7 @@ class AssetMetadata(BaseModel):
         data = {
             "asset_id": self.asset_id,
             "item_id": self.item_id,
-            "collection_id": self.collection_id,
             "tile_id": self.tile_id,
-            "title": self.title,
             "href": self.href,
             "original_href": self.original_href,
             "asset_path": self.asset_path,
@@ -342,9 +335,7 @@ class AssetMetadata(BaseModel):
         metadata = AssetMetadata()
         metadata.asset_id = cls.__get_str_from_dict("asset_id", data)
         metadata.item_id = cls.__get_str_from_dict("item_id", data)
-        metadata.collection_id = cls.__get_str_from_dict("collection_id", data)
         metadata.tile_id = cls.__get_str_from_dict("tile_id", data)
-        metadata.title = cls.__get_str_from_dict("title", data)
 
         metadata.href = cls.__get_str_from_dict("href", data)
         metadata.original_href = cls.__get_str_from_dict("original_href", data)
@@ -404,25 +395,23 @@ class AssetMetadata(BaseModel):
 
         return all(
             [
-                self._asset_id == other._asset_id,
-                self._item_id == other._item_id,
-                self._href == other._href,
-                self._original_href == other._original_href,
-                self._asset_path == other._asset_path,
-                self._asset_type == other._asset_type,
-                self._datetime == other._datetime,
-                self._start_datetime == other._start_datetime,
-                self._end_datetime == other._end_datetime,
-                self._bbox_lat_lon == other._bbox_lat_lon,
-                self._bbox_projected == other._bbox_projected,
-                self._proj_epsg == other._proj_epsg,
-                self._geometry_lat_lon == other._geometry_lat_lon,
+                self.asset_id == other.asset_id,
+                self.item_id == other.item_id,
+                self.href == other.href,
+                self.original_href == other.original_href,
+                self.asset_path == other.asset_path,
+                self.asset_type == other.asset_type,
+                self.datetime == other.datetime,
+                self.start_datetime == other.start_datetime,
+                self.end_datetime == other.end_datetime,
+                self.bbox_lat_lon == other.bbox_lat_lon,
+                self.bbox_projected == other.bbox_projected,
+                self.proj_epsg == other.proj_epsg,
+                self.geometry_lat_lon == other.geometry_lat_lon,
                 self.transform == other.transform,
                 self.shape == other.shape,
                 self.file_size == other.file_size,
                 self.tags == other.tags,
-                self.title == other.title,
-                self.collection_id == other.collection_id,
                 self.tile_id == other.tile_id,
                 self.media_type == other.media_type,
             ]
@@ -432,27 +421,27 @@ class AssetMetadata(BaseModel):
         # for sorting support
         if other is self:
             return True
-        return self._asset_id > other._asset_id
+        return self.asset_id > other.asset_id
 
     def __ge__(self, other) -> bool:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id >= other._asset_id
+        return self.asset_id >= other.asset_id
 
     def __lt__(self, other) -> bool:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id < other._asset_id
+        return self.asset_id < other.asset_id
 
     def __le__(self, other) -> bool:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id <= other._asset_id
+        return self.asset_id <= other.asset_id
 
-    def get_differences(self, other) -> Dict[str, Any]:
+    def get_differences(self, other: "AssetMetadata") -> Dict[str, Any]:
         if other is self:
             return {}
 

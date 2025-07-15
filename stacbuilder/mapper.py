@@ -1,9 +1,12 @@
+import warnings
 from math import log10
 from pathlib import Path
 from typing import Optional, Union
 
 import rasterio
 from openeo.util import normalize_crs
+from pystac.media_type import MediaType
+from rio_cogeo import cog_validate
 from upath.implementations.cloud import S3Path
 
 from stacbuilder.boundingbox import BoundingBox
@@ -144,13 +147,21 @@ class MapGeoTiffToAssetMetadata:
             tags = dataset.tags() or {}
             units = tags.get("units")
             for i in range(dataset.count):
-                # TODO: if tags contains unit, add the unit
                 band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
                 bands.append(band_md)
 
         file_stat = asset_path.stat()
 
         href_info = self.process_href_info(str(asset_path))
+
+        if cog_validate(_asset_path):
+            media_type = MediaType.COG
+        else:
+            warnings.warn(
+                f"Asset {asset_path} is not a valid COG. Consider converting it to a COG for better performance.",
+                category=UserWarning,
+            )
+            media_type = MediaType.GEOTIFF
 
         # Prepare the arguments for AssetMetadata, allowing href_info to override or add fields
         asset_metadata_args = dict(
@@ -166,6 +177,7 @@ class MapGeoTiffToAssetMetadata:
             bands=bands,
             file_size=file_stat.st_size,
             tags=tags,
+            media_type=media_type,
         )
         asset_metadata_args.update(href_info)  # href_info can override or add fields
 

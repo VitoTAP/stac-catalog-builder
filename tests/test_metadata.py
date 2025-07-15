@@ -1,7 +1,3 @@
-# TODO: test coverage for AssetMetadata.to_dict
-# TODO: test coverage for AssetMetadata.from_dict
-# TODO: test coverage for AssetMetadata.from_geoseries
-
 import datetime as dt
 import re
 from pathlib import Path
@@ -30,7 +26,6 @@ class TestAssetMetadata:
         assert asset_metadata.item_id == "test_asset_id"
         assert asset_metadata.asset_type is None
         assert asset_metadata.media_type is None
-        assert asset_metadata.title is None
 
         assert asset_metadata.href == "/local/path/to/asset.tif"
         assert asset_metadata.original_href == "/local/path/to/asset.tif"
@@ -63,9 +58,7 @@ class TestAssetMetadata:
         expected_dict = {
             "asset_id": "test_asset_id",
             "item_id": "test_asset_id",
-            "collection_id": None,
             "tile_id": None,
-            "title": None,
             "href": "/local/path/to/asset.tif",
             "original_href": "/local/path/to/asset.tif",
             "asset_path": Path("/local/path/to/asset.tif"),
@@ -310,9 +303,3 @@ class TestAssetMetadata:
 
         expected_polygon = box(min_x, min_y, max_x, max_y)
         assert meta.proj_bbox_as_polygon == expected_polygon
-
-    @pytest.mark.skip(reason="Test not yet implemented")
-    @pytest.mark.xfail("Test not yet implemented")
-    def test_process_href_info(self):
-        # Important to cover this, so adding this it already as a nagging reminder.
-        assert False, "Test not yet implemented"

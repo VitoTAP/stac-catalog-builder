@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from deprecated import deprecated
-from pystac import Collection
+from pystac import Collection, Item
 
 from stacbuilder.builder import (
     AssetMetadataPipeline,
@@ -194,7 +194,7 @@ def list_stac_items(
     input_dir: Path,
     max_files: Optional[int] = -1,
     item_postprocessor: Optional[Callable] = None,
-) -> Tuple[List[Collection], List[Path]]:
+) -> Tuple[List[Item], List[Path]]:
     """
     Return the STAC items that are generated for each file and the files for which no stac item could be generated.
 

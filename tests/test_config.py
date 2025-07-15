@@ -31,7 +31,7 @@ def test_can_parse_providermodel_from_json():
 
     assert model.name == "Some EO org"
     assert model.url.unicode_string() == "https://www.some.place.in.space.dev/"
-    assert model.roles == {ProviderRole.PRODUCER, ProviderRole.PROCESSOR}
+    assert model.roles == [ProviderRole.PRODUCER, ProviderRole.PROCESSOR]
 
 
 class TestCollectionConfigModel:

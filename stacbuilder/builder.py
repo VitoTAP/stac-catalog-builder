@@ -64,7 +64,16 @@ class AlternateHrefGenerator:
     def has_alternate_key(self, key: str) -> bool:
         return key in self._callbacks
 
+    def get_callback(self, key: str) -> Optional[AssetMetadataToURL]:
+        """Get the callback for the given key."""
+        return self._callbacks.get(key)
+
+    def has_callbacks(self) -> bool:
+        return bool(self._callbacks)
+
     def get_alternates(self, asset_metadata: AssetMetadata) -> Dict[str, Dict[str, Dict[str, str]]]:
+        if not self.has_callbacks():
+            return {}
         alternates = {}
         for key in self._callbacks:
             alternates[key] = {"href": self.get_alternate_href_for(key, asset_metadata)}
@@ -73,7 +82,7 @@ class AlternateHrefGenerator:
 
     def get_alternate_href_for(self, key: str, asset_metadata: AssetMetadata) -> Dict[str, str]:
         if not self.has_alternate_key(key):
-            return None
+            raise ValueError(f"No callback registered for key: {key}")
         return self._callbacks[key](asset_metadata)
 
     def add_MEP(self):
@@ -215,7 +224,8 @@ class ItemBuilder:
         for metadata in assets:
             item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
 
-        item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
+        if self._alternate_href_generator and self._alternate_href_generator.has_callbacks():
+            item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
 
         return item
 

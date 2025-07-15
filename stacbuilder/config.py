@@ -19,18 +19,18 @@ from pystac.extensions.item_assets import AssetDefinition
 from pystac.extensions.raster import RasterBand, RasterExtension
 from pystac.provider import Provider, ProviderRole
 
-DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
+DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = [
     ProviderRole.PRODUCER,
     ProviderRole.LICENSOR,
     ProviderRole.PROCESSOR,
-}
+]
 
 
 class ProviderModel(BaseModel):
     """Model for Providers in STAC."""
 
     name: str
-    roles: Set[ProviderRole] = DEFAULT_PROVIDER_ROLES
+    roles: List[ProviderRole] = DEFAULT_PROVIDER_ROLES
     url: Optional[HttpUrl] = None
 
     def to_provider(self) -> Provider:
@@ -105,9 +105,6 @@ class SamplingType(enum.StrEnum):
 
     AREA = "area"
     POINT = "point"
-
-    def __str__(self) -> str:
-        return super().__str__()
 
 
 class RasterBandConfig(BaseModel):
@@ -273,7 +270,6 @@ class AlternateHrefConfig(BaseModel):
     add_S3: bool = False
     s3_bucket: Optional[str] = None
     s3_root_path: Optional[str] = None
-    # TODO add validation for s3_bucket and s3_root_path if add_S3 is True
 
 
 class CollectionConfig(BaseModel):
@@ -305,8 +301,6 @@ class CollectionConfig(BaseModel):
 
     asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
-
-    # TODO: general links (urls) that are often quite specific to the dataset, such as "about", or a link to a document that describes the dataset, etc.
 
     # TODO: to simplify the use we want to include the config for the input files and output directory.
     # input_files_config: Optional[FileCollectorConfig] = None

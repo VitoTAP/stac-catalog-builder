@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 from pathlib import Path
+from typing import List
 
 import pystac
 import pytest
@@ -100,21 +101,12 @@ def create_item(item_id: str, fake_assets) -> Item:
 
 
 @pytest.fixture
-def single_item(fake_assets) -> Item:
-    return create_item("items01", fake_assets)
-
-
-@pytest.fixture
-def multiple_items(fake_assets) -> Item:
+def multiple_items(fake_assets) -> List[Item]:
     return [create_item("items01", fake_assets), create_item("items02", fake_assets)]
 
 
-def feature_collection(multiple_items) -> ItemCollection:
-    return ItemCollection(items=multiple_items)
-
-
 @pytest.fixture
-def collection_with_items(empty_collection, multiple_items) -> Collection:
+def collection_with_items(empty_collection: Collection, multiple_items: List[Item]) -> Collection:
     item: Item
     for item in multiple_items:
         item.collection = empty_collection

@@ -145,11 +145,12 @@ def create_geotiff_files(paths):
         create_mock_geotiff(file)
 
 
-# TODO: move create_mock_geotiff and test_create_tiffs to a non-test module that generates test data.
 def create_mock_geotiff(tif_path: Path):
     """Create GeoTIFF raster files for testing.
 
     The pixels form a simple gradient just to have some data.
+
+    This isn't being used in the tests, but is a utility to create mock data files.
     """
     # Based on the example in rasterio docs:
     # https://rasterio.readthedocs.io/en/stable/quickstart.html#opening-a-dataset-in-writing-mode
@@ -172,14 +173,6 @@ def create_mock_geotiff(tif_path: Path):
     )
     dataset.write(Z, 1)
     dataset.close()
-
-
-@pytest.mark.skip
-def test_create_tiffs(geotiff_paths):
-    # TODO: [refactor]: This method should not be a test but a script to generate test data.
-    #   Also, you only need to run that script one time. But now the test tiffs are
-    #   stored in git.
-    create_geotiff_files(geotiff_paths)
 
 
 class MockPathParser(RegexInputPathParser):

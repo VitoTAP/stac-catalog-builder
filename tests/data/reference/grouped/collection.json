@@ -1,0 +1,99 @@
+{
+  "type": "Collection",
+  "id": "foo-2023-v01",
+  "stac_version": "1.0.0",
+  "description": "Description of Foo",
+  "links": [
+    {
+      "rel": "root",
+      "href": "./collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    },
+    {
+      "rel": "child",
+      "href": "./foo-2023-v01_2000/collection.json",
+      "type": "application/json",
+      "title": "Foo collection 2000"
+    },
+    {
+      "rel": "child",
+      "href": "./foo-2023-v01_2001/collection.json",
+      "type": "application/json",
+      "title": "Foo collection 2001"
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/item-assets/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json"
+  ],
+  "item_assets": {
+    "2m-temp-monthly": {
+      "type": "image/tiff; application=geotiff",
+      "title": "2m temperature",
+      "description": "temperature 2m above ground (Kelvin)",
+      "roles": [
+        "data"
+      ],
+      "eo:bands": [
+        {
+          "name": "2m_temp",
+          "description": "temperature 2m above ground (Kelvin)"
+        }
+      ]
+    },
+    "tot-precip-monthly": {
+      "type": "image/tiff; application=geotiff",
+      "title": "total precipitation",
+      "description": "total precipitation per month (m)",
+      "roles": [
+        "data"
+      ],
+      "eo:bands": [
+        {
+          "name": "tot_precip",
+          "description": "total precipitation per month (m)"
+        }
+      ]
+    }
+  },
+  "title": "Foo collection",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          0.0,
+          0.0,
+          240.0,
+          180.0
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2000-01-01T00:00:00Z",
+          "2001-12-31T23:59:59Z"
+        ]
+      ]
+    }
+  },
+  "license": "proprietary",
+  "keywords": [
+    "foo",
+    "bar",
+    "oof"
+  ],
+  "providers": [
+    {
+      "name": "Test EO Org",
+      "roles": [
+        "licensor",
+        "processor",
+        "producer"
+      ],
+      "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/"
+    }
+  ]
+}

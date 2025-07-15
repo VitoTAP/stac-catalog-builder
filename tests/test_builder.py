@@ -108,7 +108,6 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         asset_path=asset_path,
         href=str(asset_path),
         original_href=str(asset_path),
-        collection_id=asset_path_data["collection_id"],
         datetime=asset_path_data["datetime"],
         start_datetime=asset_path_data["start_datetime"],
         end_datetime=asset_path_data["end_datetime"],
@@ -118,13 +117,13 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         bbox_projected=BoundingBox.from_dict(bbox_dict),
         transform=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
         bands=[BandMetadata(data_type="float64", index=0, nodata=None)],
+        media_type="image/tiff; application=geotiff; profile=cloud-optimized",
     )
     return md
 
 
 @pytest.fixture
 def basic_asset_metadata(data_dir) -> AssetMetadata:
-    # TODO: maybe better to save a few AssetMetadata and their STAC items to JSON and load them here
     return create_basic_asset_metadata(data_dir / "observations_2m-temp-monthly_2000-01-01.tif")
 
 
@@ -177,9 +176,9 @@ class TestGeoTiffPipeline:
 
         assert sorted(input_files) == sorted(geotiff_paths)
 
-    @pytest.mark.skip(reason="test files incorrect")
+    # @pytest.mark.skip(reason="test files incorrect")
     def test_get_metadata(
-        self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline, basic_asset_metadata_list: List[Path]
+        self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline, basic_asset_metadata_list: List[AssetMetadata]
     ):
         metadata_list = list(geotiff_asset_metadata_pipeline.get_metadata())
 
@@ -285,14 +284,12 @@ class TestAlternateLinksGenerator:
         asset_md = AssetMetadata(
             asset_id="asset123",
             item_id="item456",
-            collection_id="collection789",
             asset_path=Path("/data/collection789/item456/asset123.tif"),
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
             bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
         )
         asset_md.asset_id = "asset123"
         asset_md.item_id = "item456"
-        asset_md.collection_id = "collection789"
         asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
 
         return asset_md

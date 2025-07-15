@@ -706,8 +706,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         asset_metadata.href = href
         asset_metadata.original_href = href
         asset_metadata.asset_id = product.id
-        asset_metadata.collection_id = props.get("parentIdentifier")
-        asset_metadata.title = product.title
 
         # product type is a shorter code than what corresponds to asset_metadata.asset_type
         # The product type is more general. But the OpenSearch title (asset_type for is) appends the spatial resolution.

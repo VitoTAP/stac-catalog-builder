@@ -8,18 +8,15 @@ functionality underneath without dealing directly with the CLI.
 The functions you find in this module should remain very simple.
 """
 
-import datetime as dt
-import json
 import logging
 import pprint
 from pathlib import Path
 
 import click
-import dateutil.parser
 import pydantic
 import pydantic.errors
 
-from stacbuilder import commandapi, verify_openeo
+from stacbuilder import commandapi
 from stacbuilder.config import CollectionConfig
 from stacbuilder.stacapi.config import get_stac_api_settings
 
@@ -224,86 +221,6 @@ def show_collection(collection_file):
 def validate(collection_file):
     """Run STAC validation on the collection file."""
     commandapi.validate_collection(collection_file)
-
-
-@cli.command
-@click.option("-b", "--backend-url", type=click.STRING, help="URL for openEO backend", default="openeo-dev.vito.be")
-@click.option(
-    "-o",
-    "--out-dir",
-    type=click.Path(exists=False, dir_okay=True, file_okay=False),
-    help="Directory to save batch jobs outputs (GTIFF)",
-    default=".",
-)
-@click.option("--bbox", type=click.STRING, default="", help="bounding box")
-@click.option("-e", "--epsg", type=int, help="CRS of bbox as an EPSG code")
-@click.option(
-    "-m", "--max-extent-size", type=float, default=0.0, help="Maximum size of the spatial extent (in degrees)"
-)
-@click.option("--start-dt", type=click.STRING, help="Start date+time of the temporal extent")
-@click.option("--end-dt", type=click.STRING, help="End date+time of the temporal extent")
-@click.option("-n", "--dry-run", is_flag=True, help="Do a dry-run, don't execute the batch job")
-@click.option("-v", "--verbose", is_flag=True, help="Make output more verbose")
-@click.argument(
-    "collection_file",
-    type=click.Path(exists=True, dir_okay=False, file_okay=True),
-)
-def test_openeo(backend_url, out_dir, collection_file, bbox, epsg, max_extent_size, start_dt, end_dt, dry_run, verbose):
-    """Test STAC collection via load_stac in openEO.
-
-    It guesses a reasonable spatial and temporal extent based on what
-    extent the collection declares.
-    """
-    if bbox:
-        bbox = json.loads(bbox)
-
-    temp_start_dt = dateutil.parser.parse(start_dt) if start_dt else None
-    temp_end_dt = dateutil.parser.parse(end_dt) if end_dt else None
-
-    start_datetime = dt.datetime(
-        temp_start_dt.year,
-        temp_start_dt.month,
-        temp_start_dt.day,
-        temp_start_dt.hour,
-        temp_start_dt.minute,
-        temp_start_dt.second,
-        temp_start_dt.microsecond,
-        tzinfo=dt.timezone.utc,
-    )
-    end_datetime = dt.datetime(
-        temp_end_dt.year,
-        temp_end_dt.month,
-        temp_end_dt.day,
-        temp_end_dt.hour,
-        temp_end_dt.minute,
-        temp_end_dt.second,
-        temp_end_dt.microsecond,
-        tzinfo=dt.timezone.utc,
-    )
-
-    print(f"CLI test_openeo:: {start_datetime=}")
-    print(f"CLI test_openeo:: {end_datetime=}")
-
-    verify_openeo.verify_in_openeo(
-        backend_url=backend_url,
-        collection_path=collection_file,
-        output_dir=out_dir,
-        bbox=bbox,
-        epsg=epsg,
-        max_spatial_ext_size=max_extent_size,
-        start_datetime=start_datetime,
-        end_datetime=end_datetime,
-        dry_run=dry_run,
-        verbose=verbose,
-    )
-
-
-@cli.command
-@click.argument("job_id", type=str)
-@click.argument("output_dir", type=click.Path(dir_okay=True, file_okay=False, writable=True))
-def check_openeo_job(job_id: str):
-    """Check status of openeo job, and if it has finished download the files."""
-    verify_openeo.check_openeo_job(job_id=job_id, output_dir="tmp")
 
 
 #

@@ -148,9 +148,6 @@ class TestBoundingBox:
         bbox = BoundingBox(10.0, 20.0, 30.0, 40.0, 3812)
         actual_polygon = bbox.as_polygon()
 
-        # Note: Shapely basically ignores the CRS. We don't verify it here.
-        # TODO:  If we do find a way to add the CRS, we should verify that too.
-        # expected_polygon = Polygon.from_bounds(10.0, 20.0, 30.0, 40.0)
         expected_polygon = box(10.0, 20.0, 30.0, 40.0)
         assert actual_polygon == expected_polygon
 

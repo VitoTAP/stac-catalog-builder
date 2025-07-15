@@ -1,5 +1,6 @@
 """Tests for the stacbuilder.builder module"""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -15,15 +16,40 @@ from stacbuilder.commandapi import (
 )
 
 
+def compare_json_outputs(output_dir: Path, reference_dir: Path):
+    """Compare JSON files in output_dir with those in reference_dir."""
+    # if the reference_dir does not exist or is empty, copy the output_dir to reference_dir
+    # and raise an exception
+    if not reference_dir.exists() or not any(reference_dir.iterdir()):
+        reference_dir.mkdir(parents=True, exist_ok=True)
+        for file in output_dir.glob("*.json"):
+            from shutil import copy
+
+            copy(str(file), str(reference_dir / file.relative_to(output_dir)))
+        raise FileNotFoundError(
+            f"Reference directory {reference_dir} does not exist or is empty. Copied output files to reference directory."
+        )
+    created_files = list(output_dir.glob("*.json"))
+    assert len(created_files) > 0, "No files were created."
+    for file in created_files:
+        assert file.exists(), f"file {file} does not exist."
+        # Compare with reference if available
+        reference_item_file = reference_dir / file.relative_to(output_dir)
+        assert json.loads(file.read_text()) == json.loads(reference_item_file.read_text()), (
+            f"Item file {file} does not match the expected reference."
+        )
+
+
 class TestCommandAPI:
     @pytest.fixture
     def collection_config_file(self, data_dir) -> Path:
         return data_dir / "config/config-test-collection.json"
 
-    def test_command_build_collection(self, data_dir, tmp_path):
+    def test_command_build_collection(self, data_dir: Path, tmp_path: Path):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
+        reference_dir = data_dir / "reference/basic"
 
         build_collection(
             collection_config_path=config_file,
@@ -31,13 +57,15 @@ class TestCommandAPI:
             input_dir=input_dir,
             output_dir=output_dir,
         )
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
+
+        # verify the output jsons
+        compare_json_outputs(output_dir, reference_dir)
 
     def test_command_build_grouped_collections(self, data_dir, tmp_path):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
         output_dir = tmp_path / "out-mock-geotiffs"
+        reference_dir = data_dir / "reference/grouped"
 
         build_grouped_collections(
             collection_config_path=config_file,
@@ -45,8 +73,9 @@ class TestCommandAPI:
             input_dir=input_dir,
             output_dir=output_dir,
         )
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
+
+        # verify the output jsons
+        compare_json_outputs(output_dir, reference_dir)
 
     @pytest.fixture
     def valid_collection_file(self, data_dir, tmp_path):
@@ -63,26 +92,37 @@ class TestCommandAPI:
         collection_file = output_dir / "collection.json"
         return collection_file
 
-    def command_list_input_files(self, data_dir):
-        config_file = data_dir / "config/config-test-collection.json"
+    def test_command_list_input_files(self, data_dir):
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        list_input_files(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
+        list_input_files(glob="*/*.tif", input_dir=input_dir)
 
     def test_command_list_asset_metadata(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        list_asset_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
+        returned_list = list_asset_metadata(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
+        expected_count = 12
+        assert len(returned_list) == expected_count, (
+            f"Expected {expected_count} asset metadata items, got {len(returned_list)}."
+        )
+
+    def test_command_list_asset_metadata_with_glob(self, data_dir):
+        config_file = data_dir / "config/config-test-collection.json"
+        input_dir = data_dir / "geotiff/mock-geotiffs"
+        returned_list = list_asset_metadata(collection_config_path=config_file, glob="2000/*.tif", input_dir=input_dir)
+        expected_count = 6
+        assert len(returned_list) == expected_count, (
+            f"Expected {expected_count} asset metadata items, got {len(returned_list)}."
+        )
 
     def test_command_list_items(self, data_dir):
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
-        list_stac_items(collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
+        returned_items, failed_files = list_stac_items(
+            collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir
+        )
+        expected_count = 4
+        assert len(returned_items) == expected_count, f"Expected {expected_count} items, got {len(returned_items)}."
+        assert len(failed_files) == 0, f"Expected no failed files, got {len(failed_files)}."
 
     def test_command_load_collection(self, data_dir, tmp_path):
         config_file = data_dir / "config/config-test-collection.json"
@@ -96,9 +136,11 @@ class TestCommandAPI:
             output_dir=output_dir,
         )
         collection_file = output_dir / "collection.json"
-        load_collection(collection_file=collection_file)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.
+        returned_collection = load_collection(collection_file=collection_file)
+        assert returned_collection is not None, "Expected a valid collection to be returned."
+        assert returned_collection.id == "foo-2023-v01", (
+            f"Expected collection ID 'test-collection', got '{returned_collection.id}'."
+        )
 
     def test_command_validate_collection(self, data_dir, tmp_path):
         config_file = data_dir / "config/config-test-collection.json"
@@ -113,5 +155,3 @@ class TestCommandAPI:
         )
         collection_file = output_dir / "collection.json"
         validate_collection(collection_file=collection_file)
-        # TODO: how to verify the output? For now this is just a smoke test.
-        #   The underlying functionality can actually be tested more directly.

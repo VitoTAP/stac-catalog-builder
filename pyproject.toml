@@ -3,7 +3,6 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-# TODO: consider making the name lower case. Does PyPI make any difference based on casing?
 name = "stac-catalog-builder"
 authors = [
   { name="Johan Schreurs", email="johan.schreurs.ext@vito.be" },
@@ -41,6 +40,7 @@ dependencies = [
   "yarl==1.9.*",
   "universal_pathlib",
   "ipykernel>=6.29.5",
+  "rio-cogeo>=5.4.2",
 ]
 
 [dependency-groups]
@@ -51,6 +51,7 @@ dev = [
     "hatch>=1.14.1",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
+    "pytest-cov>=6.2.1",
     "pytest-xdist",
     "requests-mock>=1.11.0",
 ]
