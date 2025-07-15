@@ -302,9 +302,6 @@ class CollectionConfig(BaseModel):
     asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
 
-    # TODO: to simplify the use we want to include the config for the input files and output directory.
-    # input_files_config: Optional[FileCollectorConfig] = None
-
     @classmethod
     def from_json_str(cls, json_str: str) -> "CollectionConfig":
         return CollectionConfig.model_validate_json(json_str)
