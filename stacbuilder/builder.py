@@ -177,9 +177,6 @@ class ItemBuilder:
 
         # Ensure that all assets have consistent metadata for common properties
         assert all(a.item_id == first_asset.item_id for a in known_assets), "All assets should have the same item_id"
-        assert all(a.item_href == first_asset.item_href for a in known_assets), (
-            "All assets should have the same item_href"
-        )
         assert all(a.proj_epsg == first_asset.proj_epsg for a in known_assets), (
             "All assets should have the same proj_epsg"
         )
@@ -195,7 +192,6 @@ class ItemBuilder:
         assert all(a.shape == first_asset.shape for a in known_assets), "All assets should have the same shape"
 
         item = Item(
-            href=first_asset.item_href,
             id=first_asset.item_id,
             geometry=first_asset.geometry_lat_lon_as_dict,
             bbox=first_asset.bbox_as_list,
@@ -216,27 +212,9 @@ class ItemBuilder:
         item_proj.transform = first_asset.transform
         item_proj.shape = first_asset.shape
 
-        # Can always be done on asset level but leaving it here for now.
-        # asset_config: AssetConfig = self._get_assets_config_for(metadata.asset_type)
-        # if asset_config.eo_bands:
-        #     item_eo = EOExtension.ext(item, add_if_missing=True)
-        #     eo_bands = []
-
-        #     # TODO: https://github.com/VitoTAP/stac-catalog-builder/issues/29 set band's common_name property if common band, and wavelenght info when available
-        #     for band_cfg in asset_config.eo_bands:
-        #         new_band: EOBand = EOBand.create(
-        #             name=band_cfg.name,
-        #             description=band_cfg.description,
-        #             common_name=band_cfg.common_name,
-        #             wavelength=band_cfg.wavelength,
-        #         )
-        #         eo_bands.append(new_band)
-        #     item_eo.apply(eo_bands)
-
         for metadata in assets:
             item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
 
-        # item.stac_extensions.append(CLASSIFICATION_SCHEMA)
         item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
 
         return item
@@ -254,43 +232,50 @@ class ItemBuilder:
             file_info = FileExtension.ext(asset, add_if_missing=True)
             file_info.size = metadata.file_size
 
-        if metadata.bands:
+        # raster extension
+        if not asset_config.raster_bands:
+            # There is no information to fill in default values for raster:bands
+            # Just fill in what we do have from asset metadata.
             asset_raster = RasterExtension.ext(asset, add_if_missing=True)
             raster_bands = []
-            if not asset_config.raster_bands:
-                # There is no information to fill in default values for raster:bands
-                # Just fill in what we do have.
-                for band_md in metadata.bands:
-                    new_band: RasterBand = RasterBand.create(
-                        data_type=band_md.data_type,
-                        nodata=band_md.nodata,
-                        unit=band_md.units,
-                    )
-                    raster_bands.append(new_band)
-            else:
-                # The default values for raster:bands are available in the configuration
-                for i, raster_bands_config in enumerate(asset_config.raster_bands):
-                    band_md: BandMetadata = metadata.bands[i]
-
-                    new_band: RasterBand = RasterBand.create(
-                        data_type=band_md.data_type or raster_bands_config.data_type,
-                        nodata=band_md.nodata or raster_bands_config.nodata,
-                        unit=band_md.units or raster_bands_config.unit,
-                    )
-                    if raster_bands_config.sampling is not None:
-                        new_band.sampling = str(raster_bands_config.sampling)
-
-                    if raster_bands_config.offset is not None:
-                        new_band.offset = raster_bands_config.offset
-                    if raster_bands_config.scale is not None:
-                        new_band.scale = raster_bands_config.scale
-
-                    if raster_bands_config.spatial_resolution is not None:
-                        new_band.spatial_resolution = raster_bands_config.spatial_resolution
-
-                    raster_bands.append(new_band)
-
+            for band_md in metadata.bands:
+                new_band: RasterBand = RasterBand.create(
+                    data_type=band_md.data_type,
+                    nodata=band_md.nodata,
+                    unit=band_md.units,
+                )
+                raster_bands.append(new_band)
             asset_raster.apply(raster_bands)
+        else:
+            # The default values for raster:bands are available in the configuration
+            # the extension is already added in th AssetDefinition
+            raster_bands: List[RasterBand] = asset.ext.raster.bands
+            assert len(raster_bands) == len(metadata.bands), (
+                f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
+                f"does not match the number of raster bands in asset config ({len(raster_bands)})"
+            )
+            for i, raster_band in enumerate(raster_bands):
+                band_md: BandMetadata = metadata.bands[i]
+
+                if not isinstance(raster_band, RasterBand):
+                    raise InvalidConfiguration(
+                        f"Expected raster band to be of type RasterBand, got {type(raster_band)}"
+                    )
+
+                if raster_band.data_type is None and band_md.data_type is not None:
+                    # If the data type is not set in the asset config, use the one from the band metadata.
+                    raster_band.data_type = band_md.data_type
+                if raster_band.nodata is None and band_md.nodata is not None:
+                    # If the nodata value is not set in the asset config, use the one from the band metadata.
+                    raster_band.nodata = band_md.nodata
+                if raster_band.unit is None and band_md.units is not None:
+                    # If the unit is not set in the asset config, use the one from the band metadata.
+                    raster_band.unit = band_md.units
+
+        # eo extension
+        # the fixed values are set in the AssetDefinition, so we only need to add the extension
+        if asset_config.eo_bands:
+            asset.ext.add("eo")
 
         # Add the alternate links for the Alternate-Asset extension
         # see: https://github.com/stac-extensions/alternate-assets
@@ -306,8 +291,6 @@ class ItemBuilder:
         asset_definitions = {}
         for band_name, asset_config in self.item_assets_configs.items():
             asset_def: AssetDefinition = asset_config.to_asset_definition()
-            # TODO: check whether we do need to store the collection as the owner here.
-            # asset_def.owner = self.collection
             asset_definitions[band_name] = asset_def
 
         return asset_definitions
@@ -527,14 +510,6 @@ class CollectionBuilder:
 
         RasterExtension.add_to(collection)
         EOExtension.add_to(collection)
-
-        # TODO: Add support for custom links in the collection, like there was in the early scripts.
-        ## collection.add_links(
-        ##     [
-        ##         constants.PRODUCT_FACT_SHEET,
-        ##         constants.PROJECT_WEBSITE,
-        ##     ]
-        ## )
 
         self._collection = collection
         self._log_progress_message("DONE: create_empty_collection")

@@ -34,7 +34,6 @@ class TestAssetMetadata:
 
         assert asset_metadata.href == "/local/path/to/asset.tif"
         assert asset_metadata.original_href == "/local/path/to/asset.tif"
-        assert asset_metadata.item_href is None
 
         assert asset_metadata.shape is None
         assert asset_metadata.tags == {}
@@ -69,7 +68,6 @@ class TestAssetMetadata:
             "title": None,
             "href": "/local/path/to/asset.tif",
             "original_href": "/local/path/to/asset.tif",
-            "item_href": None,
             "asset_path": Path("/local/path/to/asset.tif"),
             "asset_type": None,
             "media_type": None,

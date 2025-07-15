@@ -100,7 +100,6 @@ class AssetMetadata(BaseModel):
         "end_datetime",
         "title",
         "tile_id",
-        "item_href",
     ]
     # The asset_id is the unique identifier for the asset.
     asset_id: str
@@ -150,16 +149,11 @@ class AssetMetadata(BaseModel):
     # The bands in the raster file.
     bands: List[BandMetadata] = []
 
-    # TODO check which of thises fields are actually used
+    # TODO check which of these fields are actually used
     title: Optional[str] = None
     collection_id: Optional[str] = None
     tile_id: Optional[str] = None
-    # TODO remove item_href, it is not used in the STAC spec.
-    item_href: Optional[str] = None
     media_type: Optional[MediaType] = None
-
-    # TODO remove this, should be defined in collection config
-    stac_version: str = "1.0.0"
 
     # platforms: Optional[List[str]] = None
     # instruments: Optional[List[str]] = None
@@ -307,7 +301,6 @@ class AssetMetadata(BaseModel):
             "title": self.title,
             "href": self.href,
             "original_href": self.original_href,
-            "item_href": self.item_href,
             "asset_path": self.asset_path,
             "asset_type": self.asset_type,
             "media_type": self.media_type,
@@ -355,7 +348,6 @@ class AssetMetadata(BaseModel):
 
         metadata.href = cls.__get_str_from_dict("href", data)
         metadata.original_href = cls.__get_str_from_dict("original_href", data)
-        metadata.item_href = cls.__get_str_from_dict("item_href", data)
         metadata.asset_path = cls.__as_type_from_dict("asset_path", Path, data)
 
         metadata.asset_type = cls.__get_str_from_dict("asset_type", data)
@@ -432,7 +424,6 @@ class AssetMetadata(BaseModel):
                 self.title == other.title,
                 self.collection_id == other.collection_id,
                 self.tile_id == other.tile_id,
-                self.item_href == other.item_href,
                 self.media_type == other.media_type,
             ]
         )

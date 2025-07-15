@@ -14,7 +14,9 @@ from typing import Any, Dict, List, Optional, Set, Union
 from openeo.util import dict_no_none
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pystac import MediaType
+from pystac.extensions.eo import Band, EOExtension
 from pystac.extensions.item_assets import AssetDefinition
+from pystac.extensions.raster import RasterBand, RasterExtension
 from pystac.provider import Provider, ProviderRole
 
 DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
@@ -78,6 +80,21 @@ class EOBandConfig(BaseModel):
         default=None,
         description=("Wavelength of the band in nanometers. " + "This is a float value, e.g. 665.0 for the red band."),
     )
+
+    def populate_asset_extension(self, ext: EOExtension) -> None:
+        """Populate the EOExtension with the values from this configuration."""
+        if not ext:
+            return None
+        eo_band = Band.create(
+            name=self.name,
+            common_name=self.common_name,
+            description=self.description,
+            center_wavelength=self.wavelength,
+        )
+        if not ext.bands:
+            ext.apply(bands=[eo_band])
+        else:
+            ext.bands.append(eo_band)
 
 
 class SamplingType(enum.StrEnum):
@@ -161,11 +178,25 @@ class RasterBandConfig(BaseModel):
         ),
     )
 
-    # statistics and histogram: Can not define defaults for these fields
-    #   They have to be read from the raster, with rasterio.
-    # Excerpt from Raster extension's docs:
-    # - statistics 	Statistics Object 	Statistics of all the pixels in the band.
-    # - histogram 	Histogram Object 	Histogram distribution information of the pixels values in the band.
+    def populate_asset_extension(self, ext: RasterExtension) -> None:
+        """Populate the RasterExtension with the values from this configuration."""
+        if not ext:
+            return None
+        raster_band = RasterBand.create(
+            name=self.name,
+            nodata=self.nodata,
+            data_type=self.data_type,
+            sampling=self.sampling,
+            bits_per_sample=self.bits_per_sample,
+            spatial_resolution=self.spatial_resolution,
+            unit=self.unit,
+            scale=self.scale,
+            offset=self.offset,
+        )
+        if not ext.bands:
+            ext.apply(bands=[raster_band])
+        else:
+            ext.bands.append(raster_band)
 
 
 class AssetConfig(BaseModel):
@@ -186,11 +217,6 @@ class AssetConfig(BaseModel):
 
     def to_asset_definition(self) -> AssetDefinition:
         """Create an AssetDefinition object from this configuration."""
-        if self.eo_bands:
-            eo_bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
-        else:
-            eo_bands = None
-
         if self.raster_bands:
             raster_bands = [dict_no_none(b.model_dump()) for b in self.raster_bands]
         else:
@@ -201,16 +227,18 @@ class AssetConfig(BaseModel):
             "description": self.description,
             "roles": self.roles,
         }
-        if eo_bands:
-            # TODO: Switch to EOExtension to add eo:bands in the correct way.
-            #   Our content for eo:bands is not 100% standard: data_type belongs in raster:bands.
-            #   For the items we already use the EO extension, but we should do the same for STAC collection.
-            properties["eo:bands"] = eo_bands
+        asset_definition = AssetDefinition(properties=properties)
+        if self.eo_bands:
+            eo_ext = EOExtension.ext(asset_definition, add_if_missing=False)
+            for eo_band in self.eo_bands:
+                eo_band.populate_asset_extension(eo_ext)
 
         if raster_bands:
-            properties["raster:bands"] = raster_bands
+            raster_ext = RasterExtension.ext(asset_definition, add_if_missing=False)
+            for raster_band in self.raster_bands:
+                raster_band.populate_asset_extension(raster_ext)
 
-        return AssetDefinition(properties=properties)
+        return asset_definition
 
 
 class FileCollectorConfig(BaseModel):

@@ -169,10 +169,7 @@ class CollectionsEndpoint:
         return self._rest_api.base_url
 
     def get_all(self) -> list[Collection]:
-        """Get all collections.
-
-        TODO: Implement paging: If there are many collections then the API will likely limit the number or collections returns, via paging.
-        """
+        """Get all collections."""
         response = self._rest_api.get("collections")
 
         _check_response_status(response, _EXPECTED_STATUS_GET)
@@ -276,8 +273,6 @@ class CollectionsEndpoint:
         :param collection: the collection to create/update
         :return: dict that contains the JSON body of the HTTP response.
         """
-
-        # TODO: decide: Another strategy could be to handle HTTP 409 conflict and the fall back to a self.update / PUT request
         if self.exists(collection.id):
             return self.update(collection)
         else:
