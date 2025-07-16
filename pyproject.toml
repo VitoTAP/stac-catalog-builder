@@ -49,6 +49,7 @@ hrvpp = [
 ]
 dev = [
     "hatch>=1.14.1",
+    "nested-lookup>=0.2.25",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "pytest-cov>=6.2.1",

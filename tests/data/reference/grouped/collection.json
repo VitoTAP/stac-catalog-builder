@@ -5,12 +5,6 @@
   "description": "Description of Foo",
   "links": [
     {
-      "rel": "root",
-      "href": "./collection.json",
-      "type": "application/json",
-      "title": "Foo collection"
-    },
-    {
       "rel": "child",
       "href": "./foo-2023-v01_2000/collection.json",
       "type": "application/json",
@@ -21,6 +15,12 @@
       "href": "./foo-2023-v01_2001/collection.json",
       "type": "application/json",
       "title": "Foo collection 2001"
+    },
+    {
+      "rel": "root",
+      "href": "./collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
     }
   ],
   "stac_extensions": [

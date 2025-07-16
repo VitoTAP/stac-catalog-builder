@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from nested_lookup import nested_update
 
 from stacbuilder.commandapi import (
     build_collection,
@@ -20,23 +21,26 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
     """Compare JSON files in output_dir with those in reference_dir."""
     # if the reference_dir does not exist or is empty, copy the output_dir to reference_dir
     # and raise an exception
-    if not reference_dir.exists() or not any(reference_dir.iterdir()):
-        reference_dir.mkdir(parents=True, exist_ok=True)
-        for file in output_dir.glob("*.json"):
-            from shutil import copy
+    copied_flag = False
+    for file in output_dir.glob("**/*.json"):
+        output_json = json.loads(file.read_text())
+        nested_update(output_json, "created", "")
 
-            copy(str(file), str(reference_dir / file.relative_to(output_dir)))
+        reference_path = reference_dir / file.relative_to(output_dir)
+        if not reference_path.exists():
+            reference_path.parent.mkdir(parents=True, exist_ok=True)
+            with reference_path.open("w") as ref_file:
+                json.dump(output_json, ref_file, indent=2)
+
+        with reference_path.open("r") as ref_file:
+            reference_json = json.load(ref_file)
+        assert output_json == reference_json, "files do not match, run with -vv to see differences."
+    assert len(list(output_dir.glob("**/*.json"))) == len(list(reference_dir.glob("**/*.json"))), (
+        "Number of JSON files in output directory does not match reference directory."
+    )
+    if copied_flag:
         raise FileNotFoundError(
             f"Reference directory {reference_dir} does not exist or is empty. Copied output files to reference directory."
-        )
-    created_files = list(output_dir.glob("*.json"))
-    assert len(created_files) > 0, "No files were created."
-    for file in created_files:
-        assert file.exists(), f"file {file} does not exist."
-        # Compare with reference if available
-        reference_item_file = reference_dir / file.relative_to(output_dir)
-        assert json.loads(file.read_text()) == json.loads(reference_item_file.read_text()), (
-            f"Item file {file} does not match the expected reference."
         )
 
 
@@ -72,6 +76,23 @@ class TestCommandAPI:
             glob="*/*.tif",
             input_dir=input_dir,
             output_dir=output_dir,
+        )
+
+        # verify the output jsons
+        compare_json_outputs(output_dir, reference_dir)
+
+    def test_command_build_collection_unlinked(self, data_dir: Path, tmp_path: Path):
+        config_file = data_dir / "config/config-test-collection.json"
+        input_dir = data_dir / "geotiff/mock-geotiffs"
+        output_dir = tmp_path / "out-mock-geotiffs"
+        reference_dir = data_dir / "reference/unlinked"
+
+        build_collection(
+            collection_config_path=config_file,
+            glob="*/*.tif",
+            input_dir=input_dir,
+            output_dir=output_dir,
+            link_items=False,
         )
 
         # verify the output jsons

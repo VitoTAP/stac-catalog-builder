@@ -1,32 +1,28 @@
 {
   "type": "Collection",
-  "id": "foo-2023-v01",
+  "id": "foo-2023-v01_2001",
   "stac_version": "1.0.0",
   "description": "Description of Foo",
   "links": [
     {
-      "rel": "item",
-      "href": "./foo-2023-v01/2000/observations_2m-temp-monthly_2000.json",
-      "type": "application/json"
-    },
-    {
-      "rel": "item",
-      "href": "./foo-2023-v01/2001/observations_2m-temp-monthly_2001.json",
-      "type": "application/json"
-    },
-    {
-      "rel": "item",
-      "href": "./foo-2023-v01/2000/observations_tot-precip-monthly_2000.json",
-      "type": "application/json"
-    },
-    {
-      "rel": "item",
-      "href": "./foo-2023-v01/2001/observations_tot-precip-monthly_2001.json",
-      "type": "application/json"
-    },
-    {
       "rel": "root",
-      "href": "./collection.json",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    },
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01_2001/2001/observations_2m-temp-monthly_2001.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01_2001/2001/observations_tot-precip-monthly_2001.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
       "type": "application/json",
       "title": "Foo collection"
     }
@@ -66,7 +62,7 @@
       ]
     }
   },
-  "title": "Foo collection",
+  "title": "Foo collection 2001",
   "extent": {
     "spatial": {
       "bbox": [
@@ -81,7 +77,7 @@
     "temporal": {
       "interval": [
         [
-          "2000-01-01T00:00:00Z",
+          "2001-01-01T00:00:00Z",
           "2001-12-31T23:59:59Z"
         ]
       ]

@@ -11,7 +11,7 @@ import logging
 from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
-from typing import Callable, Dict, Hashable, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional, Tuple
 
 # Third party libraries
 import deprecated
@@ -332,11 +332,11 @@ class CollectionBuilder:
 
         # The result
         self._collection: Collection = None
-        self._stac_items: List[Item] = None
+
+        self._extent: Optional[Extent] = None
 
     def reset(self):
         self._collection = None
-        self._stac_items = None
 
     @property
     def output_dir(self) -> Path:
@@ -371,16 +371,41 @@ class CollectionBuilder:
         self,
         stac_items: Iterable[Item],
         group: Optional[str | int] = None,
+        save_collection: bool = True,
     ) -> None:
         """Create and save the STAC collection."""
         self.reset()
-        self._stac_items = list(stac_items) or []
-        self.create_empty_collection(group=group)
-        if self.link_items:
-            self.add_items_to_collection()
 
-    def add_items_to_collection(
+        self.create_empty_collection(group=group)
+
+        item_counter = 0
+        for item in stac_items:
+            self._process_item(item=item)
+            item_counter += 1
+            if item_counter % 1000 == 0:
+                self._log_progress_message(f"Processed {item_counter} items so far.")
+
+        if self.link_items:
+            self._log_progress_message("updating collection extent")
+            self._collection.update_extent_from_items()
+        else:
+            self._log_progress_message("updating collection extent from items")
+            if self._extent is None:
+                raise InvalidOperation("Extent is not set. Cannot update collection extent without items.")
+            self._collection.extent = self._extent
+
+        self.normalize_hrefs()
+
+        if save_collection:
+            self.save_collection()
+
+        self._log_progress_message("DONE: build_collection")
+
+        return self.collection
+
+    def _process_item(
         self,
+        item: Item,
     ):
         """Fills the collection with stac items."""
         self._log_progress_message("START: add_items_to_collection")
@@ -388,52 +413,49 @@ class CollectionBuilder:
         if self._collection is None:
             raise InvalidOperation("Can not add items to a collection that has not been created yet.")
 
-        item: Item
-        for item in self._stac_items:
-            # for asset in item.assets:
-            #     asset.owner = self._collection
-            if item is None:
-                continue
+        if item is None:
+            raise ValueError("Argument 'stac_items' can not be None. It must be a list of STAC Items.")
+        if not isinstance(item, Item):
+            raise TypeError(f"Argument 'stac_items' should be of type Item, got {type(item)}")
+
+        if self.link_items:
             self._collection.add_item(item)
-
-        self._log_progress_message("updating collection extent")
-        self._collection.update_extent_from_items()
-
-        self._log_progress_message("DONE: add_items_to_collection")
-
-    def save_items_outside_collection(
-        self,
-    ):
-        """Fills the collection with stac items."""
-        self._log_progress_message("START: save_items_outside_collection")
-
-        if self._collection is None:
-            raise InvalidOperation("Can not add items to a collection that has not been created yet.")
-
-        items = [i for i in self._stac_items if i is not None]
-        item: Item
-        for item in items:
+        else:
+            # If we do not link items, we save them to the output directory.
             item.collection = self._collection
-
-        stac_item_dir = self.stac_item_dir()
-        if not stac_item_dir.exists():
-            stac_item_dir.mkdir(parents=True)
-
-        num_items = len(items)
-        for i, item in enumerate(items):
-            if i % 1000 == 0:
-                fraction_done = i / num_items
-                self._log_progress_message(f"Saved {i} of {num_items} STAC items. ({fraction_done:.1%})")
-            # item.validate()
             item_path = self.get_item_path(item)
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
             item.save_object(dest_href=item_path.as_posix(), include_self_link=False)
+            self._update_extent_from_item(item)
 
-        self._log_progress_message("updating collection extent")
-        self._collection.extent = Extent.from_items(items)
+    def _update_extent_from_item(self, item: Item):
+        """Update the extent of the collection based on the item."""
+        if self._extent is None:
+            self._extent = Extent.from_items(items=[item])
+        else:
+            bounds = item.bbox
+            starts = item.common_metadata.start_datetime or item.datetime
+            ends = item.common_metadata.end_datetime or item.datetime
 
-        self._log_progress_message("DONE: save_items_outside_collection")
+            self._extent.spatial = SpatialExtent(
+                [
+                    [
+                        min(self._extent.spatial.bboxes[0][0], bounds[0]),
+                        min(self._extent.spatial.bboxes[0][1], bounds[1]),
+                        max(self._extent.spatial.bboxes[0][2], bounds[2]),
+                        max(self._extent.spatial.bboxes[0][3], bounds[3]),
+                    ]
+                ]
+            )
+            self._extent.temporal = TemporalExtent(
+                [
+                    [
+                        min(self._extent.temporal.intervals[0][0], starts),
+                        max(self._extent.temporal.intervals[0][1], ends),
+                    ]
+                ]
+            )
 
     def stac_item_dir(self) -> Path:
         return self.output_dir / self.collection.id
@@ -472,15 +494,11 @@ class CollectionBuilder:
         """Save the STAC collection to file."""
         self._log_progress_message("START: Saving collection ...")
 
+        self._collection.links.sort(key=lambda x: repr(x))
+
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
 
-        # NOTE: creating a self-contained collection allows to move the collection and item files
-        # but this is not enough to also be able to move the assets.
-        # The href links to asset files also have the be relative (to the location of the STAC item)
-        # This needs to be done via the href_modifier
-        if not self.link_items:
-            self.save_items_outside_collection()
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
         self._log_progress_message("DONE: Saving collection.")
 
@@ -508,7 +526,6 @@ class CollectionBuilder:
             keywords=coll_config.keywords,
             providers=self.providers,
             extent=self.get_default_extent(),
-            # summaries=constants.SUMMARIES,
         )
         # TODO: Add support for summaries: https://github.com/VitoTAP/stac-catalog-builder/issues/18
         #   Summaries should, among other things, contain the platforms, instruments and mission, when available.
@@ -724,17 +741,10 @@ class AssetMetadataPipeline:
         self.reset()
 
         # This calls the item builder to create STAC Items from AssetMetadata.
-        item_generator = self.collect_stac_items()
+        item_generator: Generator[Item] = self.collect_stac_items()
 
         # This passes the STAC Items to the collection builder to create a STAC Collection.
-        self.collection_builder.build_collection(item_generator)
-
-        #
-        self.collection_builder.normalize_hrefs()
-        self.collection_builder.save_collection()
-        self.collection = self.collection_builder.collection
-
-        self._log_progress_message("DONE: build_collection")
+        self.collection = self.collection_builder.build_collection(item_generator, save_collection=True)
 
     ####################################################
     # Code below is specific to the grouped collections.
@@ -805,7 +815,12 @@ class AssetMetadataPipeline:
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
             self._setup_internals_for_group(group=group)
 
-            self.collection_builder.build_collection(stac_items=metadata_list, group=group)
+            self.collection_builder.build_collection(
+                stac_items=metadata_list,
+                group=group,
+                save_collection=False,
+            )
+
             self._root_collection_builder.collection.add_child(self.collection_builder.collection)
             self.collection_groups[group] = self.collection_builder.collection
 

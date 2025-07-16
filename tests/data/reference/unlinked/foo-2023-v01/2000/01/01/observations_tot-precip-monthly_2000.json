@@ -44,7 +44,7 @@
   "properties": {
     "start_datetime": "2000-01-01T00:00:00Z",
     "end_datetime": "2000-12-31T23:59:59Z",
-    "created": "2025-07-16T14:22:20.288663Z",
+    "created": "2025-07-16T14:22:19.964343Z",
     "proj:epsg": 4326,
     "proj:bbox": [
       0.0,
@@ -93,26 +93,7 @@
     ],
     "datetime": "2000-01-01T00:00:00Z"
   },
-  "links": [
-    {
-      "rel": "root",
-      "href": "../../collection.json",
-      "type": "application/json",
-      "title": "Foo collection"
-    },
-    {
-      "rel": "collection",
-      "href": "../../collection.json",
-      "type": "application/json",
-      "title": "Foo collection"
-    },
-    {
-      "rel": "parent",
-      "href": "../../collection.json",
-      "type": "application/json",
-      "title": "Foo collection"
-    }
-  ],
+  "links": [],
   "assets": {
     "tot-precip-monthly": {
       "href": "c:/DEV/stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_tot-precip-monthly_2000-03-01.tif",
@@ -135,6 +116,5 @@
         "data"
       ]
     }
-  },
-  "collection": "foo-2023-v01"
+  }
 }

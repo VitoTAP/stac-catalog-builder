@@ -44,7 +44,7 @@
   "properties": {
     "start_datetime": "2000-01-01T00:00:00Z",
     "end_datetime": "2000-12-31T23:59:59Z",
-    "created": "2025-07-16T14:22:20.288663Z",
+    "created": "2025-07-16T14:22:21.059897Z",
     "proj:epsg": 4326,
     "proj:bbox": [
       0.0,
@@ -96,7 +96,7 @@
   "links": [
     {
       "rel": "root",
-      "href": "../../collection.json",
+      "href": "../../../collection.json",
       "type": "application/json",
       "title": "Foo collection"
     },
@@ -104,13 +104,13 @@
       "rel": "collection",
       "href": "../../collection.json",
       "type": "application/json",
-      "title": "Foo collection"
+      "title": "Foo collection 2000"
     },
     {
       "rel": "parent",
       "href": "../../collection.json",
       "type": "application/json",
-      "title": "Foo collection"
+      "title": "Foo collection 2000"
     }
   ],
   "assets": {
@@ -136,5 +136,5 @@
       ]
     }
   },
-  "collection": "foo-2023-v01"
+  "collection": "foo-2023-v01_2000"
 }
