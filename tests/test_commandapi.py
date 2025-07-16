@@ -19,12 +19,9 @@ from stacbuilder.commandapi import (
 
 def compare_json_outputs(output_dir: Path, reference_dir: Path):
     """Compare JSON files in output_dir with those in reference_dir."""
-    # if the reference_dir does not exist or is empty, copy the output_dir to reference_dir
-    # and raise an exception
-    copied_flag = False
     for file in output_dir.glob("**/*.json"):
         output_json = json.loads(file.read_text())
-        nested_update(output_json, "created", "")
+        output_json = nested_update(output_json, "created", "")
 
         reference_path = reference_dir / file.relative_to(output_dir)
         if not reference_path.exists():
@@ -38,10 +35,6 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
     assert len(list(output_dir.glob("**/*.json"))) == len(list(reference_dir.glob("**/*.json"))), (
         "Number of JSON files in output directory does not match reference directory."
     )
-    if copied_flag:
-        raise FileNotFoundError(
-            f"Reference directory {reference_dir} does not exist or is empty. Copied output files to reference directory."
-        )
 
 
 class TestCommandAPI:

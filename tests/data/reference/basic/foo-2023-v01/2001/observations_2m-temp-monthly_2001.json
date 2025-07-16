@@ -44,7 +44,7 @@
   "properties": {
     "start_datetime": "2001-01-01T00:00:00Z",
     "end_datetime": "2001-12-31T23:59:59Z",
-    "created": "2025-07-16T14:22:20.321679Z",
+    "created": "",
     "proj:epsg": 4326,
     "proj:bbox": [
       0.0,
