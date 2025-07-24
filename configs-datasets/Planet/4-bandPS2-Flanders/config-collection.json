@@ -1,0 +1,133 @@
+{
+    "collection_id": "PLANETSCOPE-DOVES_V01",
+    "title": "PlanetScope-Doves-Flanders",
+    "description": "PlanetScope data derived from PS2 sattelites (Doves) is a high-resolution Earth observation product from Planet Labs, offering 4-band surface reflectance data suitable for scientific and geospatial analysis. See also: https://www.planet.com/products/planet-imagery/",
+    "instruments": [],
+    "keywords": [
+        "Planet", "PlanetScope", "Doves", "Flanders", "Surface Reflectance", "High Resolution"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Planet",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.planet.com/"
+        },
+        {
+            "name": "VITO",
+            "roles": [
+                "processor"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/",
+    "input_path_parser": {
+	"classname": "DefaultInputPathParser",
+	"parameters": {
+	    "regex_pattern":  ".*/ortho_analytic_4b_sr/(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<day>\\d{2})/\\d{8}_(?P<hour>\\d{2})(?P<minute>\\d{2})(?P<second>\\d{2})_(?P<satellite_id>\\w+)/\\d{8}_\\d{6}_\\w+_3B_(?P<asset_type>AnalyticMS_SR|udm2)_clip.tif$",
+	    "period": "secondly",
+	    "fixed_values": {
+	    }
+	}
+    },
+    "item_assets": {
+	"4b": {
+	    "title": "Surface Reflectance (4 bands)",
+	    "description": "Imagery from both the older 4-band PS2 satellites (300km2) and the new SuperDove (600km2).",
+	    "eo_bands": [
+		{
+			"name": "Band 1",
+			"description": "blue",
+			"wavelength": "490 (50)",
+			"interoperability": "With Sentinel-2 band 2"
+		},
+		{
+			"name": "Band 2",
+			"description": "green",
+			"wavelength": "565 (36)",
+			"interoperability": "With Sentinel-2 band 3"
+		},
+		{
+			"name": "Band 3",
+			"description": "red",
+			"wavelength": "665 (31)",
+			"interoperability": "With Sentinel-2 band 4"
+		},
+		{
+			"name": "Band 4",
+			"description": "nir",
+			"wavelength": "865 (40)",
+			"interoperability": "With Sentinel-2 band 8a"
+		}
+	    ]
+	},
+	"udm2": {
+	    "title": "Usable Data Mask",
+	    "description": "UDM classifies each pixel in an image as Clear, Cloud, Haze, Cloud Shadow or Snow, allowing users to determine which pixels are usable for their analysis. See also: https://docs.planet.com/data/imagery/udm/#udm21-product-bands",
+	    "eo_bands": [
+		{
+			"name": "Band 1",
+			"description": "clear",
+			"data_type": "uint8",
+			"pixel_value_range": "0,1",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 2",
+			"description": "snow",
+			"data_type": "uint8",
+			"pixel_value_range": "0,1",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 3",
+			"description": "shadow",
+			"data_type": "uint8",
+			"pixel_value_range": "0,1",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 4",
+			"description": "haze_light",
+			"data_type": "uint8",
+			"pixel_value_range": "0,1",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 5",
+			"description": "haze_heavy",
+			"data_type": "uint8",
+			"pixel_value_range": "0,1",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 6",
+			"description": "cloud",
+			"data_type": "uint8",
+			"pixel_value_range": "0,1",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 7",
+			"description": "confidence",
+			"pixel_value_range": "0-100",
+			"data_type": "uint8",
+			"no_data_value": "N/A"
+		},
+		{
+			"name": "Band 8",
+			"description": "udm1",
+			"pixel_value_range": "0-255",
+			"data_type": "uint8",
+			"no_data_value": "N/A"
+		}
+	    ]
+	}
+    }
+}
