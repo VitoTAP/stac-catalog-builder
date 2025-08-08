@@ -49,11 +49,6 @@ asset_metadata = list_asset_metadata(
 for k in asset_metadata:
     pprint.pprint(k.to_dict())
 
-# def item_postprocessor(item: pystac.Item) -> pystac.Item:
-#     item.properties["tileId"] = item.properties["product_tile"]
-#     del item.properties["product_tile"]
-#     return item
-
 
 # list items
 stac_items, failed_files = list_stac_items(
@@ -61,14 +56,10 @@ stac_items, failed_files = list_stac_items(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     max_files=1,
-    # item_postprocessor=item_postprocessor
 )
 print(f"Found {len(stac_items)} STAC items")
 if failed_files:
     print(f"Failed files: {failed_files}")
-
-# print("First stac item:")
-# pprint.pprint(stac_items[0].to_dict())
 
 
 stac_api_pw = getpass("Enter password for stac api: ")
@@ -79,7 +70,6 @@ build_collection(
     input_dir=tiff_input_path,
     output_dir=test_output_path,
     link_items=False,
-    # item_postprocessor=item_postprocessor,
 )
 
 # validate collection
@@ -94,7 +84,7 @@ auth_settings = AuthSettings(
     token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
     authorization_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
     client_id="terracatalogueclient",
-    username="vincent.verelst",
+    username=input("Username: "),
     password=stac_api_pw,
 )
 settings = Settings(

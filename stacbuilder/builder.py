@@ -50,7 +50,12 @@ _logger = logging.getLogger(__name__)
 
 
 class AlternateHrefGenerator:
-    """Generates the alternate links for assets."""
+    """Generates the alternate links for assets.
+
+    This class is best initialized either by using `AlternateHrefConfig.from_config(config)` or
+    creating an instance and calling the `add_MEP()` or `add_basic_S3()` methods to register
+    the callbacks for generating alternate links.
+    """
 
     # Type alias for the specific callable that AlternateHrefGenerator needs.
     AssetMetadataToURL = Callable[[AssetMetadata], str]
@@ -58,38 +63,49 @@ class AlternateHrefGenerator:
     def __init__(self):
         self._callbacks: Dict[str, AlternateHrefGenerator.AssetMetadataToURL] = {}
 
-    def register_callback(self, key, converter=AssetMetadataToURL):
+    def _register_callback(self, key, converter=AssetMetadataToURL):
         self._callbacks[key] = converter
 
-    def has_alternate_key(self, key: str) -> bool:
+    def _has_alternate_key(self, key: str) -> bool:
         return key in self._callbacks
 
-    def get_callback(self, key: str) -> Optional[AssetMetadataToURL]:
+    def _get_callback(self, key: str) -> Optional[AssetMetadataToURL]:
         """Get the callback for the given key."""
         return self._callbacks.get(key)
 
     def has_callbacks(self) -> bool:
+        """Check if there are any registered callbacks."""
         return bool(self._callbacks)
 
     def get_alternates(self, asset_metadata: AssetMetadata) -> Dict[str, Dict[str, Dict[str, str]]]:
+        """Get the alternate links for the asset metadata.
+
+        Returns a dictionary with the alternate links for the asset metadata.
+        The keys are the names of the registered callbacks, and the values are dictionaries with the hrefs.
+        If no callbacks are registered, returns an empty dictionary.
+
+        :param asset_metadata: The asset metadata for which to generate the alternate links.
+        :return: A dictionary with the alternate links for the asset metadata.
+        """
         if not self.has_callbacks():
             return {}
         alternates = {}
         for key in self._callbacks:
-            alternates[key] = {"href": self.get_alternate_href_for(key, asset_metadata)}
+            alternates[key] = {"href": self._get_alternate_href_for(key, asset_metadata)}
 
         return {"alternate": alternates}
 
-    def get_alternate_href_for(self, key: str, asset_metadata: AssetMetadata) -> Dict[str, str]:
-        if not self.has_alternate_key(key):
+    def _get_alternate_href_for(self, key: str, asset_metadata: AssetMetadata) -> Dict[str, str]:
+        if not self._has_alternate_key(key):
             raise ValueError(f"No callback registered for key: {key}")
         return self._callbacks[key](asset_metadata)
 
     def add_MEP(self):
-        self.register_callback("local", lambda asset_md: asset_md.asset_path.as_posix())
+        """Add a callback for adding an alternate href with a local file path."""
+        self._register_callback("local", lambda asset_md: asset_md.asset_path.as_posix())
 
     def add_basic_S3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
-        """Add a S3 with an S3 bucket and the asset's file path concatenated to that bucket.
+        """Add a callback for adding an alternate href in S3 with an S3 bucket and the asset's file path concatenated to that bucket.
 
         For example:
             /my/data/folder/some-collection/some-asset.tif
@@ -97,18 +113,14 @@ class AlternateHrefGenerator:
             s3://my-bucket/my/data/folder/some-collection/some-asset.tif
 
         If you need to translate the file path in a more sophisticated wat you have to write your
-        own handler.
-
-        For example when the root of the path needs to be replaced by something else
-        for the S3 urls. You need write a callback for that:
-
-            /my/data/folder/some-collection/some-asset.tif -> s3://my-bucket/different-data-root/some-asset.tif
+        own handler. It is advised to define an item_postprocessor that will
+        modify the item before it is saved.
         """
         s3_bucket = self.remove_leading_trailing_slash(s3_bucket)
         s3_root_path = self.remove_leading_trailing_slash(s3_root_path) if s3_root_path else None
 
         convert = partial(self.to_S3_url, s3_bucket=s3_bucket, s3_root_path=s3_root_path)
-        self.register_callback("S3", convert)
+        self._register_callback("S3", convert)
 
     @classmethod
     def to_S3_url(cls, asset_md: AssetMetadata, s3_bucket: str, s3_root_path: str) -> str:
@@ -133,6 +145,7 @@ class AlternateHrefGenerator:
 
     @classmethod
     def from_config(cls, config: AlternateHrefConfig) -> "AlternateHrefGenerator":
+        """Create an AlternateHrefGenerator from an AlternateHrefConfig."""
         alt_link_gen = AlternateHrefGenerator()
         if not config:
             return alt_link_gen
@@ -214,12 +227,13 @@ class ItemBuilder:
 
         # Add the projection extension
         item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-        if first_asset.proj_epsg:
-            item_proj.epsg = first_asset.proj_epsg
-        item_proj.bbox = first_asset.proj_bbox_as_list
-        item_proj.geometry = first_asset.geometry_proj_as_dict
-        item_proj.transform = first_asset.transform
-        item_proj.shape = first_asset.shape
+        item_proj.apply(
+            epsg=first_asset.proj_epsg if first_asset.proj_epsg else None,
+            bbox=first_asset.proj_bbox_as_list,
+            geometry=first_asset.geometry_proj_as_dict,
+            transform=first_asset.transform,
+            shape=first_asset.shape,
+        )
 
         for metadata in assets:
             item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
@@ -240,47 +254,10 @@ class ItemBuilder:
         # file extension
         if metadata.file_size:
             file_info = FileExtension.ext(asset, add_if_missing=True)
-            file_info.size = metadata.file_size
+            file_info.apply(size=metadata.file_size)
 
         # raster extension
-        if not asset_config.raster_bands:
-            # There is no information to fill in default values for raster:bands
-            # Just fill in what we do have from asset metadata.
-            asset_raster = RasterExtension.ext(asset, add_if_missing=True)
-            raster_bands = []
-            for band_md in metadata.bands:
-                new_band: RasterBand = RasterBand.create(
-                    data_type=band_md.data_type,
-                    nodata=band_md.nodata,
-                    unit=band_md.units,
-                )
-                raster_bands.append(new_band)
-            asset_raster.apply(raster_bands)
-        else:
-            # The default values for raster:bands are available in the configuration
-            # the extension is already added in th AssetDefinition
-            raster_bands: List[RasterBand] = asset.ext.raster.bands
-            assert len(raster_bands) == len(metadata.bands), (
-                f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
-                f"does not match the number of raster bands in asset config ({len(raster_bands)})"
-            )
-            for i, raster_band in enumerate(raster_bands):
-                band_md: BandMetadata = metadata.bands[i]
-
-                if not isinstance(raster_band, RasterBand):
-                    raise InvalidConfiguration(
-                        f"Expected raster band to be of type RasterBand, got {type(raster_band)}"
-                    )
-
-                if raster_band.data_type is None and band_md.data_type is not None:
-                    # If the data type is not set in the asset config, use the one from the band metadata.
-                    raster_band.data_type = band_md.data_type
-                if raster_band.nodata is None and band_md.nodata is not None:
-                    # If the nodata value is not set in the asset config, use the one from the band metadata.
-                    raster_band.nodata = band_md.nodata
-                if raster_band.unit is None and band_md.units is not None:
-                    # If the unit is not set in the asset config, use the one from the band metadata.
-                    raster_band.unit = band_md.units
+        self._add_raster_bands_to_asset(asset, metadata, asset_config)
 
         # eo extension
         # the fixed values are set in the AssetDefinition, so we only need to add the extension
@@ -295,6 +272,51 @@ class ItemBuilder:
                 asset.extra_fields.update(alternate_links)
 
         return asset
+
+    def _add_raster_bands_to_asset(self, asset: Asset, metadata: AssetMetadata, asset_config: AssetConfig) -> None:
+        """Add raster bands to the asset based on the metadata and asset configuration.
+
+        There are two cases:
+        1. If the asset configuration does not specify raster bands, we create them based on the metadata.
+        2. If the asset configuration specifies raster bands, the extension is already added in the AssetDefinition,
+              and we fill in the missing values from the metadata.
+        :param asset: The asset to which the raster bands should be added.
+        :param metadata: The metadata containing the band information.
+        :param asset_config: The asset configuration containing the band information.
+        """
+        # Case 1: If the asset configuration does not specify raster bands, we create them based on the metadata.
+        if not asset_config.raster_bands:
+            # There is no information to fill in default values for raster:bands
+            # Just fill in what we do have from asset metadata.
+            asset_raster = RasterExtension.ext(asset, add_if_missing=True)
+            raster_bands = []
+            for band_md in metadata.bands:
+                new_band: RasterBand = RasterBand.create(
+                    data_type=band_md.data_type,
+                    nodata=band_md.nodata,
+                    unit=band_md.units,
+                )
+                raster_bands.append(new_band)
+            asset_raster.apply(raster_bands)
+        # Case 2: If the asset configuration specifies raster bands, we fill in the missing values from the metadata.
+        else:
+            raster_bands: List[RasterBand] = asset.ext.raster.bands
+            assert len(raster_bands) == len(metadata.bands), (
+                f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
+                f"does not match the number of raster bands in asset config ({len(raster_bands)})"
+            )
+            for i, raster_band in enumerate(raster_bands):
+                band_md: BandMetadata = metadata.bands[i]
+
+                if not isinstance(raster_band, RasterBand):
+                    raise InvalidConfiguration(
+                        f"Expected raster band to be of type RasterBand, got {type(raster_band)}"
+                    )
+                raster_band.apply(
+                    data_type=raster_band.data_type or band_md.data_type,
+                    nodata=raster_band.nodata or band_md.nodata,
+                    unit=raster_band.unit or band_md.units,
+                )
 
     def _get_assets_definitions(self) -> List[AssetDefinition]:
         """Create AssetDefinitions, according to the config in self.item_assets_configs"""
@@ -313,7 +335,10 @@ class ItemBuilder:
 
 
 class CollectionBuilder:
-    """Creates a STAC Collection from STAC Items."""
+    """Class to build a STAC Collection from a list of STAC Items.
+
+    Once initialized, you can use the `build_collection_from_items()` method to create a collection.
+    Use the `collection` property to access the created collection."""
 
     def __init__(
         self,
@@ -360,20 +385,28 @@ class CollectionBuilder:
         return self.collection_config.item_assets or {}
 
     @property
-    def collection_file(self) -> Path:
+    def collection_file_path(self) -> Path:
         return self.output_dir / "collection.json"
 
     @property
     def collection(self) -> Optional[Collection]:
         return self._collection
 
-    def build_collection(
+    def build_collection_from_items(
         self,
         stac_items: Iterable[Item],
         group: Optional[str | int] = None,
         save_collection: bool = True,
     ) -> None:
-        """Create and save the STAC collection."""
+        """Create and save a STAC Collection from a list of STAC Items.
+
+        The collection will be created with the ID and title from the collection configuration.
+        If the collection already exists, it will be reset and a new collection will be created.
+        The collection will be saved under the collection property, and optionally to the output directory.
+
+        :param stac_items: An iterable of STAC Items to be added to the collection.
+        :param group: Optional group identifier to create a collection with a different ID and title.
+        :param save_collection: If True, the collection will be saved to the output directory."""
         self.reset()
 
         self.create_empty_collection(group=group)
@@ -744,7 +777,7 @@ class AssetMetadataPipeline:
         item_generator: Generator[Item] = self.collect_stac_items()
 
         # This passes the STAC Items to the collection builder to create a STAC Collection.
-        self.collection = self.collection_builder.build_collection(item_generator, save_collection=True)
+        self.collection = self.collection_builder.build_collection_from_items(item_generator, save_collection=True)
 
     ####################################################
     # Code below is specific to the grouped collections.
@@ -815,7 +848,7 @@ class AssetMetadataPipeline:
         for group, metadata_list in sorted(self.group_stac_items_by().items()):
             self._setup_internals_for_group(group=group)
 
-            self.collection_builder.build_collection(
+            self.collection_builder.build_collection_from_items(
                 stac_items=metadata_list,
                 group=group,
                 save_collection=False,

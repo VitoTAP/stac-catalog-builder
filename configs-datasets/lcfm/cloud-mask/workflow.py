@@ -93,7 +93,7 @@ auth_settings = AuthSettings(
     token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
     authorization_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
     client_id="terracatalogueclient",
-    username="victor.verhaert",
+    username=input("Username: "),
     password=stac_api_pw,
 )
 settings = Settings(

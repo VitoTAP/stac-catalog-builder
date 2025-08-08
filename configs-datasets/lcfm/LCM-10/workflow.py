@@ -43,9 +43,6 @@ for k in asset_metadata:
 
 
 def item_postprocessor(item: pystac.Item) -> pystac.Item:
-    # item.properties["proj:code"] = "EPSG:" + str(item.properties["proj:epsg"])
-    # del item.properties["proj:epsg"]
-    # item.stac_extensions[2] = "https://stac-extensions.github.io/projection/v2.0.0/schema.json"
     item.id = item.id.replace("_MAP_V12C_C232", "_MAP")
 
     item.properties["tileId"] = item.properties["product_tile"]

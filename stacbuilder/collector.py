@@ -1,3 +1,10 @@
+"""
+This module defines classes for collecting Metadata from files. It uses a FileCollector to gather files and a Mapper to convert files to AssetMetadata.
+
+It provides a MetadataCollector class that can be used to collect metadata from files matching a specified glob pattern in a directory.
+It is designed to be flexible and can be extended to support different file types and metadata mapping strategies.
+"""
+
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, List, Literal, Optional, Protocol
@@ -40,6 +47,12 @@ class FileCollector(IDataCollector):
     """
 
     def __init__(self, input_dir: Optional[Path] = None, glob: str = "*", max_files: int = -1) -> None:
+        """Initialize the FileCollector with an input directory, glob pattern, and maximum number of files.
+
+        :param input_dir: The directory to search for files.
+        :param glob: The glob pattern to match files. The default is "*", which matches all files.
+        :param max_files: The maximum number of files to collect. Default is -1, which means no limit.
+        """
         self.input_dir: Optional[Path] = input_dir
         self.glob: str = glob or "*"
         self.max_files: int = max_files if max_files is not None else -1
@@ -55,6 +68,7 @@ class FileCollector(IDataCollector):
         )
 
     def collect(self):
+        """Collect files matching the glob pattern in the input directory. Once collected, the files can be accessed via the `input_files` property."""
         input_files = (f for f in self.input_dir.glob(self.glob) if f.is_file())
 
         if self.max_files > 0:

@@ -300,9 +300,9 @@ class TestAlternateLinksGenerator:
         def fake_call_back(asset_md: AssetMetadata) -> str:
             return f"foo://bar/{asset_md.asset_id}"
 
-        assert alternate_generator.has_alternate_key("FOO") is False
-        alternate_generator.register_callback("FOO", fake_call_back)
-        assert alternate_generator.has_alternate_key("FOO") is True
+        assert alternate_generator._has_alternate_key("FOO") is False
+        alternate_generator._register_callback("FOO", fake_call_back)
+        assert alternate_generator._has_alternate_key("FOO") is True
 
         assert alternate_generator._callbacks["FOO"] is fake_call_back
 
@@ -312,9 +312,9 @@ class TestAlternateLinksGenerator:
         def fake_call_back(asset_md: AssetMetadata) -> str:
             return f"foo://bar/{asset_md.asset_id}"
 
-        alternate_generator.register_callback("FOO", fake_call_back)
+        alternate_generator._register_callback("FOO", fake_call_back)
 
-        alternate_href = alternate_generator.get_alternate_href_for("FOO", simple_asset_metadata)
+        alternate_href = alternate_generator._get_alternate_href_for("FOO", simple_asset_metadata)
         assert alternate_href == "foo://bar/asset123"
 
     def test_get_alternates(self, simple_asset_metadata):
@@ -323,7 +323,7 @@ class TestAlternateLinksGenerator:
         def fake_call_back(asset_md: AssetMetadata) -> str:
             return f"foo://bar/{asset_md.asset_id}"
 
-        alternate_generator.register_callback("FOO", fake_call_back)
+        alternate_generator._register_callback("FOO", fake_call_back)
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
 
@@ -332,9 +332,9 @@ class TestAlternateLinksGenerator:
     def test_mep(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("local") is False
+        assert alternate_generator._has_alternate_key("local") is False
         alternate_generator.add_MEP()
-        assert alternate_generator.has_alternate_key("local") is True
+        assert alternate_generator._has_alternate_key("local") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
 
@@ -343,9 +343,9 @@ class TestAlternateLinksGenerator:
     def test_S3_only_bucket(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("S3") is False
+        assert alternate_generator._has_alternate_key("S3") is False
         alternate_generator.add_basic_S3(s3_bucket="test-bucket")
-        assert alternate_generator.has_alternate_key("S3") is True
+        assert alternate_generator._has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {"alternate": {"S3": {"href": "s3://test-bucket/data/collection789/item456/asset123.tif"}}}
@@ -353,9 +353,9 @@ class TestAlternateLinksGenerator:
     def test_S3_with_root_path(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("S3") is False
+        assert alternate_generator._has_alternate_key("S3") is False
         alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
-        assert alternate_generator.has_alternate_key("S3") is True
+        assert alternate_generator._has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {
@@ -367,13 +367,13 @@ class TestAlternateLinksGenerator:
     def test_MEP_and_S3(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("local") is False
-        assert alternate_generator.has_alternate_key("S3") is False
+        assert alternate_generator._has_alternate_key("local") is False
+        assert alternate_generator._has_alternate_key("S3") is False
 
         alternate_generator.add_MEP()
         alternate_generator.add_basic_S3("test-bucket")
-        assert alternate_generator.has_alternate_key("local") is True
-        assert alternate_generator.has_alternate_key("S3") is True
+        assert alternate_generator._has_alternate_key("local") is True
+        assert alternate_generator._has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {
@@ -386,14 +386,14 @@ class TestAlternateLinksGenerator:
     def test_MEP_and_S3_with_root_path(self, simple_asset_metadata):
         alternate_generator = AlternateHrefGenerator()
 
-        assert alternate_generator.has_alternate_key("local") is False
-        assert alternate_generator.has_alternate_key("S3") is False
+        assert alternate_generator._has_alternate_key("local") is False
+        assert alternate_generator._has_alternate_key("S3") is False
 
         alternate_generator.add_MEP()
         alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
 
-        assert alternate_generator.has_alternate_key("local") is True
-        assert alternate_generator.has_alternate_key("S3") is True
+        assert alternate_generator._has_alternate_key("local") is True
+        assert alternate_generator._has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
         assert alternates == {
@@ -418,11 +418,11 @@ class TestAlternateLinksGenerator:
         alt_href_gen = AlternateHrefGenerator.from_config(config)
 
         if config is None:
-            assert alt_href_gen.has_alternate_key("local") is False
-            assert alt_href_gen.has_alternate_key("S3") is False
+            assert alt_href_gen._has_alternate_key("local") is False
+            assert alt_href_gen._has_alternate_key("S3") is False
         else:
-            assert alt_href_gen.has_alternate_key("local") == config.add_MEP
-            assert alt_href_gen.has_alternate_key("S3") == config.add_S3
+            assert alt_href_gen._has_alternate_key("local") == config.add_MEP
+            assert alt_href_gen._has_alternate_key("S3") == config.add_S3
 
     @pytest.mark.parametrize(
         "config",
