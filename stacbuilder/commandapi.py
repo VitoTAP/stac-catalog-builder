@@ -1,14 +1,24 @@
 """
-CLI command-style functions
+This module provides the most important functions for building STAC collections and items.
 
-The functions below are helper functions to keep the CLI in __main__.py
-as thin and dumb as reasonably possible.
+The module is organized into the following functional areas:
 
-We want to the logic out of the CLI, therefore we put it in these functions
-and the CLI only does the argument parsing, via the click library.
+**Collection Building:**
+- build_collection: Build STAC collections from input files
+- build_grouped_collections: Build multiple related STAC collections (deprecated)
 
-The main advantage is that this style allows for unit tests on core
-functionality of the CLI, and that is harder to do directly on the CLI.
+**Data Exploration:**
+- list_input_files: List files that match the configuration
+- list_asset_metadata: Extract metadata from input files
+- list_stac_items: Generate STAC items for testing
+
+**Collection Management:**
+- load_collection: Load existing STAC collections
+- validate_collection: Validate STAC collection format
+
+**STAC API Operations:**
+- upload_to_stac_api: Upload collections and items to STAC API
+- upload_items_to_stac_api: Upload only items to STAC API
 """
 
 import logging
@@ -37,14 +47,19 @@ logging.basicConfig(handlers=[console_handler], level=log_level)
 logging.getLogger("botocore").setLevel(logging.WARNING)
 logging.getLogger("boto3").setLevel(logging.WARNING)
 
+# Organized by functionality for better discoverability
 __all__ = [
+    # Collection building
     "build_collection",
     "build_grouped_collections",
+    # Data exploration and listing
     "list_input_files",
     "list_asset_metadata",
     "list_stac_items",
+    # Collection management
     "load_collection",
     "validate_collection",
+    # STAC API operations
     "upload_to_stac_api",
     "upload_items_to_stac_api",
 ]
