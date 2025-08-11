@@ -28,7 +28,7 @@
         }
     },
     "alternate_links": {
-        "add_MEP": true
+        "add_local": true
     },
     "item_assets": {
         "temperature-mean": {

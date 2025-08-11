@@ -262,11 +262,11 @@ class AlternateHrefConfig(BaseModel):
     See also: stacbuilder.builder.AlternateLinksGenerator
     In particular these methods:
     - AlternateLinksGenerator.from_config
-    - AlternateLinksGenerator.add_MEP
-    - AlternateLinksGenerator.add_basic_S3
+    - AlternateLinksGenerator.add_local
+    - AlternateLinksGenerator.add_S3
     """
 
-    add_MEP: bool = True
+    add_local: bool = True
     add_S3: bool = False
     s3_bucket: Optional[str] = None
     s3_root_path: Optional[str] = None

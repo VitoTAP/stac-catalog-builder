@@ -53,7 +53,7 @@ class AlternateHrefGenerator:
     """Generates the alternate links for assets.
 
     This class is best initialized either by using `AlternateHrefConfig.from_config(config)` or
-    creating an instance and calling the `add_MEP()` or `add_basic_S3()` methods to register
+    creating an instance and calling the `add_local()` or `add_S3()` methods to register
     the callbacks for generating alternate links.
     """
 
@@ -100,11 +100,11 @@ class AlternateHrefGenerator:
             raise ValueError(f"No callback registered for key: {key}")
         return self._callbacks[key](asset_metadata)
 
-    def add_MEP(self):
+    def add_local(self):
         """Add a callback for adding an alternate href with a local file path."""
         self._register_callback("local", lambda asset_md: asset_md.asset_path.as_posix())
 
-    def add_basic_S3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
+    def add_S3(self, s3_bucket: str, s3_root_path: Optional[str] = None):
         """Add a callback for adding an alternate href in S3 with an S3 bucket and the asset's file path concatenated to that bucket.
 
         For example:
@@ -150,15 +150,15 @@ class AlternateHrefGenerator:
         if not config:
             return alt_link_gen
 
-        if config.add_MEP:
-            alt_link_gen.add_MEP()
+        if config.add_local:
+            alt_link_gen.add_local()
 
         if config.add_S3:
             if not config.s3_bucket:
                 raise InvalidConfiguration(
                     "AlternateHrefConfig specifies S3 links need to be added but there is no value for s3_bucket"
                 )
-            alt_link_gen.add_basic_S3(s3_bucket=config.s3_bucket, s3_root_path=config.s3_root_path)
+            alt_link_gen.add_S3(s3_bucket=config.s3_bucket, s3_root_path=config.s3_root_path)
 
         return alt_link_gen
 

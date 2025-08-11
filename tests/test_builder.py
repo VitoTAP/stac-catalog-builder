@@ -337,7 +337,7 @@ class TestAlternateLinksGenerator:
         alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator._has_alternate_key("local") is False
-        alternate_generator.add_MEP()
+        alternate_generator.add_local()
         assert alternate_generator._has_alternate_key("local") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
@@ -348,7 +348,7 @@ class TestAlternateLinksGenerator:
         alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator._has_alternate_key("S3") is False
-        alternate_generator.add_basic_S3(s3_bucket="test-bucket")
+        alternate_generator.add_S3(s3_bucket="test-bucket")
         assert alternate_generator._has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
@@ -358,7 +358,7 @@ class TestAlternateLinksGenerator:
         alternate_generator = AlternateHrefGenerator()
 
         assert alternate_generator._has_alternate_key("S3") is False
-        alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
+        alternate_generator.add_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
         assert alternate_generator._has_alternate_key("S3") is True
 
         alternates = alternate_generator.get_alternates(simple_asset_metadata)
@@ -374,8 +374,8 @@ class TestAlternateLinksGenerator:
         assert alternate_generator._has_alternate_key("local") is False
         assert alternate_generator._has_alternate_key("S3") is False
 
-        alternate_generator.add_MEP()
-        alternate_generator.add_basic_S3("test-bucket")
+        alternate_generator.add_local()
+        alternate_generator.add_S3("test-bucket")
         assert alternate_generator._has_alternate_key("local") is True
         assert alternate_generator._has_alternate_key("S3") is True
 
@@ -393,8 +393,8 @@ class TestAlternateLinksGenerator:
         assert alternate_generator._has_alternate_key("local") is False
         assert alternate_generator._has_alternate_key("S3") is False
 
-        alternate_generator.add_MEP()
-        alternate_generator.add_basic_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
+        alternate_generator.add_local()
+        alternate_generator.add_S3(s3_bucket="test-bucket", s3_root_path="test/data-root/path")
 
         assert alternate_generator._has_alternate_key("local") is True
         assert alternate_generator._has_alternate_key("S3") is True
@@ -411,11 +411,11 @@ class TestAlternateLinksGenerator:
         "config",
         [
             None,
-            AlternateHrefConfig(add_MEP=False, add_S3=False),
-            AlternateHrefConfig(add_MEP=True, add_S3=False),
-            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="test-bucket"),
-            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
-            AlternateHrefConfig(add_MEP=True, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
+            AlternateHrefConfig(add_local=False, add_S3=False),
+            AlternateHrefConfig(add_local=True, add_S3=False),
+            AlternateHrefConfig(add_local=False, add_S3=True, s3_bucket="test-bucket"),
+            AlternateHrefConfig(add_local=False, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
+            AlternateHrefConfig(add_local=True, add_S3=True, s3_bucket="test-bucket", s3_root_path="test/root-path"),
         ],
     )
     def test_from_config_adds_correct_callback(self, config):
@@ -425,15 +425,15 @@ class TestAlternateLinksGenerator:
             assert alt_href_gen._has_alternate_key("local") is False
             assert alt_href_gen._has_alternate_key("S3") is False
         else:
-            assert alt_href_gen._has_alternate_key("local") == config.add_MEP
+            assert alt_href_gen._has_alternate_key("local") == config.add_local
             assert alt_href_gen._has_alternate_key("S3") == config.add_S3
 
     @pytest.mark.parametrize(
         "config",
         [
-            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=None),
-            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=""),
-            AlternateHrefConfig(add_MEP=False, add_S3=True, s3_bucket=None, s3_root_path="test/root-path"),
+            AlternateHrefConfig(add_local=False, add_S3=True, s3_bucket=None),
+            AlternateHrefConfig(add_local=False, add_S3=True, s3_bucket=""),
+            AlternateHrefConfig(add_local=False, add_S3=True, s3_bucket=None, s3_root_path="test/root-path"),
         ],
     )
     def test_from_config_raises_invalidconfiguration_when_s3bucket_missing(self, config):
