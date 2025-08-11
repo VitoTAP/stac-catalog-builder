@@ -95,7 +95,7 @@ def build_collection(
         file_coll_cfg=file_coll_cfg,
     )
 
-    pipeline = AssetMetadataPipeline.from_config(
+    pipeline = AssetMetadataPipeline(
         collection_config=coll_cfg,
         metadata_collector=metadata_collector,
         output_dir=output_dir,
@@ -139,7 +139,7 @@ def build_grouped_collections(
         file_coll_cfg=file_coll_cfg,
     )
 
-    pipeline = AssetMetadataPipeline.from_config(
+    pipeline = AssetMetadataPipeline(
         collection_config=coll_cfg,
         metadata_collector=metadata_collector,
         output_dir=output_dir,
@@ -229,7 +229,7 @@ def list_stac_items(
         collection_config=coll_cfg,
         file_coll_cfg=file_coll_cfg,
     )
-    pipeline = AssetMetadataPipeline.from_config(
+    pipeline = AssetMetadataPipeline(
         collection_config=coll_cfg,
         metadata_collector=metadata_collector,
         item_postprocessor=item_postprocessor,

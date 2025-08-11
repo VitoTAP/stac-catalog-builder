@@ -23,7 +23,7 @@ def vpp_list_metadata(
     collector.max_products = max_products
 
     coll_cfg = collector.get_collection_config()
-    pipeline = AssetMetadataPipeline.from_config(
+    pipeline = AssetMetadataPipeline(
         metadata_collector=collector,
         collection_config=coll_cfg,
     )
@@ -45,7 +45,7 @@ def vpp_list_stac_items(
     collector.max_products = max_products
 
     coll_cfg = collector.get_collection_config()
-    pipeline = AssetMetadataPipeline.from_config(
+    pipeline = AssetMetadataPipeline(
         metadata_collector=collector,
         collection_config=coll_cfg,
     )
@@ -71,7 +71,7 @@ def vpp_build_collection(
         output_dir = output_dir / collection_id
 
     coll_cfg = collector.get_collection_config()
-    pipeline: AssetMetadataPipeline = AssetMetadataPipeline.from_config(
+    pipeline: AssetMetadataPipeline = AssetMetadataPipeline(
         metadata_collector=collector,
         collection_config=coll_cfg,
         output_dir=output_dir,
@@ -98,7 +98,7 @@ def vpp_build_all_collections(
         collector.collect()
 
         coll_cfg = collector.get_collection_config()
-        pipeline = AssetMetadataPipeline.from_config(
+        pipeline = AssetMetadataPipeline(
             metadata_collector=collector,
             collection_config=coll_cfg,
             output_dir=output_dir,

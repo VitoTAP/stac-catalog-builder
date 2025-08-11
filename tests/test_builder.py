@@ -151,7 +151,7 @@ def metadata_collector_basic_assets(basic_asset_metadata_list) -> MockMetadataCo
 def asset_metadata_pipeline(
     metadata_collector_basic_assets, collection_config_from_file, tmp_path
 ) -> AssetMetadataPipeline:
-    return AssetMetadataPipeline.from_config(
+    return AssetMetadataPipeline(
         metadata_collector=metadata_collector_basic_assets,
         collection_config=collection_config_from_file,
         output_dir=tmp_path,
