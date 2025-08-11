@@ -23,6 +23,23 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
         output_json = json.loads(file.read_text())
         output_json = nested_update(output_json, "created", "")
 
+        def update_href(obj):
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    if key == "href" and isinstance(value, str) and not value.startswith("http"):
+                        if Path(value).is_absolute():
+                            new_href = Path("/stac-catalog-builder/tests") / Path(value).relative_to(
+                                Path(__file__).parent
+                            )
+                            obj[key] = new_href.as_posix()
+                    else:
+                        update_href(value)
+            elif isinstance(obj, list):
+                for item in obj:
+                    update_href(item)
+
+        update_href(output_json)
+
         reference_path = reference_dir / file.relative_to(output_dir)
         if not reference_path.exists():
             reference_path.parent.mkdir(parents=True, exist_ok=True)
