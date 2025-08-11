@@ -40,6 +40,9 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
 
         update_href(output_json)
 
+        if "links" in output_json and isinstance(output_json["links"], list):
+            output_json["links"].sort(key=lambda x: (x.get("rel", ""), x.get("href", "")))
+
         reference_path = reference_dir / file.relative_to(output_dir)
         if not reference_path.exists():
             reference_path.parent.mkdir(parents=True, exist_ok=True)

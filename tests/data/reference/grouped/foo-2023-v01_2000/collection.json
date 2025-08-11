@@ -5,12 +5,6 @@
   "description": "Description of Foo",
   "links": [
     {
-      "rel": "root",
-      "href": "../collection.json",
-      "type": "application/json",
-      "title": "Foo collection"
-    },
-    {
       "rel": "item",
       "href": "./foo-2023-v01_2000/2000/observations_2000-01-01.json",
       "type": "application/json"
@@ -27,6 +21,12 @@
     },
     {
       "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    },
+    {
+      "rel": "root",
       "href": "../collection.json",
       "type": "application/json",
       "title": "Foo collection"

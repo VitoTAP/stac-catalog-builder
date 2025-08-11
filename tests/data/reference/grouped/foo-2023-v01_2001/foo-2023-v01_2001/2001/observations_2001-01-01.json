@@ -95,12 +95,6 @@
   },
   "links": [
     {
-      "rel": "root",
-      "href": "../../../collection.json",
-      "type": "application/json",
-      "title": "Foo collection"
-    },
-    {
       "rel": "collection",
       "href": "../../collection.json",
       "type": "application/json",
@@ -111,6 +105,12 @@
       "href": "../../collection.json",
       "type": "application/json",
       "title": "Foo collection 2001"
+    },
+    {
+      "rel": "root",
+      "href": "../../../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
     }
   ],
   "assets": {
