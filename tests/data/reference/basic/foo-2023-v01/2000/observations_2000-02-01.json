@@ -1,0 +1,161 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "stac_extensions": [
+    "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json"
+  ],
+  "id": "observations_2000-02-01",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          240.0,
+          180.0
+        ],
+        [
+          240.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          180.0
+        ],
+        [
+          240.0,
+          180.0
+        ]
+      ]
+    ]
+  },
+  "bbox": [
+    0.0,
+    0.0,
+    240.0,
+    180.0
+  ],
+  "properties": {
+    "start_datetime": "2000-02-01T00:00:00Z",
+    "end_datetime": "2000-02-29T23:59:59Z",
+    "created": "",
+    "proj:epsg": 4326,
+    "proj:geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            240.0,
+            180.0
+          ],
+          [
+            240.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            180.0
+          ],
+          [
+            240.0,
+            180.0
+          ]
+        ]
+      ]
+    },
+    "proj:bbox": [
+      0.0,
+      180.0,
+      240.0,
+      0.0
+    ],
+    "proj:shape": [
+      180,
+      240
+    ],
+    "proj:transform": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+    ],
+    "datetime": "2000-02-01T00:00:00Z"
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    },
+    {
+      "rel": "collection",
+      "href": "../../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    },
+    {
+      "rel": "parent",
+      "href": "../../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    }
+  ],
+  "assets": {
+    "2m-temp-monthly": {
+      "href": "/stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_2m-temp-monthly_2000-02-01.tif",
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "title": "2m temperature",
+      "description": "temperature 2m above ground (Kelvin)",
+      "eo:bands": [
+        {
+          "name": "2m_temp",
+          "description": "temperature 2m above ground (Kelvin)"
+        }
+      ],
+      "file:size": 346140,
+      "raster:bands": [
+        {
+          "data_type": "float64"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    },
+    "tot-precip-monthly": {
+      "href": "/stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_tot-precip-monthly_2000-02-01.tif",
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "title": "total precipitation",
+      "description": "total precipitation per month (m)",
+      "eo:bands": [
+        {
+          "name": "tot_precip",
+          "description": "total precipitation per month (m)"
+        }
+      ],
+      "file:size": 346140,
+      "raster:bands": [
+        {
+          "data_type": "float64"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    }
+  },
+  "collection": "foo-2023-v01"
+}

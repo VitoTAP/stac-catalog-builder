@@ -34,7 +34,8 @@ from stacbuilder.config import (
 )
 from stacbuilder.exceptions import InvalidConfiguration
 from stacbuilder.metadata import AssetMetadata, BandMetadata
-from tests.conftest import MockMetadataCollector, MockPathParser
+from stacbuilder.pathparsers import DefaultInputPathParser
+from tests.conftest import MockMetadataCollector
 
 
 @pytest.fixture
@@ -92,7 +93,11 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
 
     """
 
-    path_parser = MockPathParser()
+    path_parser = DefaultInputPathParser(
+        period="monthly",
+        regex_pattern=".*/observations_(?P<asset_type>2m-temp-monthly|tot-precip-monthly)_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}).tif$",
+        fixed_values={"item_id": "observations_{year}-{month}-{day}"},
+    )
     asset_path_data = path_parser.parse(asset_path)
 
     prefix_length = len("observations_")
@@ -158,7 +163,7 @@ class TestGeoTiffPipeline:
     def geotiff_asset_metadata_pipeline(
         self, collection_config_from_file, file_collector_config, collection_output_dir
     ) -> AssetMetadataPipeline:
-        return AssetMetadataPipeline.from_config(
+        return AssetMetadataPipeline(
             metadata_collector=MetadataCollector.from_config(
                 collection_config=collection_config_from_file,
                 file_coll_cfg=file_collector_config,
@@ -176,7 +181,6 @@ class TestGeoTiffPipeline:
 
         assert sorted(input_files) == sorted(geotiff_paths)
 
-    # @pytest.mark.skip(reason="test files incorrect")
     def test_get_metadata(
         self, geotiff_asset_metadata_pipeline: AssetMetadataPipeline, basic_asset_metadata_list: List[AssetMetadata]
     ):
@@ -237,7 +241,7 @@ class TestAssetMetadataPipeline:
 
     def test_collect_stac_items(self, asset_metadata_pipeline: AssetMetadataPipeline):
         stac_items = list(asset_metadata_pipeline.collect_stac_items())
-        assert len(stac_items) == 4
+        assert len(stac_items) == 6, f"Expected 6 items, got {len(stac_items)}. Items: {pprint.pformat(stac_items)}"
 
         for item in stac_items:
             len(item.assets) == 3

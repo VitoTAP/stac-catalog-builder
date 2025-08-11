@@ -151,7 +151,7 @@ class TestCommandAPI:
         returned_items, failed_files = list_stac_items(
             collection_config_path=config_file, glob="*/*.tif", input_dir=input_dir
         )
-        expected_count = 4
+        expected_count = 6
         assert len(returned_items) == expected_count, f"Expected {expected_count} items, got {len(returned_items)}."
         assert len(failed_files) == 0, f"Expected no failed files, got {len(failed_files)}."
 

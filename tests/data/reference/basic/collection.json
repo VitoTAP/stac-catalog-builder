@@ -6,22 +6,32 @@
   "links": [
     {
       "rel": "item",
-      "href": "./foo-2023-v01/2000/observations_2m-temp-monthly_2000.json",
+      "href": "./foo-2023-v01/2000/observations_2000-01-01.json",
       "type": "application/json"
     },
     {
       "rel": "item",
-      "href": "./foo-2023-v01/2001/observations_2m-temp-monthly_2001.json",
+      "href": "./foo-2023-v01/2000/observations_2000-02-01.json",
       "type": "application/json"
     },
     {
       "rel": "item",
-      "href": "./foo-2023-v01/2000/observations_tot-precip-monthly_2000.json",
+      "href": "./foo-2023-v01/2000/observations_2000-03-01.json",
       "type": "application/json"
     },
     {
       "rel": "item",
-      "href": "./foo-2023-v01/2001/observations_tot-precip-monthly_2001.json",
+      "href": "./foo-2023-v01/2001/observations_2001-01-01.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01/2001/observations_2001-02-01.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01/2001/observations_2001-03-01.json",
       "type": "application/json"
     },
     {
@@ -82,7 +92,7 @@
       "interval": [
         [
           "2000-01-01T00:00:00Z",
-          "2001-12-31T23:59:59Z"
+          "2001-03-31T23:59:59Z"
         ]
       ]
     }

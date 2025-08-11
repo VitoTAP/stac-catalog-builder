@@ -135,7 +135,9 @@ class RegexInputPathParser(InputPathParser):
 
     def parse(self, input_file: Union[Path, str]) -> Dict[str, Any]:
         data = {}
-        self._path = str(input_file)
+        if isinstance(input_file, str):
+            input_file = Path(input_file)
+        self._path = input_file.as_posix()
 
         if self._regex_has_named_groups():
             match = self._regex.search(self._path)
@@ -147,13 +149,18 @@ class RegexInputPathParser(InputPathParser):
                     + f"regex pattern={self._regex.pattern}"
                 )
 
+        for key, value in self._fixed_values.items():
+            if isinstance(value, str) and "{" in value and "}" in value:
+                try:
+                    value = value.format(**data)
+                except KeyError as e:
+                    logger.warning(f"Could not format fixed value '{value}' with data keys: {e}")
+            data[key] = value
+
         for key, value in data.items():
             if key in self._type_converters:
                 func = self._type_converters[key]
                 data[key] = func(value)
-
-        for key, value in self._fixed_values.items():
-            data[key] = value
 
         self._data = data
         self._post_process_data()

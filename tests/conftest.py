@@ -1,4 +1,3 @@
-import datetime as dt
 from pathlib import Path
 from typing import List
 
@@ -14,7 +13,6 @@ from stacbuilder.config import (
     InputPathParserConfig,
 )
 from stacbuilder.metadata import AssetMetadata
-from stacbuilder.pathparsers import RegexInputPathParser
 
 
 @pytest.fixture(scope="session")
@@ -173,56 +171,6 @@ def create_mock_geotiff(tif_path: Path):
     )
     dataset.write(Z, 1)
     dataset.close()
-
-
-class MockPathParser(RegexInputPathParser):
-    def __init__(self, *args, **kwargs) -> None:
-        type_converters = {
-            "year": int,
-            "month": int,
-            "day": int,
-        }
-        fixed_values = {"collection_id": "observations"}
-        regex_pattern = ".*observations_(?P<asset_type>.*)_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}).*\\.tif$"
-        super().__init__(
-            regex_pattern=regex_pattern, type_converters=type_converters, fixed_values=fixed_values, *args, **kwargs
-        )
-
-    def _post_process_data(self):
-        start_dt = self._derive_start_datetime()
-        self._data["datetime"] = start_dt
-        self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._derive_end_datetime()
-
-        year = self._data["year"]
-        self._data["item_id"] = f"observations_{self._data['asset_type']}_{year:04}"
-
-    def _derive_start_datetime(self):
-        """Derive the start datetime from other properties that were extracted."""
-        year = self._data.get("year")
-        month = self._data.get("month")
-        day = self._data.get("day")
-
-        if not (year and month and day):
-            print(
-                "WARNING: Could not find all date fields: "
-                + f"{year=}, {month=}, {day=}, {self._data=},\n{self._path=}\n{self._regex.pattern=}"
-            )
-            return None
-
-        return dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
-
-    def _derive_end_datetime(self):
-        """Derive the end datetime from other properties that were extracted."""
-        start_dt = self._derive_start_datetime()
-        if not start_dt:
-            print(
-                "WARNING: Could not determine start_datetime: " + f"{self._data=}, {self._path=}, {self._regex.pattern}"
-            )
-            return None
-
-        year = start_dt.year
-        return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
 
 
 class MockMetadataCollector(IMetadataCollector):
