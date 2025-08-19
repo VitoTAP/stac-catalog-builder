@@ -1,0 +1,146 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "openEO_2022-05-01",
+  "properties": {
+    "product_version": "1.0.0",
+    "product_tile": null,
+    "start_datetime": "2022-05-01T00:00:00Z",
+    "end_datetime": "2022-05-31T23:59:59Z",
+    "description": "precipitation-flux",
+    "created": "2025-03-20T14:39:00.474090Z",
+    "proj:epsg": 4326,
+    "proj:bbox": [
+      -180.05,
+      -90.05,
+      180.05,
+      90.05000000000003
+    ],
+    "proj:geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            180.05,
+            -90.05
+          ],
+          [
+            180.05,
+            90.05000000000003
+          ],
+          [
+            -180.05,
+            90.05000000000003
+          ],
+          [
+            -180.05,
+            -90.05
+          ],
+          [
+            180.05,
+            -90.05
+          ]
+        ]
+      ]
+    },
+    "proj:transform": [
+      0.1,
+      0.0,
+      -180.05,
+      0.0,
+      -0.10000000000000002,
+      90.05000000000003
+    ],
+    "proj:shape": [
+      1801,
+      3601
+    ],
+    "datetime": "2022-05-01T00:00:00Z"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          180.0,
+          -90.0
+        ],
+        [
+          180.0,
+          90.0
+        ],
+        [
+          -180.0,
+          90.0
+        ],
+        [
+          -180.0,
+          -90.0
+        ],
+        [
+          180.0,
+          -90.0
+        ]
+      ]
+    ]
+  },
+  "links": [],
+  "assets": {
+    "precipitation-flux": {
+      "href": "/data/worldcereal_data/agera5_monthly/openEO_2022-05-01Z_precipitation-flux.tif",
+      "title": "precipitation-flux",
+      "description": "precipitation-flux",
+      "eo:bands": [
+        {
+          "name": "precipitation-flux",
+          "description": "precipitation-flux"
+        }
+      ],
+      "file:size": 766580,
+      "raster:bands": [
+        {
+          "nodata": 65535.0,
+          "data_type": "uint16"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    },
+    "temperature-mean": {
+      "href": "/data/worldcereal_data/agera5_monthly/openEO_2022-05-01Z_temperature-mean.tif",
+      "title": "temperature-mean",
+      "description": "temperature-mean",
+      "eo:bands": [
+        {
+          "name": "temperature-mean",
+          "description": "temperature-mean"
+        }
+      ],
+      "file:size": 3231004,
+      "raster:bands": [
+        {
+          "nodata": 65535.0,
+          "data_type": "uint16"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    }
+  },
+  "bbox": [
+    -180,
+    -90,
+    180,
+    90
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/classification/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
+  ]
+}
