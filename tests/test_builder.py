@@ -292,8 +292,6 @@ class TestAlternateLinksGenerator:
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
             bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
         )
-        asset_md.asset_id = "asset123"
-        asset_md.item_id = "item456"
         asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
 
         return asset_md

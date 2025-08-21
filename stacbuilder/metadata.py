@@ -41,9 +41,16 @@ class BandMetadata:
     """
 
     data_type: np.dtype
+    """NumPy data type of the band (e.g., uint8, float32)."""
+
     nodata: Any
+    """Value representing no data/missing pixels in the band."""
+
     index: int
+    """Band index/number (typically 1-based)."""
+
     units: Optional[str] = None
+    """Physical units of the band values (e.g., 'meters', 'degrees')."""
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -57,37 +64,13 @@ class BandMetadata:
 
 
 class AssetMetadata(BaseModel):
-    """Intermediate metadata that models the properties we actually use."""
+    """Intermediate metadata for one asset. This is the metadata used to create stac items."""
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_assignment=True,
     )
 
-    # This is metadata of an asset that belongs to a STAC item, not really the metadata of one STAC item.
-    # (Realizing this now when reviewing the code, this class has been roughly the same since the earliest versions of the tool)
-    # We process files which correspond to assets.
-    # Those assets are grouped into STAC items.
-    # Also an asset can either be one band, or it can itself contain multiple bands.
-    #
-    # properties we want to collect:
-    # - item_id
-    # - path or href (How do we handle URLs?)
-    # - asset_type:
-    #       We use this to find the corresponding asset definition config in the CollectionConfig
-    # - everything to do with the date and time.
-    #       "datetime" is the standard name (To be confirmed)
-    #       But this could correspond to either the start datetime or end datetime, usually the start datetime.
-    #       Often it is easier to extract year, month and day as separate parts of the path.
-    #       Keep in mind some paths only contain a year, or a year and month.
-    # - bounding box and everything to do with the CRS (projected CRS)
-    #   - in lat-lon
-    #   - as well as projected + the CRS
-    #   - geometry of the bounding box
-    # - raster shape (height & width in pixels)
-    # - raster tags
-    # - Metadata from the raster about the bands,
-    #       for the EO and Raster STAC extensions (eo:bands and raster:bands)
     PROPS_FROM_HREFS: ClassVar[List[str]] = [
         "item_id",
         "asset_id",
@@ -99,56 +82,81 @@ class AssetMetadata(BaseModel):
         "title",
         "tile_id",
     ]
-    # The asset_id is the unique identifier for the asset.
+    """Properties that can be extracted from href parsing."""
+
     asset_id: str
+    """The unique identifier for the asset."""
 
-    # href is the path to the asset. At least one of the following needs to be set:
     href: str = None
+    """The file path or URL to the asset. At least one of href, original_href, or asset_path must be set."""
+
     original_href: str = None
+    """The original file path or URL before any modifications."""
+
     asset_path: Path = None
+    """Path object representing the asset location on the filesystem."""
 
-    # Which STAC item this asset belongs to.
-    # When a STAC item bundles multiple assets then the InputPathParser in extract_href_info
-    # must provide a value for item_id.
-    # However, when each asset corresponds to one STAC item then asset_id and item_id will
-    # be identical. So if we don't get an explicit value for item_id we assume it is the same as
-    # asset_id.
     item_id: str = None
+    """STAC item identifier that this asset belongs to.
 
-    # We use asset_type to find the corresponding asset definition config in the CollectionConfig
+    When a STAC item bundles multiple assets, the InputPathParser must provide
+    a value for item_id. When each asset corresponds to one STAC item, asset_id
+    and item_id will be identical. If no explicit value is provided, it defaults
+    to the same as asset_id.
+    """
+
     asset_type: Optional[str] = None
+    """Asset type used to find the corresponding asset definition in CollectionConfig."""
 
-    # Temporal information of the asset. Only datetime is required, but we can also have
-    # start_datetime and end_datetime.
     datetime: dt.datetime
+    """Primary datetime for the asset. This is the only required temporal field."""
+
     start_datetime: Optional[dt.datetime] = None
+    """Start datetime for assets representing a time range."""
+
     end_datetime: Optional[dt.datetime] = None
+    """End datetime for assets representing a time range."""
 
-    # The bounding boxes and geometries, in latitude-longitude and also the projected version.
-    # At least one of these must be set. If bbox_projected is not set, then proj_epsg must also be set.
     bbox_lat_lon: BoundingBox = None
+    """Bounding box in WGS84 latitude-longitude coordinates.
+
+    At least one spatial reference must be provided (bbox_lat_lon, bbox_projected,
+    geometry_lat_lon, or geometry_proj). If bbox_projected is not set, then
+    proj_epsg must also be provided.
+    """
+
     bbox_projected: BoundingBox = None
+    """Bounding box in the projected coordinate system specified by proj_epsg."""
+
     geometry_lat_lon: Polygon = None
+    """Geometry polygon in WGS84 latitude-longitude coordinates."""
+
     geometry_proj: Polygon = None
+    """Geometry polygon in the projected coordinate system specified by proj_epsg."""
+
     proj_epsg: int = None
+    """EPSG code for the projected coordinate reference system."""
 
-    # Affine transform as the raster file states it, in case we need it for CRS conversions.
     transform: Optional[List[float]] = None
+    """Affine transformation matrix from the raster file for CRS conversions."""
 
-    # Raster shape in pixels
     shape: Optional[List[int]] = None
+    """Raster dimensions in pixels as [height, width]."""
 
-    # file size, corresponds to file:size from FileInfo STAC extension
     file_size: Optional[int] = None
+    """File size in bytes (corresponds to file:size from FileInfo STAC extension)."""
 
-    # Tags in the raster.
     tags: dict[str, str] = {}
+    """Metadata tags extracted from the raster file."""
 
-    # The bands in the raster file.
     bands: List[BandMetadata] = []
+    """Band information for multi-band raster files."""
 
     tile_id: Optional[str] = None
+    """Identifier for the tile if the asset is part of a tiled dataset."""
+
     media_type: Optional[MediaType] = None
+    """MIME type of the asset file (e.g., image/tiff, application/json)."""
 
     # platforms: Optional[List[str]] = None
     # instruments: Optional[List[str]] = None
@@ -229,54 +237,63 @@ class AssetMetadata(BaseModel):
 
     @property
     def bbox_as_list(self) -> Optional[List[float]]:
+        """Return the WGS84 bounding box as a list [min_x, min_y, max_x, max_y]."""
         if not self.bbox_lat_lon:
             return None
         return self.bbox_lat_lon.to_list()
 
     @property
     def proj_bbox_as_list(self) -> Optional[List[float]]:
+        """Return the projected bounding box as a list [min_x, min_y, max_x, max_y]."""
         if not self.bbox_projected:
             return None
         return self.bbox_projected.to_list()
 
     @property
     def geometry_lat_lon_as_dict(self) -> Optional[Dict[str, Any]]:
+        """Return the WGS84 geometry as a GeoJSON-like dictionary."""
         if not self.geometry_lat_lon:
             return None
         return mapping(self.geometry_lat_lon)
 
     @property
     def geometry_proj_as_dict(self) -> Optional[Dict[str, Any]]:
+        """Return the projected geometry as a GeoJSON-like dictionary."""
         if not self.bbox_projected:
             return None
         return mapping(self.geometry_proj)
 
     @property
     def proj_geometry_as_wkt(self) -> Optional[str]:
+        """Return the projected geometry as Well-Known Text (WKT) string."""
         if not self.bbox_projected:
             return None
         return self.bbox_projected.as_wkt()
 
     @property
     def proj_bbox_as_polygon(self) -> Optional[Polygon]:
+        """Return the projected bounding box as a Shapely Polygon."""
         if not self.bbox_projected:
             return None
         return self.bbox_projected.as_polygon()
 
     @property
     def year(self) -> Optional[int]:
+        """Extract the year from the datetime field."""
         if not self.datetime:
             return None
         return self.datetime.year
 
     @property
     def month(self) -> Optional[int]:
+        """Extract the month from the datetime field."""
         if not self.datetime:
             return None
         return self.datetime.month
 
     @property
     def day(self) -> Optional[int]:
+        """Extract the day from the datetime field."""
         if not self.datetime:
             return None
         return self.datetime.day
@@ -332,6 +349,11 @@ class AssetMetadata(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AssetMetadata":
+        """Create an AssetMetadata instance from a dictionary.
+
+        :param data: Dictionary containing asset metadata fields.
+        :return: AssetMetadata instance populated with the dictionary data.
+        """
         metadata = AssetMetadata()
         metadata.asset_id = cls.__get_str_from_dict("asset_id", data)
         metadata.item_id = cls.__get_str_from_dict("item_id", data)
@@ -367,6 +389,11 @@ class AssetMetadata(BaseModel):
 
     @classmethod
     def from_geoseries(cls, series: gpd.GeoSeries) -> "AssetMetadata":
+        """Create an AssetMetadata instance from a GeoPandas GeoSeries.
+
+        :param series: GeoPandas GeoSeries containing asset metadata.
+        :return: AssetMetadata instance populated with the series data.
+        """
         # Delegate the conversion to `from_dict` for consistency.
         return cls.from_dict(series.to_dict())
 
@@ -442,6 +469,12 @@ class AssetMetadata(BaseModel):
         return self.asset_id <= other.asset_id
 
     def get_differences(self, other: "AssetMetadata") -> Dict[str, Any]:
+        """Compare this AssetMetadata with another and return the differences.
+
+        :param other: Another AssetMetadata instance to compare against.
+        :return: Dictionary where keys are field names and values are tuples of
+                 (self_value, other_value) for fields that differ.
+        """
         if other is self:
             return {}
 
@@ -456,6 +489,12 @@ class AssetMetadata(BaseModel):
 
 
 def check_datetime(value) -> dt.datetime:
+    """Convert various datetime representations to a timezone-aware datetime object.
+
+    :param value: Input value that can be a datetime, date, or string representation.
+    :return: A timezone-aware datetime object (assumes UTC if no timezone provided).
+    :raises TypeError: If the value cannot be converted to a datetime.
+    """
     if isinstance(value, dt.datetime):
         if value.tzinfo is None:
             # If the datetime has no timezone, assume it is UTC.
@@ -480,4 +519,9 @@ def check_datetime(value) -> dt.datetime:
 
 
 def convert_date_to_datetime(value: dt.date) -> dt.datetime:
+    """Convert a date object to a datetime object at midnight UTC.
+
+    :param value: A date object to convert.
+    :return: A datetime object representing midnight on the given date in UTC.
+    """
     return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)

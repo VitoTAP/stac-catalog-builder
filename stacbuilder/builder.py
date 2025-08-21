@@ -733,7 +733,7 @@ class AssetMetadataPipeline:
         gc.collect()
         self._log_progress_message("DONE: collect_stac_items")
 
-    def _group_metadata_by_item_id(self, iter_metadata) -> Dict[int, List[Item]]:
+    def _group_metadata_by_item_id(self, iter_metadata: Iterable[AssetMetadata]) -> Dict[str, List[Item]]:
         self._log_progress_message("START: group_metadata_by_item_id")
         groups: Dict[str, AssetMetadata] = {}
 
@@ -835,10 +835,6 @@ class AssetMetadataPipeline:
         self._output_base_dir = self._collection_dir
 
         self.reset()
-
-        if not self.uses_collection_groups:
-            raise InvalidOperation(f"This instance of {self.__class__.__name__} does not have grouping.")
-
         self._root_collection_builder = CollectionBuilder(
             collection_config=self.collection_config,
             output_dir=self._output_base_dir,

@@ -77,7 +77,7 @@ def get_transform(from_crs: Any, to_crs: Any) -> XYTransform:
     return transformer.transform
 
 
-@lru_cache(maxsize=6)
+@lru_cache()
 def _get_transformer(from_crs: Any, to_crs: Any) -> Any:
     """Get a transformer to reproject from "from_crs" to "to_crs"..
 

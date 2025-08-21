@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **API Simplification**: Removed `GeoTiffPipeline` with simpler `AssetMetadataPipeline` as main entry point
 - **Renamed classes**: `GeoTiffMetadataCollector` → `MetadataCollector`
-- **AlternateHREF's fFunction renames**: `add_MEP()` → `add_local()`, `add_basic_S3()` → `add_S3()`
+- **AlternateHREF's function renames**: `add_MEP()` → `add_local()`, `add_basic_S3()` → `add_S3()`
 - **Simplified imports**: Direct imports from `stacbuilder` package for cleaner API
 - **Streamlined `AssetMetadata` class**: Simplified constructor and initialization
 - **Code quality**: Applied ruff and black formatting, improved type hints and docstrings
