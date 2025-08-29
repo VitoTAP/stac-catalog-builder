@@ -1,21 +1,19 @@
-import logging
+import concurrent.futures
 import inspect
 import itertools
+import logging
 from pathlib import Path
 from time import sleep
 from typing import Iterable
-import concurrent.futures
 
 import pystac
 from pystac import Collection, Item
 from requests.auth import AuthBase
 from yarl import URL
 
-
 from stacbuilder.stacapi.auth import get_auth
 from stacbuilder.stacapi.config import Settings
 from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
-
 
 _logger = logging.getLogger(__name__)
 
@@ -127,7 +125,12 @@ class Uploader:
         self.upload_items(collection, items, limit=limit, offset=offset)
 
     def upload_items(
-        self, collection: Path | Collection, items: Path | list[Item], limit: int = -1, offset: int = -1
+        self,
+        collection: Path | Collection,
+        items: Path | list[Item],
+        limit: int = -1,
+        offset: int = -1,
+        item_glob: str = "*/*/*/*/*.json",
     ) -> None:
         if isinstance(collection, Path):
             collection = Collection.from_file(collection)
@@ -139,7 +142,7 @@ class Uploader:
         elif isinstance(items, Path):
             item_dir: Path = items
             _logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
-            item_paths = list(item_dir.glob("*/*/*/*/*.json"))  # TODO should this be hard coded?
+            item_paths = list(item_dir.glob(item_glob))
             _logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 

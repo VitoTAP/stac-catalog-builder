@@ -1,19 +1,18 @@
+import pprint
 from getpass import getpass
 from pathlib import Path
-import pprint
 
 import pystac
 
 from stacbuilder import (
-    list_input_files,
-    list_asset_metadata,
-    list_stac_items,
     build_collection,
-    validate_collection,
+    list_asset_metadata,
+    list_input_files,
+    list_stac_items,
     upload_to_stac_api,
+    validate_collection,
 )
 from stacbuilder.stacapi.config import AuthSettings, Settings
-
 
 # Collection configuration
 catalog_version = "v0.1"
@@ -25,7 +24,6 @@ tiffs_glob = "*/*.tif"
 
 # Output Paths
 output_path = Path("results") / catalog_version
-overwrite = True
 
 
 # list input files
@@ -72,7 +70,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=output_path,
-    overwrite=overwrite,
     item_postprocessor=postprocess_item,
 )
 

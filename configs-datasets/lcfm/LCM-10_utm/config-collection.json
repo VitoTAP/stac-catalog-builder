@@ -23,6 +23,5 @@
             "title": "Land Cover Map 10m",
             "description": "Land Cover Map at 10m resolution"
         }
-    },
-    "overrides": {}
+    }
 }

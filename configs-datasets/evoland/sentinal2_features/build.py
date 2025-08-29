@@ -1,27 +1,29 @@
 """Build a STAC collection for LCFM sentinel 2 features for a group of UTM regions from GeoTIFF files.
-   Needs LCFM shapefile from https://github.com/VITO-RS-Vegetation/lcfm-shapefiles/ to match the tiles.
-   Adjust the path in line 62
+Needs LCFM shapefile from https://github.com/VITO-RS-Vegetation/lcfm-shapefiles/ to match the tiles.
+Adjust the path in line 62
 """
 
+import json
 from pathlib import Path
+
+import geopandas as gpd
+import pystac
+
 from stacbuilder import (
-    CollectionConfig,
-    FileCollectorConfig,
-    AssetMetadataPipeline,
+    upload_to_stac_api,
     validate_collection,
+)
+from stacbuilder.builder import AssetMetadataPipeline
+from stacbuilder.collector import MetadataCollector
+from stacbuilder.config import CollectionConfig, FileCollectorConfig
+from stacbuilder.stacapi import (
     AuthSettings,
     Settings,
-    upload_to_stac_api,
 )
-from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
-import pystac
-import json
-import geopandas as gpd
-
 
 data_input_path = Path("/vitodata/vegteam_lcfm_features_2020/LCFM/LSF-ANNUAL/v100/blocks/").expanduser().absolute()
 configfile = "sentinel-2_annualfeatures.json"
-overwrite = False
+
 
 def build_collection(filepattern):
     # Find tiff files and print
@@ -29,8 +31,8 @@ def build_collection(filepattern):
     noofassets = len(matching_tiffs)
     print(f"Found {noofassets} assets matching the pattern {filepattern} in {data_input_path}")
     if noofassets == 0:
-       print("There are no assets")
-       exit()
+        print("There are no assets")
+        exit()
 
     # Collection configuration
     collection_config_path = Path(configfile).expanduser().absolute()
@@ -45,7 +47,7 @@ def build_collection(filepattern):
         output_path = Path(output_path).expanduser().absolute()
 
     # Define collector
-    collector = GeoTiffMetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    collector = MetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
     # create pipeline
     pipeline: AssetMetadataPipeline = AssetMetadataPipeline.from_config(
@@ -53,13 +55,12 @@ def build_collection(filepattern):
         collection_config=coll_cfg,
         output_dir=output_path,
         link_items=False,
-        overwrite=overwrite,
     )
 
     # postprocessor to add new properties into items
     # example asset version and others
     # read tiles bounds
-    tilesfilename = "lcfm_shapefiles/data/LCFM_100p_S2-reduced-tiles.fgb"   # Adjust the path as needed
+    tilesfilename = "lcfm_shapefiles/data/LCFM_100p_S2-reduced-tiles.fgb"  # Adjust the path as needed
     tiles = gpd.read_file(tilesfilename)
 
     def add_properties(item):
@@ -68,8 +69,8 @@ def build_collection(filepattern):
         dff = tiles[tiles.tile == item.id.split("_")[1]]
         # item dff.west.values[0]
         coords = item.properties["proj:bbox"]
-        easting = int((coords[0] - dff.west.values[0])/10)
-        northing = int((coords[1] - dff.south.values[0])/10)
+        easting = int((coords[0] - dff.west.values[0]) / 10)
+        northing = int((coords[1] - dff.south.values[0]) / 10)
         ext.apply(code=f"MGRS-{item.id.split('_')[1]}{easting:04}{northing:04}")
         return item
 
@@ -83,8 +84,9 @@ def build_collection(filepattern):
         collection_file=output_path / "collection.json",
     )
 
+
 # create collection for following UTM zones
-for tl in ['21N' ,'22N', '30N', '30S', '30T', '31T', '31U', '32T', '32U', '33V', '34T', '34V', '35T']:
+for tl in ["21N", "22N", "30N", "30S", "30T", "31T", "31U", "32T", "32U", "33V", "34T", "34V", "35T"]:
     filepattern = f"{tl[:2]}/{tl[-1]}/*/*/*/*.tif"
     build_collection(filepattern)
 
@@ -96,7 +98,7 @@ for fl in allitem_jsonfiles:
     if "collection" in fl.stem:
         col = pystac.Collection.from_file(fl)
         # pystac creates links which is not needed so use json.load
-        with open(output_path/"collection.json", "r") as json_file:
+        with open(output_path / "collection.json", "r") as json_file:
             col1 = json.load(json_file)
     else:
         items.append(pystac.Item.from_file(fl))
@@ -106,9 +108,9 @@ col.update_extent_from_items()
 print(f"Extent after update is {col.extent.spatial.bboxes}")
 # update extent
 col1["extent"]["spatial"]["bbox"] = col.extent.spatial.bboxes
-with open(output_path/"collection.json", "w") as json_file:
+with open(output_path / "collection.json", "w") as json_file:
     json.dump(col1, json_file, indent=2)  # Use indent=4 for pretty formatting
-print(f"Extent updated in collection.json")
+print("Extent updated in collection.json")
 
 # upload stac collection to STAC API
 auth_settings = AuthSettings(
@@ -123,12 +125,7 @@ auth_settings = AuthSettings(
 settings = Settings(
     auth=auth_settings,
     stac_api_url="https://stac.openeo.vito.be/",
-    collection_auth_info={
-        "_auth": {
-            "read": ["anonymous"],
-            "write": ["stac-openeo-admin", "stac-openeo-editor"]
-        }
-    },
+    collection_auth_info={"_auth": {"read": ["anonymous"], "write": ["stac-openeo-admin", "stac-openeo-editor"]}},
     bulk_size=5000,  # Number of items to upload in a single request
 )
 

@@ -23,7 +23,5 @@
             "title": "Tree Cover Density Map 10m",
             "description": "Tree Cover Density Map at 10m resolution"
         }
-    },
-    "overrides": {
     }
 }

@@ -1,17 +1,23 @@
 import datetime as dt
 import json
 from pathlib import Path
+from typing import List
 
-import pytest
 import pystac
+import pytest
 import shapely
-from pystac import Asset, Collection, Item, ItemCollection, Extent, SpatialExtent, TemporalExtent
+from pystac import (
+    Asset,
+    Collection,
+    Extent,
+    Item,
+    SpatialExtent,
+    TemporalExtent,
+)
 from yarl import URL
 
-
-from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 from stacbuilder.boundingbox import BoundingBox
-
+from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 
 API_BASE_URL = URL("http://test.stacapi.local")
 
@@ -94,21 +100,12 @@ def create_item(item_id: str, fake_assets) -> Item:
 
 
 @pytest.fixture
-def single_item(fake_assets) -> Item:
-    return create_item("items01", fake_assets)
-
-
-@pytest.fixture
-def multiple_items(fake_assets) -> Item:
+def multiple_items(fake_assets) -> List[Item]:
     return [create_item("items01", fake_assets), create_item("items02", fake_assets)]
 
 
-def feature_collection(multiple_items) -> ItemCollection:
-    return ItemCollection(items=multiple_items)
-
-
 @pytest.fixture
-def collection_with_items(empty_collection, multiple_items) -> Collection:
+def collection_with_items(empty_collection: Collection, multiple_items: List[Item]) -> Collection:
     item: Item
     for item in multiple_items:
         item.collection = empty_collection
@@ -219,24 +216,6 @@ class TestItemsEndPoint:
             assert asset_type in actual_item.assets
             assert expected_asset.to_dict() == actual_item.assets[asset_type].to_dict()
 
-        assert m.called
-
-    @pytest.mark.skip(reason="Test not yet correct, ItemCollection does not work yet")
-    def test_get_all(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint):
-        collection_path = Path(collection_with_items.self_href)
-        if not collection_path.parent.exists():
-            collection_path.mkdir(parents=True)
-        collection_with_items.save(catalog_type=pystac.CatalogType.SELF_CONTAINED)
-
-        expected_items = list(collection_with_items.get_all_items())
-        expected_item_collection = ItemCollection(expected_items)
-        data = expected_item_collection.to_dict()
-        m = requests_mock.get(
-            str(self.BASE_URL / "collections" / collection_with_items.id / "items"), json=data, status_code=200
-        )
-        actual_item_collection = items_endpt.get_all(collection_with_items.id)
-
-        assert expected_item_collection == actual_item_collection
         assert m.called
 
     def test_create(self, requests_mock, collection_with_items: Collection, items_endpt: ItemsEndpoint, tmp_path):

@@ -17,12 +17,18 @@ fsspec
 
 import configparser
 import os
-from upath import UPath
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from stacbuilder import CollectionConfig, FileCollectorConfig, AssetMetadataPipeline, AssetMetadata
-from stacbuilder.collector import GeoTiffMetadataCollector, IMetadataCollector
+from upath import UPath
+
+from stacbuilder import (
+    AssetMetadata,
+    AssetMetadataPipeline,
+    CollectionConfig,
+    FileCollectorConfig,
+)
+from stacbuilder.collector import IMetadataCollector, MetadataCollector
 
 
 def set_var_conf(var_name: str, conf_file: str):
@@ -62,7 +68,7 @@ def build_collection(
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
 
-    collector = GeoTiffMetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
+    collector = MetadataCollector.from_config(collection_config=coll_cfg, file_coll_cfg=file_coll_cfg)
 
     if output_dir and not isinstance(output_dir, Path):
         output_dir = Path(output_dir).expanduser().absolute()
@@ -91,7 +97,6 @@ def build_collection(
         metadata_collector=CustomCollector(),
         collection_config=coll_cfg,
         output_dir=output_dir,
-        overwrite=True,
         link_items=False,
     )
 

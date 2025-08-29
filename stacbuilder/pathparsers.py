@@ -6,15 +6,13 @@ Normally these are paths to GeoTIFF files, but this could include other file for
 import abc
 import calendar
 import datetime as dt
-from enum import Enum
 import logging
 import re
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
-
 from stacbuilder.config import InputPathParserConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +56,11 @@ class InputPathParserFactory:
 
     @classmethod
     def from_config(cls, config: InputPathParserConfig):
+        """Create an InputPathParser from a InputPathParserConfig.
+        Returns None if no input_path_parser is configured."""
+        if not config:
+            return None
+
         if config.classname not in cls._implementations:
             raise UnknownInputPathParserClass(config.classname)
 
@@ -96,16 +99,14 @@ class NoopInputPathParser(InputPathParser):
         return {}
 
 
+# Type alias for the callables we need, what signature the function/method must have.
 TypeConverter = Callable[[str], Any]
-"""Type alias for the callables we need, what signature the function/method must have."""
 
+# Type alias for the converting functions.
+# These convert strings extracted from the path into a more useful time.
+# For example a year, month or day can be converted to an integer, or an entire
+# date could be converted to datetime.
 TypeConverterMapping = Dict[str, TypeConverter]
-"""Type alias for the converting functions.
-
-These convert strings extracted from the path into a more useful time.
-For example a year, month or day can be converted to an integer, or an entire
-date could be converted to datetime.
-"""
 
 
 class RegexInputPathParser(InputPathParser):
@@ -134,7 +135,9 @@ class RegexInputPathParser(InputPathParser):
 
     def parse(self, input_file: Union[Path, str]) -> Dict[str, Any]:
         data = {}
-        self._path = str(input_file)
+        if isinstance(input_file, str):
+            input_file = Path(input_file)
+        self._path = input_file.as_posix()
 
         if self._regex_has_named_groups():
             match = self._regex.search(self._path)
@@ -146,13 +149,18 @@ class RegexInputPathParser(InputPathParser):
                     + f"regex pattern={self._regex.pattern}"
                 )
 
+        for key, value in self._fixed_values.items():
+            if isinstance(value, str) and "{" in value and "}" in value:
+                try:
+                    value = value.format(**data)
+                except KeyError as e:
+                    logger.warning(f"Could not format fixed value '{value}' with data keys: {e}")
+            data[key] = value
+
         for key, value in data.items():
             if key in self._type_converters:
                 func = self._type_converters[key]
                 data[key] = func(value)
-
-        for key, value in self._fixed_values.items():
-            data[key] = value
 
         self._data = data
         self._post_process_data()

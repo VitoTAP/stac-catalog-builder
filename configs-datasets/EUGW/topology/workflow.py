@@ -1,13 +1,19 @@
 # from time import sleep
-from pathlib import Path
-from upath import UPath
-from getpass import getpass
+import configparser
 import logging
 import os
-import configparser
+from getpass import getpass
+from pathlib import Path
+
+from upath import UPath
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import CollectionConfig, build_collection, validate_collection, upload_to_stac_api
+from stacbuilder import (
+    CollectionConfig,
+    build_collection,
+    upload_to_stac_api,
+    validate_collection,
+)
 from stacbuilder.stacapi.config import AuthSettings, Settings
 
 _logger = logging.getLogger(__name__)
@@ -32,13 +38,12 @@ os.environ["AWS_S3_ENDPOINT"] = config["EUGrasslandwatch"]["endpoint"]
 os.environ["AWS_VIRTUAL_HOSTING"] = "FALSE"
 os.environ["AWS_DEFAULT_REGION"] = "default"
 os.environ["CPL_VSIL_CURL_CHUNK_SIZE"] = "10485760"
-tiff_input_path = UPath(f"s3://topography/{ collection_name }")
+tiff_input_path = UPath(f"s3://topography/{collection_name}")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 
 # Output Paths
 output_path = Path(__file__).parent.resolve() / "results"
 stac_output_path = output_path / collection_name
-overwrite = True
 
 tiffs_glob = "*.tif"  # CLCBB*/ WAW*/
 
@@ -53,7 +58,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=stac_output_path,
-    overwrite=overwrite,
     link_items=False,
 )
 # validate collection
