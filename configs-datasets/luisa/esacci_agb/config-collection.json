@@ -1,0 +1,35 @@
+{
+    "collection_id": "ESACCI_BIOMASS_AGB",
+    "title": "ESA CCI Global Biomass AGB at 100m resolution",
+    "description": "ESA CCI Global Biomass AGB at 100m resolution for the year 2021",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/ESACCI-BIOMASS-L4-AGB-MERGED-100m-(?P<year>\\d{4})-fv6.0_agb_cog.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "agb"
+            }
+        }
+    },
+    "item_assets": {
+        "agb": {
+            "title": "Above Ground Biomass",
+            "description": "Above Ground Biomass",
+            "eo_bands": [
+                {
+                    "name": "agb",
+                    "description": "Above Ground Biomass"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}

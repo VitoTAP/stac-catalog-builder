@@ -1,0 +1,35 @@
+{
+    "collection_id": "ESA_LUISA_NPP_ACT",
+    "title": "ESA LUISA - Continental NPP_ACT products for Africa at 1km resolution",
+    "description": "Contains Actual Net Primary Production (NPP_ACT) products at 1km resolution for the African continent from 2000-2020.",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/openEO_(?P<year>\\d{4})-01-01Z.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "npp_act"
+            }
+        }
+    },
+    "item_assets": {
+        "npp_act": {
+            "title": "Actual Net Primary Production",
+            "description": "Actual Net Primary Production",
+            "eo_bands": [
+                {
+                    "name": "npp_act",
+                    "description": "NPP Act"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}

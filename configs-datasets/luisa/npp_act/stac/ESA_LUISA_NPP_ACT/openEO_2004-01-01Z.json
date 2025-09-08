@@ -1,0 +1,151 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "openEO_2004-01-01Z",
+  "properties": {
+    "product_version": "1.0.0",
+    "product_tile": null,
+    "start_datetime": "2004-01-01T00:00:00Z",
+    "end_datetime": "2004-12-31T23:59:59Z",
+    "description": "Actual Net Primary Production",
+    "created": "2025-08-12T12:07:29.294010Z",
+    "proj:epsg": 3857,
+    "proj:bbox": [
+      -1976417.9813901547,
+      -4130012.047171235,
+      5761160.927900718,
+      4544797.640795762
+    ],
+    "proj:geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            5761160.927900718,
+            -4130012.047171235
+          ],
+          [
+            5761160.927900718,
+            4544797.640795762
+          ],
+          [
+            -1976417.9813901547,
+            4544797.640795762
+          ],
+          [
+            -1976417.9813901547,
+            -4130012.047171235
+          ],
+          [
+            5761160.927900718,
+            -4130012.047171235
+          ]
+        ]
+      ]
+    },
+    "proj:transform": [
+      1033.3305167322212,
+      0.0,
+      -1976417.9813901547,
+      0.0,
+      -1033.3305167322212,
+      4544797.640795762
+    ],
+    "proj:shape": [
+      8395,
+      7488
+    ],
+    "eo:bands": [
+      {
+        "name": "npp_act",
+        "description": "NPP Act"
+      }
+    ],
+    "datetime": "2004-01-01T00:00:00Z"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          51.75338915805419,
+          -34.750392801113
+        ],
+        [
+          51.75338915805419,
+          37.7544639872
+        ],
+        [
+          -17.754464804914278,
+          37.7544639872
+        ],
+        [
+          -17.754464804914278,
+          -34.750392801113
+        ],
+        [
+          51.75338915805419,
+          -34.750392801113
+        ]
+      ]
+    ]
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental NPP_ACT products for Africa at 1km resolution"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental NPP_ACT products for Africa at 1km resolution"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental NPP_ACT products for Africa at 1km resolution"
+    }
+  ],
+  "assets": {
+    "npp_act": {
+      "href": "https://s3.waw3-1.cloudferro.com/swift/v1/luisa/npp_act/openEO_2004-01-01Z.tif",
+      "title": "Actual Net Primary Production",
+      "description": "Actual Net Primary Production",
+      "eo:bands": [
+        {
+          "name": "npp_act",
+          "description": "NPP Act"
+        }
+      ],
+      "file:size": 170112035,
+      "raster:bands": [
+        {
+          "nodata": NaN,
+          "data_type": "float64"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    }
+  },
+  "bbox": [
+    -17.754464804914278,
+    -34.750392801113,
+    51.75338915805419,
+    37.7544639872
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/classification/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
+  ],
+  "collection": "ESA_LUISA_NPP_ACT"
+}

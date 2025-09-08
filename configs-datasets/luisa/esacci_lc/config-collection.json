@@ -1,0 +1,35 @@
+{
+    "collection_id": "ESACCI_LANDCOVER",
+    "title": "ESA CCI Global Landcover at 300m resolution",
+    "description": "ESA CCI Global Landcover at 300m resolution from 1992-2022",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/ESACCI-LC-L4-LCCS-Map-300m-P1Y-(?P<year>\\d{4})-v2.0.7cds_lccs_class.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "lccs_class"
+            }
+        }
+    },
+    "item_assets": {
+        "lccs_class": {
+            "title": "Land Cover Classification",
+            "description": "Land Cover Classification",
+            "eo_bands": [
+                {
+                    "name": "lccs_class",
+                    "description": "Land Cover Classification"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}

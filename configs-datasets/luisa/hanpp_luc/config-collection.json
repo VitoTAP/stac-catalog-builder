@@ -1,0 +1,35 @@
+{
+    "collection_id": "ESA_LUISA_HANPP_LUC",
+    "title": "ESA LUISA - Continental HANPP_LUC products for Africa at 1km resolution",
+    "description": "Contains HANPP_LUC products at 1km resolution for the African continent from 2000-2020.",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/openEO_(?P<year>\\d{4})-01-01Z.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "hanpp_luc"
+            }
+        }
+    },
+    "item_assets": {
+        "hanpp_luc": {
+            "title": "Human Appropriation of the Net Primary Production Land Use Change",
+            "description": "Human Appropriation of the Net Primary Production Land Use Change",
+            "eo_bands": [
+                {
+                    "name": "hanpp_luc",
+                    "description": "HANPP Luc"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}

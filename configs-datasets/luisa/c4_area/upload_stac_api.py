@@ -1,7 +1,7 @@
 from stacbuilder import *
 from getpass import getpass
 
-collection_path = "/home/vincent.verelst/vitotap/stac-catalog-builder/configs-datasets/luisa/results/test/v0.1/collection.json"
+collection_path = "/home/vincent.verelst/vitotap/stac-catalog-builder/configs-datasets/luisa/c4_area/results/test/v0.1/collection.json"
 
 stac_api_pw = getpass("Enter password for stac api: ")
 

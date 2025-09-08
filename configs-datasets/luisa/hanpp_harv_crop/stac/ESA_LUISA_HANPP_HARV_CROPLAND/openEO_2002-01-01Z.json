@@ -1,0 +1,151 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "openEO_2002-01-01Z",
+  "properties": {
+    "product_version": "1.0.0",
+    "product_tile": null,
+    "start_datetime": "2002-01-01T00:00:00Z",
+    "end_datetime": "2002-12-31T23:59:59Z",
+    "description": "Human Appropriation of the Net Primary Production Harvest Cropland",
+    "created": "2025-08-12T11:39:28.146909Z",
+    "proj:epsg": 3857,
+    "proj:bbox": [
+      -1976417.9813901547,
+      -4130714.2572019277,
+      5761919.018398907,
+      4474635.387766334
+    ],
+    "proj:geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            5761919.018398907,
+            -4130714.2572019277
+          ],
+          [
+            5761919.018398907,
+            4474635.387766334
+          ],
+          [
+            -1976417.9813901547,
+            4474635.387766334
+          ],
+          [
+            -1976417.9813901547,
+            -4130714.2572019277
+          ],
+          [
+            5761919.018398907,
+            -4130714.2572019277
+          ]
+        ]
+      ]
+    },
+    "proj:transform": [
+      996.5662588266661,
+      0.0,
+      -1976417.9813901547,
+      0.0,
+      -996.5662588266661,
+      4474635.387766334
+    ],
+    "proj:shape": [
+      8635,
+      7765
+    ],
+    "eo:bands": [
+      {
+        "name": "hanpp_harv_crop",
+        "description": "HANPP Harv Crop"
+      }
+    ],
+    "datetime": "2002-01-01T00:00:00Z"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          51.76019920086688,
+          -34.75557561203972
+        ],
+        [
+          51.76019920086688,
+          37.254463988800005
+        ],
+        [
+          -17.754464804914278,
+          37.254463988800005
+        ],
+        [
+          -17.754464804914278,
+          -34.75557561203972
+        ],
+        [
+          51.76019920086688,
+          -34.75557561203972
+        ]
+      ]
+    ]
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental HANPP_HARV_CROPLAND products for Africa at 1km resolution"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental HANPP_HARV_CROPLAND products for Africa at 1km resolution"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental HANPP_HARV_CROPLAND products for Africa at 1km resolution"
+    }
+  ],
+  "assets": {
+    "hanpp_harv_crop": {
+      "href": "https://s3.waw3-1.cloudferro.com/swift/v1/luisa/hanpp_harv_crop/openEO_2002-01-01Z.tif",
+      "title": "Human Appropriation of the Net Primary Production Harvest Cropland",
+      "description": "Human Appropriation of the Net Primary Production Harvest Cropland",
+      "eo:bands": [
+        {
+          "name": "hanpp_harv_crop",
+          "description": "HANPP Harv Crop"
+        }
+      ],
+      "file:size": 101288879,
+      "raster:bands": [
+        {
+          "nodata": "nan",
+          "data_type": "float32"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    }
+  },
+  "bbox": [
+    -17.754464804914278,
+    -34.75557561203972,
+    51.76019920086688,
+    37.254463988800005
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/classification/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
+  ],
+  "collection": "ESA_LUISA_HANPP_HARV_CROPLAND"
+}

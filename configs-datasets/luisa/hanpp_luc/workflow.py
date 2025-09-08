@@ -16,7 +16,7 @@ catalog_version = "v0.1"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
-tiff_input_path = Path("/data/open/luisa_npp_pot_jules_30_arcsec")
+tiff_input_path = Path("/data/open/luisa/continental_products/hanpp_luc")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 tiffs_glob = "*.tif"
 
@@ -45,10 +45,16 @@ asset_metadata = list_asset_metadata(
 for k in asset_metadata: 
     pprint.pprint(k.to_dict())
 
-# def item_postprocessor(item: pystac.Item) -> pystac.Item:
-#     item.properties["tileId"] = item.properties["product_tile"]
-#     del item.properties["product_tile"]
-#     return item
+def item_postprocessor(item: pystac.Item) -> pystac.Item:
+    def replace_path_with_url(path: str) -> str:
+        filename = path.split("/")[-1]
+        return 'https://s3.waw3-1.cloudferro.com/swift/v1/luisa/hanpp_luc/' + filename
+    
+    for asset in item.assets.values():
+        asset.href = replace_path_with_url(asset.href)
+        asset.extra_fields['raster:bands'][0]['nodata'] = 'nan'  # Ensure no data is set to 'nan' as a string
+
+    return item
 
 
 # list items
@@ -57,7 +63,7 @@ stac_items, failed_files = list_stac_items(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     max_files=1,
-    # item_postprocessor=item_postprocessor
+    item_postprocessor=item_postprocessor
 )
 print(f"Found {len(stac_items)} STAC items")
 if failed_files: print(f"Failed files: {failed_files}")
@@ -74,8 +80,8 @@ build_collection(
     input_dir=tiff_input_path,
     output_dir=test_output_path,
     overwrite=overwrite,
-    link_items=False,
-    # item_postprocessor=item_postprocessor,
+    link_items=True,
+    item_postprocessor=item_postprocessor,
 )
 
 # validate collection
@@ -83,31 +89,3 @@ validate_collection(
     collection_file=test_output_path / "collection.json",
 )
 
-stac_api_pw = getpass("Enter password for stac api: ")
-
-auth_settings = AuthSettings(
-    enabled=True,
-    interactive=False,
-    token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
-    authorization_url= "https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
-    client_id="terracatalogueclient",
-    username = "vincent.verelst",
-    password = stac_api_pw,
-)
-settings = Settings(
-    auth=auth_settings,
-    stac_api_url="https://stac.openeo.vito.be/",
-    collection_auth_info={
-            "_auth": {
-                "read": ["anonymous"],
-                "write": ["stac-openeo-admin", "stac-openeo-editor"]
-            }
-        },
-    bulk_size=1000,  
-)
-upload_to_stac_api(
-    collection_path=test_output_path / "collection.json",
-    settings=settings,
-)
-print("Sleeping for 60 seconds to allow the STAC API to update")
-sleep(60)

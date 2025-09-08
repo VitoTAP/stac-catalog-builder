@@ -1,0 +1,150 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "ESACCI-LC-L4-LCCS-Map-300m-P1Y-2010-v2.0.7cds_lccs_class",
+  "properties": {
+    "product_version": "1.0.0",
+    "product_tile": null,
+    "start_datetime": "2010-01-01T00:00:00Z",
+    "end_datetime": "2010-12-31T23:59:59Z",
+    "description": "Land Cover Classification",
+    "created": "2025-08-19T08:56:18.210219Z",
+    "proj:epsg": 4326,
+    "proj:bbox": [
+      -180.0,
+      -90.00000000000001,
+      180.0,
+      90.00000000000001
+    ],
+    "proj:geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            180.0,
+            -90.00000000000001
+          ],
+          [
+            180.0,
+            90.00000000000001
+          ],
+          [
+            -180.0,
+            90.00000000000001
+          ],
+          [
+            -180.0,
+            -90.00000000000001
+          ],
+          [
+            180.0,
+            -90.00000000000001
+          ]
+        ]
+      ]
+    },
+    "proj:transform": [
+      0.002777777777777778,
+      0.0,
+      -180.0,
+      0.0,
+      -0.0027777777777777783,
+      90.00000000000001
+    ],
+    "proj:shape": [
+      64800,
+      129600
+    ],
+    "eo:bands": [
+      {
+        "name": "lccs_class",
+        "description": "Land Cover Classification"
+      }
+    ],
+    "datetime": "2010-01-01T00:00:00Z"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          180.0,
+          -90.00000000000001
+        ],
+        [
+          180.0,
+          90.00000000000001
+        ],
+        [
+          -180.0,
+          90.00000000000001
+        ],
+        [
+          -180.0,
+          -90.00000000000001
+        ],
+        [
+          180.0,
+          -90.00000000000001
+        ]
+      ]
+    ]
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA CCI Global Landcover at 300m resolution"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA CCI Global Landcover at 300m resolution"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "ESA CCI Global Landcover at 300m resolution"
+    }
+  ],
+  "assets": {
+    "lccs_class": {
+      "href": "/data/open/luisa/esacci_lc/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2010-v2.0.7cds_lccs_class.tif",
+      "title": "Land Cover Classification",
+      "description": "Land Cover Classification",
+      "eo:bands": [
+        {
+          "name": "lccs_class",
+          "description": "Land Cover Classification"
+        }
+      ],
+      "file:size": 537707023,
+      "raster:bands": [
+        {
+          "data_type": "uint8"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    }
+  },
+  "bbox": [
+    -180.0,
+    -90.00000000000001,
+    180.0,
+    90.00000000000001
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/file/v2.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/classification/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
+  ],
+  "collection": "ESACCI_LANDCOVER"
+}

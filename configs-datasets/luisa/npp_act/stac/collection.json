@@ -1,0 +1,158 @@
+{
+  "type": "Collection",
+  "id": "ESA_LUISA_NPP_ACT",
+  "stac_version": "1.0.0",
+  "description": "Contains Actual Net Primary Production (NPP_ACT) products at 1km resolution for the African continent from 2000-2020.",
+  "links": [
+    {
+      "rel": "root",
+      "href": "./collection.json",
+      "type": "application/json",
+      "title": "ESA LUISA - Continental NPP_ACT products for Africa at 1km resolution"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2000-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2001-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2002-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2003-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2004-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2005-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2006-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2007-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2008-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2009-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2010-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2011-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2012-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2013-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2014-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2015-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2016-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2017-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2018-01-01Z.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./ESA_LUISA_NPP_ACT/openEO_2019-01-01Z.json",
+      "type": "application/json"
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/item-assets/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/classification/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json"
+  ],
+  "item_assets": {
+    "npp_act": {
+      "type": "image/tiff; application=geotiff",
+      "title": "Actual Net Primary Production",
+      "description": "Actual Net Primary Production",
+      "roles": [
+        "data"
+      ],
+      "eo:bands": [
+        {
+          "name": "npp_act",
+          "description": "NPP Act"
+        }
+      ]
+    }
+  },
+  "title": "ESA LUISA - Continental NPP_ACT products for Africa at 1km resolution",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -17.754464804914278,
+          -34.750392801113,
+          51.75338915805419,
+          37.7544639872
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2000-01-01T00:00:00Z",
+          "2019-12-31T23:59:59Z"
+        ]
+      ]
+    }
+  },
+  "license": "proprietary"
+}

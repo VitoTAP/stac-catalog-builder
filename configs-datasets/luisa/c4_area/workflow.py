@@ -16,7 +16,7 @@ catalog_version = "v0.1"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
-tiff_input_path = Path("/data/open/luisa_npp_pot_jules_30_arcsec")
+tiff_input_path = Path("/data/open/luisa/c4_area")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 tiffs_glob = "*.tif"
 
@@ -83,31 +83,31 @@ validate_collection(
     collection_file=test_output_path / "collection.json",
 )
 
-stac_api_pw = getpass("Enter password for stac api: ")
+# stac_api_pw = getpass("Enter password for stac api: ")
 
-auth_settings = AuthSettings(
-    enabled=True,
-    interactive=False,
-    token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
-    authorization_url= "https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
-    client_id="terracatalogueclient",
-    username = "vincent.verelst",
-    password = stac_api_pw,
-)
-settings = Settings(
-    auth=auth_settings,
-    stac_api_url="https://stac.openeo.vito.be/",
-    collection_auth_info={
-            "_auth": {
-                "read": ["anonymous"],
-                "write": ["stac-openeo-admin", "stac-openeo-editor"]
-            }
-        },
-    bulk_size=1000,  
-)
-upload_to_stac_api(
-    collection_path=test_output_path / "collection.json",
-    settings=settings,
-)
-print("Sleeping for 60 seconds to allow the STAC API to update")
-sleep(60)
+# auth_settings = AuthSettings(
+#     enabled=True,
+#     interactive=False,
+#     token_url="https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/token",
+#     authorization_url= "https://sso.terrascope.be/auth/realms/terrascope/protocol/openid-connect/auth",
+#     client_id="terracatalogueclient",
+#     username = "vincent.verelst",
+#     password = stac_api_pw,
+# )
+# settings = Settings(
+#     auth=auth_settings,
+#     stac_api_url="https://stac.openeo.vito.be/",
+#     collection_auth_info={
+#             "_auth": {
+#                 "read": ["anonymous"],
+#                 "write": ["stac-openeo-admin", "stac-openeo-editor"]
+#             }
+#         },
+#     bulk_size=1000,  
+# )
+# upload_to_stac_api(
+#     collection_path=test_output_path / "collection.json",
+#     settings=settings,
+# )
+# print("Sleeping for 60 seconds to allow the STAC API to update")
+# sleep(60)
