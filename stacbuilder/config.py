@@ -193,7 +193,7 @@ class RasterBandConfig(BaseModel):
         if not ext.bands:
             ext.apply(bands=[raster_band])
         else:
-            ext.bands.append(raster_band)
+            ext.bands = ext.bands + [raster_band]
 
 
 class AssetConfig(BaseModel):
