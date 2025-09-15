@@ -701,6 +701,7 @@ class AssetMetadataPipeline:
     def get_metadata(self) -> Iterable[AssetMetadata]:
         """Tells the metadata collector to collect the metadata and return it."""
         self.metadata_collector.collect()
+        _logger.info("Metadata collection done.")
         return self.metadata_collector.metadata_list
 
     def collect_stac_items(self):
