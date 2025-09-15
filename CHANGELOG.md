@@ -5,11 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## In progress: 1.0.1
+## [1.0.1] - in progress
+### Added
+- 
+
+### Changed
+
+- Limit the number of concurrent futures to avoid memory issues during metadata collection. Current setting is 1000. 
+- Improve logging to show progress every 1000 files processed.
+
+### Removed
+- 
 
 ### Fixed
 
 - Fix for eo:bands with tiffs that contain multiple bands. ([#76](https://github.com/VitoTAP/stac-catalog-builder/issues/76))
+- Fix for rare issue where pathparsing is not thread safe 
 
 
 ## [1.0.0] - 2025-08-11
