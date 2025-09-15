@@ -274,6 +274,17 @@ class DefaultInputPathParser(RegexInputPathParser):
                 return dt.datetime(year, start_dt.month, start_dt.day, 23, 59, 59, tzinfo=dt.timezone.utc)
 
 
+class DOYInputPathParser(DefaultInputPathParser):
+    def _post_process_data(self):
+        if "doy" in self._data:
+            doy = int(self._data["doy"])
+            year = int(self._data["year"])
+            date = dt.datetime(year, 1, 1, tzinfo=dt.timezone.utc) + dt.timedelta(days=doy - 1)
+            self._data["month"] = date.month
+            self._data["day"] = date.day
+        super()._post_process_data()
+
+
 class LandsatNDWIInputPathParser(RegexInputPathParser):
     def __init__(self, *args, **kwargs) -> None:
         type_converters = {

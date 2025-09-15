@@ -1,0 +1,119 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "stac_extensions": [
+    "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json"
+  ],
+  "id": "ReflNorm_VJB_database1km_corr_2020269_REPROJECTED",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          60.00236,
+          39.99822
+        ],
+        [
+          60.00236,
+          60.0
+        ],
+        [
+          13.05407,
+          60.0
+        ],
+        [
+          13.05407,
+          39.99822
+        ],
+        [
+          60.00236,
+          39.99822
+        ]
+      ]
+    ]
+  },
+  "bbox": [
+    13.05407,
+    39.99822,
+    60.00236,
+    60.0
+  ],
+  "properties": {
+    "start_datetime": "2020-09-25T00:00:00Z",
+    "end_datetime": "2020-09-25T23:59:59Z",
+    "created": "2025-09-15T14:19:20.983341Z",
+    "proj:epsg": 4326,
+    "proj:geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            60.00236,
+            39.99822
+          ],
+          [
+            60.00236,
+            60.0
+          ],
+          [
+            13.05407,
+            60.0
+          ],
+          [
+            13.05407,
+            39.99822
+          ],
+          [
+            60.00236,
+            39.99822
+          ]
+        ]
+      ]
+    },
+    "proj:bbox": [
+      13.05407,
+      39.99822,
+      60.00236,
+      60.0
+    ],
+    "proj:shape": [
+      2451,
+      5753
+    ],
+    "proj:transform": [
+      0.00816,
+      0.0,
+      13.05407,
+      0.0,
+      -0.00816,
+      60.0
+    ],
+    "datetime": "2020-09-25T00:00:00Z"
+  },
+  "links": [],
+  "assets": {
+    "MODIS": {
+      "href": "/vitodata/worldcereal/data/yield_module/ukraine/2020/ReflNorm_VJB_database1km_corr_2020269_REPROJECTED.tif",
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "title": "MODIS",
+      "description": "MODIS",
+      "file:size": 8358310,
+      "raster:bands": [
+        {
+          "nodata": -9999.0,
+          "data_type": "int16"
+        },
+        {
+          "nodata": -9999.0,
+          "data_type": "int16"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    }
+  }
+}

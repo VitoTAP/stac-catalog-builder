@@ -1,0 +1,39 @@
+{
+    "collection_id": "modis_ukraine",
+    "title": "Modis Ukraine",
+    "description": "Modis Ukraine 2020-2021",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DOYInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/ReflNorm_VJB_database1km_corr_(?P<year>\\d{4})(?P<doy>\\d{3})_REPROJECTED.tif$",
+            "period": "daily",
+            "fixed_values": {
+                "asset_type": "MODIS"
+            }
+        }
+    },
+    "item_assets": {
+        "MODIS": {
+            "title": "MODIS",
+            "description": "MODIS",
+            "eo_bands": [
+                {
+                    "name": "SREF1",
+                    "description": "MODIS Surface Reflectance Band 1"
+                },
+                {
+                    "name": "SREF2",
+                    "description": "MODIS Surface Reflectance Band 2"
+                }
+            ]
+        }
+    },
+    "overrides": {
+    }
+}
