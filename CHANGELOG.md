@@ -19,9 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix for eo:bands with tiffs that contain multiple bands. ([#76](https://github.com/VitoTAP/stac-catalog-builder/issues/76))
-- Fix for rare issue where pathparsing is not thread safe 
-
+- Fix for eo:bands and raster:bands from the config with tiffs that contain multiple bands. ([#76](https://github.com/VitoTAP/stac-catalog-builder/issues/76))
+- Fix for rare issue where path parsers is not thread safe 
 
 ## [1.0.0] - 2025-08-11
 
