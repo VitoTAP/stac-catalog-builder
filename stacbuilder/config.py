@@ -94,7 +94,7 @@ class EOBandConfig(BaseModel):
         if not ext.bands:
             ext.apply(bands=[eo_band])
         else:
-            ext.bands = ext.bands.append(eo_band)
+            ext.bands = ext.bands + [eo_band]
 
 
 class SamplingType(enum.StrEnum):
@@ -193,7 +193,7 @@ class RasterBandConfig(BaseModel):
         if not ext.bands:
             ext.apply(bands=[raster_band])
         else:
-            ext.bands.append(raster_band)
+            ext.bands = ext.bands + [raster_band]
 
 
 class AssetConfig(BaseModel):
