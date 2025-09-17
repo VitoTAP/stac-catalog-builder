@@ -1,14 +1,7 @@
-import pprint
 from pathlib import Path
 
-import pystac
-
-# run pip install -e . in the root directory to install this package
 from stacbuilder import (
     build_collection,
-    list_asset_metadata,
-    list_input_files,
-    list_stac_items,
     validate_collection,
 )
 
@@ -16,12 +9,12 @@ from stacbuilder import (
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
-tiff_input_path = Path("/vitodata/worldcereal/data/yield_module/ukraine/2020/")
+tiff_input_path = Path("/data/worldcereal_data/test_modis/2020/")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 tiffs_glob = "*.tif"
 
 # Output Paths
-output_path = Path(__file__).parent.resolve() / "stac"
+output_path = Path('/data/users/Public/vincent.verelst/modis_stac/')  # Path(__file__).parent.resolve() / "stac"
 
 # build collection
 build_collection(
@@ -29,7 +22,7 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=output_path,
-    link_items=False,
+    link_items=True,
 )
 
 # validate collection
