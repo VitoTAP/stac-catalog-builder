@@ -5,13 +5,18 @@ It provides a MetadataCollector class that can be used to collect metadata from 
 It is designed to be flexible and can be extended to support different file types and metadata mapping strategies.
 """
 
+import logging
 from itertools import islice
 from pathlib import Path
-from typing import Iterable, List, Literal, Optional, Protocol
+from typing import Iterable, List, Literal, Optional, Protocol, Union
+
+from upath import UPath
 
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.mapper import MapGeoTiffToAssetMetadata
 from stacbuilder.metadata import AssetMetadata
+
+logger = logging.getLogger(__name__)
 
 FileType = Literal["GeoTiff"]
 
@@ -53,7 +58,7 @@ class FileCollector(IDataCollector):
         :param glob: The glob pattern to match files. The default is "*", which matches all files.
         :param max_files: The maximum number of files to collect. Default is -1, which means no limit.
         """
-        self.input_dir: Optional[Path] = input_dir
+        self.input_dir: Optional[Union[Path, UPath]] = input_dir
         self.glob: str = glob or "*"
         self.max_files: int = max_files if max_files is not None else -1
         self._input_files: Optional[List[Path]] = None
@@ -69,12 +74,14 @@ class FileCollector(IDataCollector):
 
     def collect(self):
         """Collect files matching the glob pattern in the input directory. Once collected, the files can be accessed via the `input_files` property."""
-        input_files = (f for f in self.input_dir.glob(self.glob) if f.is_file())
+        logger.info(f"START collecting files in '{self.input_dir}' with glob '{self.glob}'")
+        input_files = self.input_dir.glob(self.glob)
 
         if self.max_files > 0:
             input_files = islice(input_files, self.max_files)
 
-        self._input_files = list(input_files)
+        self._input_files = [f for f in input_files if f.is_file()]
+        logger.info(f"DONE collecting files. Found {len(self._input_files)} files.")
 
     def has_collected(self) -> bool:
         """Whether or not the data has been collected.
@@ -206,10 +213,52 @@ class MetadataCollector(IMetadataCollector):
             yield file
 
     def collect(self) -> None:
+        """Collect metadata from the input files using the metadata mapper."""
+        logger.info("START collecting metadata from input files")
         self._metadata_list = []
 
-        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import (
+            FIRST_COMPLETED,
+            ThreadPoolExecutor,
+            as_completed,
+            wait,
+        )
 
-        with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self.metadata_mapper.to_metadata, file) for file in self.get_input_files()]
-            self._metadata_list = [future.result() for future in futures]
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            max_futures = 1000  # limit the number of concurrent futures to avoid memory issues
+            futures = []
+            submitted_count = 0
+            finished_count = 0
+
+            for file in self.get_input_files():
+                while (submitted_count - finished_count) >= max_futures:
+                    # Check for completed futures before submitting new ones
+                    completed_futures = wait(futures, return_when=FIRST_COMPLETED)
+                    for completed_future in completed_futures:
+                        self._metadata_list.append(completed_future.result())
+                        futures.remove(completed_future)
+                        finished_count += 1
+
+                        # Log progress every 1000 finished items
+                        if finished_count % max_futures == 0:
+                            logger.info(f"Progress: {finished_count} files completed, {len(futures)} pending")
+
+                # Submit new task
+                future = executor.submit(self.metadata_mapper.to_metadata, file)
+                futures.append(future)
+                submitted_count += 1
+                if submitted_count % max_futures == 0:
+                    logger.info(f"Submitted {submitted_count} files for processing, currently {len(futures)} pending")
+
+            logger.info(f"All {submitted_count} files submitted. Collecting remaining results...")
+
+            # Collect results from any remaining futures
+            for future in as_completed(futures):
+                self._metadata_list.append(future.result())
+                finished_count += 1
+
+                # Log progress every 1000 finished items during final collection
+                if finished_count % max_futures == 0:
+                    logger.info(f"Collected {finished_count} of {submitted_count} results")
+
+            logger.info(f"DONE metadata collection. Total {finished_count} metadata items collected.")

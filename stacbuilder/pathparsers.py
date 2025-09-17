@@ -130,23 +130,19 @@ class RegexInputPathParser(InputPathParser):
         self._type_converters = type_converters or {}
         self._fixed_values = fixed_values or {}
 
-        self._data = None
-        self._path = None
-
     def parse(self, input_file: Union[Path, str]) -> Dict[str, Any]:
         data = {}
         if isinstance(input_file, str):
             input_file = Path(input_file)
-        self._path = input_file.as_posix()
+        path = input_file.as_posix()
 
         if self._regex_has_named_groups():
-            match = self._regex.search(self._path)
+            match = self._regex.search(path)
             if match:
                 data = match.groupdict()
             else:
                 logger.warning(
-                    f"No data could be extracted from this path: {self._path}, "
-                    + f"regex pattern={self._regex.pattern}"
+                    f"No data could be extracted from this path: {path}, " + f"regex pattern={self._regex.pattern}"
                 )
 
         for key, value in self._fixed_values.items():
@@ -162,19 +158,13 @@ class RegexInputPathParser(InputPathParser):
                 func = self._type_converters[key]
                 data[key] = func(value)
 
-        self._data = data
-        self._post_process_data()
+        data = self._post_process_data(data, path)
 
-        return self._data
+        return data
 
-    def _post_process_data(self):
+    def _post_process_data(self, data: Dict[str, Any], path: str) -> Dict[str, Any]:
         """Optionally do any desired processing on the extracted data."""
-        pass
-
-    @property
-    def data(self) -> Dict[str, Any]:
-        """Get the data extracted from the path."""
-        return self._data
+        return data
 
     @property
     def regex(self) -> re.Pattern:
@@ -233,32 +223,33 @@ class DefaultInputPathParser(RegexInputPathParser):
     def period(self) -> Period:
         return self._period
 
-    def _fill_missing_data(self):
-        if self.period is Period.YEARLY and "month" not in self._data:
-            self._data["month"] = 1
-        if (self.period is Period.YEARLY or self.period is Period.MONTHLY) and "day" not in self._data:
-            self._data["day"] = 1
+    def _fill_missing_data(self, data: Dict[str, Any]) -> None:
+        if self.period is Period.YEARLY and "month" not in data:
+            data["month"] = 1
+        if (self.period is Period.YEARLY or self.period is Period.MONTHLY) and "day" not in data:
+            data["day"] = 1
 
-    def _post_process_data(self):
-        self._fill_missing_data()
-        start_dt = self._get_start_datetime()
-        self._data["datetime"] = start_dt
-        self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._get_end_datetime()
+    def _post_process_data(self, data: Dict[str, Any], path: str) -> Dict[str, Any]:
+        self._fill_missing_data(data)
+        start_dt = self._get_start_datetime(data)
+        data["datetime"] = start_dt
+        data["start_datetime"] = start_dt
+        data["end_datetime"] = self._get_end_datetime(data)
+        return data
 
-    def _get_start_datetime(self):
+    def _get_start_datetime(self, data: Dict[str, Any]):
         return dt.datetime(
-            year=self._data["year"],
-            month=self._data["month"],
-            day=self._data["day"],
-            hour=int(self._data.get("hour", 0)),
-            minute=int(self._data.get("minute", 0)),
-            second=int(self._data.get("second", 0)),
+            year=data["year"],
+            month=data["month"],
+            day=data["day"],
+            hour=int(data.get("hour", 0)),
+            minute=int(data.get("minute", 0)),
+            second=int(data.get("second", 0)),
             tzinfo=dt.timezone.utc,
         )
 
-    def _get_end_datetime(self):
-        start_dt = self._get_start_datetime()
+    def _get_end_datetime(self, data: Dict[str, Any]):
+        start_dt = self._get_start_datetime(data)
         year = start_dt.year
 
         match self.period:
@@ -283,17 +274,18 @@ class LandsatNDWIInputPathParser(RegexInputPathParser):
         }
         super().__init__(type_converters=type_converters, *args, **kwargs)
 
-    def _post_process_data(self):
-        start_dt = self._get_start_datetime()
-        self._data["datetime"] = start_dt
-        self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._get_end_datetime()
+    def _post_process_data(self, data: Dict[str, Any], path: str) -> Dict[str, Any]:
+        start_dt = self._get_start_datetime(data)
+        data["datetime"] = start_dt
+        data["start_datetime"] = start_dt
+        data["end_datetime"] = self._get_end_datetime(data)
+        return data
 
-    def _get_start_datetime(self):
-        return dt.datetime(self._data["year"], 1, 1, 0, 0, 0, tzinfo=dt.timezone.utc)
+    def _get_start_datetime(self, data: Dict[str, Any]):
+        return dt.datetime(data["year"], 1, 1, 0, 0, 0, tzinfo=dt.timezone.utc)
 
-    def _get_end_datetime(self):
-        start_dt = self._get_start_datetime()
+    def _get_end_datetime(self, data: Dict[str, Any]):
+        start_dt = self._get_start_datetime(data)
         year = start_dt.year
         return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
 
@@ -311,34 +303,33 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
             regex_pattern=regex_pattern, type_converters=type_converters, fixed_values=fixed_values, *args, **kwargs
         )
 
-    def _post_process_data(self):
-        start_dt = self._derive_start_datetime()
-        self._data["datetime"] = start_dt
-        self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._derive_end_datetime()
+    def _post_process_data(self, data: Dict[str, Any], path: str) -> Dict[str, Any]:
+        start_dt = self._derive_start_datetime(data, path)
+        data["datetime"] = start_dt
+        data["start_datetime"] = start_dt
+        data["end_datetime"] = self._derive_end_datetime(data, path)
+        return data
 
-    def _derive_start_datetime(self):
+    def _derive_start_datetime(self, data: Dict[str, Any], path: str):
         """Derive the start datetime from other properties that were extracted."""
-        year = self._data.get("year")
-        month = self._data.get("month")
-        day = self._data.get("day")
+        year = data.get("year")
+        month = data.get("month")
+        day = data.get("day")
 
         if not (year and month and day):
             print(
                 "WARNING: Could not find all date fields: "
-                + f"{year=}, {month=}, {day=}, {self._data=},\n{self._path=}\n{self._regex.pattern=}"
+                + f"{year=}, {month=}, {day=}, {data=},\n{path=}\n{self._regex.pattern=}"
             )
             return None
 
         return dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
 
-    def _derive_end_datetime(self):
+    def _derive_end_datetime(self, data: Dict[str, Any], path: str):
         """Derive the end datetime from other properties that were extracted."""
-        start_dt = self._derive_start_datetime()
+        start_dt = self._derive_start_datetime(data, path)
         if not start_dt:
-            print(
-                "WARNING: Could not determine start_datetime: " + f"{self._data=}, {self._path=}, {self._regex.pattern}"
-            )
+            print("WARNING: Could not determine start_datetime: " + f"{data=}, {path=}, {self._regex.pattern}")
             return None
 
         year = start_dt.year
@@ -363,17 +354,18 @@ class ERA5LandInputPathParser(RegexInputPathParser):
         }
         super().__init__(type_converters=type_converters, *args, **kwargs)
 
-    def _post_process_data(self):
-        start_dt = self._get_start_datetime()
-        self._data["datetime"] = start_dt
-        self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._get_end_datetime()
+    def _post_process_data(self, data: Dict[str, Any], path: str) -> Dict[str, Any]:
+        start_dt = self._get_start_datetime(data)
+        data["datetime"] = start_dt
+        data["start_datetime"] = start_dt
+        data["end_datetime"] = self._get_end_datetime(data)
+        return data
 
-    def _get_start_datetime(self):
-        return dt.datetime(self._data["year"], self._data["month"], self._data["day"], 0, 0, 0, tzinfo=dt.timezone.utc)
+    def _get_start_datetime(self, data: Dict[str, Any]):
+        return dt.datetime(data["year"], data["month"], data["day"], 0, 0, 0, tzinfo=dt.timezone.utc)
 
-    def _get_end_datetime(self):
-        start_dt = self._get_start_datetime()
+    def _get_end_datetime(self, data: Dict[str, Any]):
+        start_dt = self._get_start_datetime(data)
         year = start_dt.year
         month = start_dt.month
         end_month = calendar.monthrange(year, month)[1]
