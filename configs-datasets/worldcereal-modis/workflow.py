@@ -9,12 +9,12 @@ from stacbuilder import (
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
-tiff_input_path = Path("/data/worldcereal_data/test_modis/2020/")
+tiff_input_path = Path("/data/worldcereal_data/ukraine_modis/")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
-tiffs_glob = "*.tif"
+tiffs_glob = "**/*.tif"
 
 # Output Paths
-output_path = Path('/data/users/Public/vincent.verelst/modis_stac/')  # Path(__file__).parent.resolve() / "stac"
+output_path = Path('/data/worldcereal_data/ukraine_modis/stac/')  # Path(__file__).parent.resolve() / "stac"
 
 # build collection
 build_collection(
