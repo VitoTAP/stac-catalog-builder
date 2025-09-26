@@ -28,7 +28,7 @@ from pystac.errors import STACValidationError
 from pystac.extensions.eo import EOExtension
 from pystac.extensions.file import FileExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
-from pystac.extensions.projection import ItemProjectionExtension
+from pystac.extensions.projection import ItemProjectionExtension, AssetProjectionExtension
 from pystac.extensions.raster import RasterBand, RasterExtension
 from pystac.layout import TemplateLayoutStrategy
 
@@ -202,16 +202,14 @@ class ItemBuilder:
         assert all(a.proj_epsg == first_asset.proj_epsg for a in known_assets), (
             "All assets should have the same proj_epsg"
         )
-        assert all(a.transform == first_asset.transform for a in known_assets), (
-            "All assets should have the same transform"
-        )
+        single_transform = all(a.transform == first_asset.transform for a in known_assets)
+
         assert all(a.bbox_as_list == first_asset.bbox_as_list for a in known_assets), (
             "All assets should have the same lat-lon bounding box"
         )
         assert all(a.proj_bbox_as_list == first_asset.proj_bbox_as_list for a in known_assets), (
             "All assets should have the same projected bounding box"
         )
-        assert all(a.shape == first_asset.shape for a in known_assets), "All assets should have the same shape"
 
         item = Item(
             id=first_asset.item_id,
@@ -225,25 +223,34 @@ class ItemBuilder:
 
         item.common_metadata.created = dt.datetime.now(dt.timezone.utc)
 
-        # Add the projection extension
-        item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
-        item_proj.apply(
-            epsg=first_asset.proj_epsg if first_asset.proj_epsg else None,
-            bbox=first_asset.proj_bbox_as_list,
-            geometry=first_asset.geometry_proj_as_dict,
-            transform=first_asset.transform,
-            shape=first_asset.shape,
-        )
+        if(single_transform):
+
+            # Add the projection extension
+            item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
+            item_proj.apply(
+                epsg=first_asset.proj_epsg if first_asset.proj_epsg else None,
+                bbox=first_asset.proj_bbox_as_list,
+                geometry=first_asset.geometry_proj_as_dict,
+                transform=first_asset.transform,
+                shape=first_asset.shape,
+            )
+        else:
+            item_proj = ItemProjectionExtension.ext(item, add_if_missing=True)
+            item_proj.apply(
+                epsg=first_asset.proj_epsg if first_asset.proj_epsg else None,
+                bbox=first_asset.proj_bbox_as_list,
+                geometry=first_asset.geometry_proj_as_dict
+            )
 
         for metadata in assets:
-            item.add_asset(metadata.asset_type, self._create_asset(metadata, item))
+            item.add_asset(metadata.asset_type, self._create_asset(metadata, item, not single_transform))
 
         if self._alternate_href_generator and self._alternate_href_generator.has_callbacks():
             item.stac_extensions.append(ALTERNATE_ASSETS_SCHEMA)
 
         return item
 
-    def _create_asset(self, metadata: AssetMetadata, item: Item) -> Asset:
+    def _create_asset(self, metadata: AssetMetadata, item: Item, add_proj_shape:bool) -> Asset:
         asset_defs = self._get_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.asset_type]
         asset_config = self._get_assets_config_for(metadata.asset_type)
@@ -255,6 +262,14 @@ class ItemBuilder:
         if metadata.file_size:
             file_info = FileExtension.ext(asset, add_if_missing=True)
             file_info.apply(size=metadata.file_size)
+
+        if add_proj_shape:
+            asset_proj = AssetProjectionExtension.ext(asset, add_if_missing=True)
+            asset_proj.apply(
+                epsg=metadata.proj_epsg if metadata.proj_epsg else None,
+                transform=metadata.transform,
+                shape=metadata.shape,
+            )
 
         # raster extension
         self._add_raster_bands_to_asset(asset, metadata, asset_config)
