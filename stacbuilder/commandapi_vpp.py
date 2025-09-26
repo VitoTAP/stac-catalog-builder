@@ -11,7 +11,7 @@ from stacbuilder.terracatalog import CollectionConfigBuilder, HRLVPPMetadataColl
 def vpp_list_metadata(
     collection_id: Optional[str] = None,
     max_products: Optional[int] = -1,
-    query_by_frequency: str = "QS",
+    query_by_frequency: str = "SME",
 ) -> List[AssetMetadata]:
     """Show the AssetMetadata objects that are generated for each VPP product.
 
@@ -33,7 +33,7 @@ def vpp_list_metadata(
 def vpp_list_stac_items(
     collection_id: Optional[str] = None,
     max_products: Optional[int] = -1,
-    query_by_frequency: str = "QS",
+    query_by_frequency: str = "SME",
 ) -> List[Item]:
     """Show the STAC items that are generated for each VPP product.
 
@@ -56,7 +56,7 @@ def vpp_build_collection(
     collection_id: Optional[str] = None,
     output_dir: Optional[Path] = None,
     max_products: Optional[int] = -1,
-    query_by_frequency: str = "QS",
+    query_by_frequency: str = "SME",
     item_postprocessor=None,
 ) -> None:
     """Build a STAC collection for one of the collections in HRL VPP (OpenSearch)."""
@@ -84,7 +84,7 @@ def vpp_build_collection(
 def vpp_build_all_collections(
     output_dir: Path,
     max_products: Optional[int] = -1,
-    query_by_frequency: str = "QS",
+    query_by_frequency: str = "SME",
 ) -> None:
     """Build a STAC collection for each of the collections in HRL VPP (OpenSearch)."""
 

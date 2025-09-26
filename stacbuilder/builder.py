@@ -12,6 +12,8 @@ from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional, Tuple
+import psutil
+
 
 # Third party libraries
 import deprecated
@@ -712,12 +714,19 @@ class AssetMetadataPipeline:
         num_groups = len(groups)
 
         progress_chunk_size = 10_000
-        for i, assets in enumerate(groups.values()):
+        i = 0
+        while groups:
+            # Pop a group from the dictionary to process and immediately free its memory
+            group_key, assets = groups.popitem()
+            
             if i % progress_chunk_size == 0:
                 fraction_done = i / num_groups
+                gc.collect()
+                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
                 self._log_progress_message(
-                    f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%})"
+                    f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%}) - Memory: {memory_mb:.1f} MB"
                 )
+                
             sub_groups = self._split_group_by_latlon(
                 assets
             )  # Ensure that all the assets have the same lat-lon bounding box
@@ -727,8 +736,10 @@ class AssetMetadataPipeline:
                     if self.item_postprocessor is not None:
                         stac_item = self.item_postprocessor(stac_item)
                     yield stac_item
-
-        # Clean up the memory
+            
+            i += 1
+        
+        # groups is now empty, but del it anyway for clarity
         del groups
         self.metadata_collector.reset()
         gc.collect()
