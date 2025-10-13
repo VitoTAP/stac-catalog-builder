@@ -1,0 +1,61 @@
+{
+    "collection_id": "agera5_dekad_terrascope",
+    "title": "AGERA5 10-daily precipitation & temperature",
+    "description": "AGERA5 10-daily precipitation & temperature",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}/${year}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<item_id>openEO_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}))Z_(?P<asset_type>temperature-mean|precipitation-flux).tif$",
+            "period": "daily",
+            "fixed_values": {
+            }
+        }
+    },
+    "alternate_links": {
+        "add_local": true
+    },
+    "item_assets": {
+        "temperature-mean": {
+            "title": "temperature-mean",
+            "description": "temperature-mean",
+            "eo_bands": [
+                {
+                    "name": "temperature-mean",
+                    "description": "temperature-mean",
+                    "data_type": "uint16",
+                    "sampling": "area",
+                    "spatial_resolution": 0.1
+                }
+            ]
+        },
+        "precipitation-flux": {
+            "title": "precipitation-flux",
+            "description": "precipitation-flux",
+            "eo_bands": [
+                {
+                    "name": "precipitation-flux",
+                    "description": "precipitation-flux",
+                    "data_type": "uint16",
+                    "sampling": "area",
+                    "spatial_resolution": 0.1
+                }
+            ]
+        }
+    }
+}

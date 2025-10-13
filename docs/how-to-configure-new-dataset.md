@@ -15,12 +15,11 @@ See: [config-collection.json](configs-datasets/config-template/config-collection
 
 This is the actual configuration file.
 
-It is a JSON file containing some variables that we need to know to ba able to build the collection, for example, the collection ID, title, description. et cetera.
+It is a JSON file containing some variables that we need to know to ba able to build the collection, for example, the collection ID, title, description. etc.
 
 This file is loaded and validated through Pydantic.
 
 Below some explanation of the items in the config file.
-Since the JSON format doesn't support comments, I'm commenting it here instead, in the README.
 
 The code that defines these configurations is located in: [./stacbuilder/config.py](./stacbuilder/config.py)
 Each configuration is a subclass of Pydantic BaseModel.
@@ -67,29 +66,35 @@ Collection configuration file: corresponds to class `CollectionConfig`.
     // We extract some metadata from the geotiff's file path using a subclass of InputPathParser.
     // Path parsers are defined in stacbuilder/pathparsers.py
     //
-    // You probably will need to write a subclass to customize for your particular
-    // needs, unless it happens to fit a simple existing case.
-    //
-    // Below you fill in the class name to use.
-    // For how the tool finds the right class:
-    //  see the classes InputPathParserFactory and InputPathParser.
+    // There are several path parsers available, but you can also write your own.
     //
     // While it is technically also possible to define parameters that would be
     // passed to the constructor, at present, it is just easier to just write a
     // subclass specifically for the collection and give that a no-arguments constructor.
+    //
+    // Fields that typically are required are `asset_type`, and `year` and `month` (only for monthly)
+    // The `asset_type` is equivalent to the band name.
     "input_path_parser": {
-        "classname": "RegexInputPathParser"
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/(?P<asset_type>MIN|MAX)/(?P<year>\\d{4})-(?P<month>\\d{2}).tif$",
+            "period": "monthly",
+            "fixed_values": {
+            }
+        }
     },
 
-
-    //
     // `item_assets` defines what assets STAC Items have and what bands the assets contain.
     //
     // This is a dictionary that maps the asset type to an asset definition
     // Asset definition are defined by the class `AssetConfig`.
+    //
     // We assume each file is an asset, but depending on the file name it could
     // be a different type of item, therefore "item_type".
-    // if there is only on type of item, make your InputPathParser return a fixed value for
+    //
+    // if there is only on type of item, you can set the `asset_type` as a fixed value
+    // in the `input_path_parser`.
+    // Extra fields like data_type, sampling, spatial_resolution are optional.
     "item_assets": {
         "some_item_type": {
             "title": "REPLACE_THIS--BAND_NAME",
@@ -98,150 +103,28 @@ Collection configuration file: corresponds to class `CollectionConfig`.
                 {
                     "name": "REPLACE_THIS--BAND_NAME",
                     "description": "REPLACE_THIS--BAND_DESCRIPTION",
-                    "data_type": "float32",
-                    "sampling": "area",
-                    "spatial_resolution": 100
+                    "data_type": "float32", // optional
+                    "sampling": "area", // optional
+                    "spatial_resolution": 100 // optional
                 }
             ]
         }
     },
 
     // See .stacbuilder/config.py,  class: CollectionConfig
-    // This dictionary allows us to fill in or overwrite some fields with values
-    // that we just want to give a fixed value. This is done at the very end of
-    // the process in a post-processing step.
-    "overrides": {}
 }
 ```
 
 
 
 
-#### 2. `Makefile`
+#### 2. `workflow.py`
 
-See: [configs-datasets/config-template/Makefile](configs-datasets/config-template/Makefile)
+See: [configs-datasets/config-template/workflow.py](configs-datasets/config-template/workflow.py)
 
-The Makefile automates the CLI commands and some helper commands to copy and list files.
+This is a Python file that contains the workflow to run the STAC builder.
 
-It is basically there to have consistent values for the parameters you pass to the stacbuilder tool.
-You can also use `make --dry-run` to show you the exact command it would run if you want to see an example to run the command directly.
+It is advised to run this code step by step by commenting out the steps you do not want to run. This way you can validate each step before running the next one.
 
-Make calls the python script and passes the different CLI commands and arguments using a bunch of variables for configuration.
-Basically, instead of explaining bash commands that show you how to use the Python script, we give you the commands in the Makefile.
-
-Example: dry-run
-
-```shell
-make --dry-run -f configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/Makefile build-collection
-```
-
-Output:
-
-```shell
-$ make --dry-run -f configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/Makefile build-collection
-/home/demo-user/mambaforge/envs/stac-catalog-builder/bin/python3 stacbuilder \
-        -v build \
-        -g "*/*.tif" \
-        -c /home/demo-user/stac-catalog-builder/configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/config-collection.json \
-        --overwrite \
-        /data/MTDA/PEOPLE_EA/Landsat_three-annual_NDWI_v1/ \
-        /home/demo-user/stac-catalog-builder/configs-datasets/configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/STAC_wip/v0.4
-```
-
-I tried to make the Makefile reasonably self-documenting.
-
-- There configuration variables are all at the top and explained with comments.
-- There is a `help` make target which is also the default, so you can see what all the make target are for.
-
-Example:
-
-```
-make help
-
-# Or simply `make` without any targets also shows the help target.
-make
-```
-
-Typically you will have to run make from the root of the git repo because there are some issues with Python finding the stacbuilder modules. (To be fixed still)
-
-In that case you need to point `make` to the Makefile with the `-f <path to makefile>` option.
-
-Example: `-f <path to makefile>`
-
-```shell
-# run this at the root of the git repo
-make -f configs-datasets/PEOPLE_EA/Landsat_three-annual_NDWI_v1/Makefile
-```
-
-The configuration parameters are set up a the top of the Makefile and they are mainly the following items:
-
-- input directory,
-- file glob,
-- output dir,
-- where the collection config file is located
-- and where the final result for the STAC files should be copied to, so other people can use it.
-
-### The main variables to change in the Makefile
-
-`STACBLD_PYTHON_BIN`
-
-Set this to the path of your python executable so make uses the correct python.
-This is not the nicest solution, but necessary for now to get things to work.
-
-Example:
-
-```make
-STACBLD_PYTHON_BIN := /home/johan.schreurs/mambaforge/envs/stac-catalog-builder/bin/python3
-```
-
-CAVEAT: on Terrascope the command `python` is really an alias to the system's Python.
-This can trip you up if you are not aware that `python` will not find your conda or virtualenv executable.
-Always use something more specific such as the absolute path or `python3`, `python3.11`, or alike.
-
-
-`DATASET_NAME`: Just the name of you collection.
-
-Example:
-
-```make
-DATASET_NAME :=  Landsat_three-annual_NDWI_v1
-```
-
-
-`TIFF_INPUT_DIR`: Directory containing the GeoTIFF input files.
-
-Example:
-
-```make
-TIFF_INPUT_DIR := /data/MTDA/PEOPLE_EA/Landsat_three-annual_NDWI_v1/
-```
-
-`GLOB_PATTERN`:  Glob pattern to find the GeoTIFF files inside TIFF_INPUT_DIR.
-
-```make
-GLOB_PATTERN := */*.tif
-```
-
-`OUT_DIR_ROOT`: Base/root directory for the test output.
-
-This is where you test and review the "work-in-progress" STAC files, so this is not the PUBLISH_DIR
-
-```make
-OUT_DIR_ROOT := $(WORKSPACE)/${DATASET_NAME}
-```
-
-PUBLISH_DIR_ROOT: the root folder where you share or "publish" the result with other users.
-PUBLISH_DIR is then a subfolder inside ${PUBLISH_DIR_ROOT} with a subfolder for the specific dataset and its catalog version.µ
-
-```make
-PUBLISH_DIR_ROOT := /data/users/Public/johan.schreurs/PEOPLE_EA/STAC-for-review
-PUBLISH_DIR := $(PUBLISH_DIR_ROOT)/${DATASET_NAME}/$(CATALOG_VERSION)
-```
-
-In the future this can be simplified and `PUBLISH_DIR` could point directly to the folder where you to put the STAC collections.
-But for now I go by a more step-by-step process, at least until we have ironed out all the initial wrinkles.
-
-The default values `PUBLISH_DIR_ROOT` and `PUBLISH_DIR` point to a folder inside the current git repo in `configs-datasets`
-in order to have a setup that runs immediately.
-
----
+### Item Postprocessor
+Some advanced usecases require you to write an `item_postprocessor`. This is a function that accespt a pystac item and modifies it. This is useful for example to add extra fields to the item, or to modify the asset metadata.

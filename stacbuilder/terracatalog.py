@@ -7,39 +7,45 @@ At present, all code in this module is still very experimental (d.d. 2024-01-29)
 
 """
 
+import concurrent.futures
 import datetime as dt
+import gc
 import inspect
 import itertools
 import logging
 from pathlib import Path
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple
-import concurrent.futures
-
-# import resource
-import psutil
-import gc
 
 import geopandas as gpd
 import pandas as pd
+
+# import resource
+import psutil
 from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
 
 try:
     import terracatalogueclient as tcc
-    from terracatalogueclient.config import CatalogueConfig
-    from terracatalogueclient.config import CatalogueEnvironment
     from terracatalogueclient import ProductFile
+    from terracatalogueclient.config import CatalogueConfig, CatalogueEnvironment
 except ImportError:
-    raise ImportError("Terracatalogueclient not found. Please install it with 'pip install terracatalogueclient==0.1.14 --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple'.")
+    raise ImportError(
+        "Terracatalogueclient not found. Please install it with 'pip install terracatalogueclient==0.1.14 --extra-index-url https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages/simple'."
+    )
 
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
-from stacbuilder.config import AssetConfig, CollectionConfig, RasterBandConfig, ProviderModel
+from stacbuilder.config import (
+    AssetConfig,
+    CollectionConfig,
+    EOBandConfig,
+    ProviderModel,
+    RasterBandConfig,
+)
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
-
 
 _logger = logging.getLogger(__name__)
 
@@ -192,11 +198,16 @@ class CollectionConfigBuilder:
                 bits_per_sample=bit_per_value,
                 data_type=data_type,
             )
+            eobands_cfg = EOBandConfig(
+                name=title,
+                description=title,
+            )
             asset_cfg = AssetConfig(
                 title=title,
                 description=title,
                 media_type=media_type,
                 raster_bands=[raster_cfg],
+                eo_bands=[eobands_cfg],
             )
             asset_configs[title] = asset_cfg
 
@@ -370,7 +381,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     self._df_asset_metadata = pd.concat([self._df_asset_metadata, gpd.read_parquet(path)])
                     # self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
                 self._log_progress_message(
-                    f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024 ** 2:_}MB",
+                    f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB",
                     level=logging.DEBUG,
                 )
             self._log_progress_message(
@@ -528,14 +539,14 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                         del future
 
                         self._log_progress_message(
-                            f"Number of new products {len(self._df_asset_metadata)-num_products_processed}.",
+                            f"Number of new products {len(self._df_asset_metadata) - num_products_processed}.",
                             level=logging.DEBUG,
                         )
 
                         num_products_processed = len(self._df_asset_metadata)
                         percent_processed = (num_products_processed + num_products_stored) / max_prods_to_process
                         self._log_progress_message(
-                            f"Progress: {num_products_processed + num_products_stored} of {max_prods_to_process} ({percent_processed:.1%}) Memory usage: {psutil.Process().memory_info().rss // 1024 ** 2:_}MB"
+                            f"Progress: {num_products_processed + num_products_stored} of {max_prods_to_process} ({percent_processed:.1%}) Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB"
                         )  # {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss:_}
                         if num_products_processed > max_prods_to_process:
                             executor.shutdown(wait=False)
@@ -672,7 +683,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             metadata = AssetMetadata.from_geoseries(record)
             md_list.append(metadata)
 
-        self._log_progress_message(f"DONE: {i+1} of {num_products} converted to AssetMetadata")
+        self._log_progress_message(f"DONE: {i + 1} of {num_products} converted to AssetMetadata")
         self._log_progress_message("DONE: _convert_to_asset_metadata", level=logging.DEBUG)
         return md_list
 
@@ -695,8 +706,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         asset_metadata.href = href
         asset_metadata.original_href = href
         asset_metadata.asset_id = product.id
-        asset_metadata.collection_id = props.get("parentIdentifier")
-        asset_metadata.title = product.title
 
         # product type is a shorter code than what corresponds to asset_metadata.asset_type
         # The product type is more general. But the OpenSearch title (asset_type for is) appends the spatial resolution.
@@ -738,6 +747,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                     raise
         if epsg_code is None and asset_metadata.tile_id:
             import re
+
             results = re.findall("""\d+""", asset_metadata.tile_id)
             epsg_code = int("326" + results[0])
         if epsg_code is None:
@@ -755,14 +765,6 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         asset_metadata.datetime = product.beginningDateTime
         asset_metadata.start_datetime = product.beginningDateTime
         asset_metadata.end_datetime = product.endingDateTime
-
-        # TODO: should we also process the following attributes of product?
-        #   - product.alternates
-        #   - product.geojson
-        #   - product.geometry
-        #   - product.previews
-        #   - product.related
-        #   - product.properties
 
         # TODO: should we also process the following keys in the product.properties dict?
         # 'acquisitionInformation': [{'acquisitionParameters': {'acquisitionType': 'NOMINAL', 'beginningDateTime': '2017-04-01T00:00:00.000Z', 'endingDateTime': '2017-04-01T23:59:59.999Z', 'tileId': 'E09N27'},

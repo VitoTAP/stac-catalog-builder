@@ -1,0 +1,108 @@
+{
+  "type": "Collection",
+  "id": "foo-2023-v01_2000",
+  "stac_version": "1.0.0",
+  "description": "Description of Foo",
+  "links": [
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01_2000/2000/observations_2000-01-01.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01_2000/2000/observations_2000-02-01.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./foo-2023-v01_2000/2000/observations_2000-03-01.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    },
+    {
+      "rel": "root",
+      "href": "../collection.json",
+      "type": "application/json",
+      "title": "Foo collection"
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/item-assets/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+    "https://stac-extensions.github.io/eo/v1.1.0/schema.json"
+  ],
+  "item_assets": {
+    "2m-temp-monthly": {
+      "type": "image/tiff; application=geotiff",
+      "title": "2m temperature",
+      "description": "temperature 2m above ground (Kelvin)",
+      "roles": [
+        "data"
+      ],
+      "eo:bands": [
+        {
+          "name": "2m_temp",
+          "description": "temperature 2m above ground (Kelvin)"
+        }
+      ]
+    },
+    "tot-precip-monthly": {
+      "type": "image/tiff; application=geotiff",
+      "title": "total precipitation",
+      "description": "total precipitation per month (m)",
+      "roles": [
+        "data"
+      ],
+      "eo:bands": [
+        {
+          "name": "tot_precip",
+          "description": "total precipitation per month (m)"
+        }
+      ]
+    }
+  },
+  "title": "Foo collection 2000",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          0.0,
+          0.0,
+          240.0,
+          180.0
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2000-01-01T00:00:00Z",
+          "2000-03-31T23:59:59Z"
+        ]
+      ]
+    }
+  },
+  "license": "proprietary",
+  "keywords": [
+    "foo",
+    "bar",
+    "oof"
+  ],
+  "providers": [
+    {
+      "name": "Test EO Org",
+      "roles": [
+        "licensor",
+        "processor",
+        "producer"
+      ],
+      "url": "https://www.test-eo-org.nowhere.to.be.found.xyz/"
+    }
+  ]
+}

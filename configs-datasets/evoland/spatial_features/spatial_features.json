@@ -1,0 +1,409 @@
+{
+    "collection_id": "LCFM_SpatialFeatures",
+    "title": "LCFM Spatial features",
+    "description": "LCFM Spatial features for the EVOLAND project",
+    "instruments": [],
+    "keywords": [
+	"LCFM", "Spatial Features", "Land Cover", "Forest Monitoring", "Copernicus"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "Copernicous Land Monitoring Service (CLMS)",
+            "roles": [
+                "licensor",
+                "producer"
+            ],
+            "url": "https://land.copernicus.eu/"
+        },
+	{
+            "name": "VITO",
+            "roles": [
+                "processor"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+	    "regex_pattern": ".*/.*/.*/.*/.*/LCFM_LCM-10_(.*)_(?P<item_id>(?P<year>\\d{4})_(?P<tile_id>(.*))_(.*))_(.*).tif$",
+            "period": "yearly",
+            "fixed_values": {
+		"asset_type": "SpatialFeatures"
+	    }
+	}
+    },
+    "item_assets": {
+        "SpatialFeatures": {
+            "title": "Spatial Features",
+            "description": "LCFM Spatial features",
+            "eo_bands": [
+                {
+                    "name": "Band 1",
+                    "description": "Band 1"
+                },
+		{
+		    "name": "Band 2",
+		    "description": "Band 2"
+		},
+		{
+		    "name": "Band 3",
+		    "description": "Band 3"
+		},
+		{
+		    "name": "Band 4",
+		    "description": "Band 4"
+		},
+		{
+		    "name": "Band 5",
+		    "description": "Band 5"
+		},
+		{
+		    "name": "Band 6",
+		    "description": "Band 6"
+		},
+		{
+		    "name": "Band 7",
+		    "description": "Band 7"
+		},
+		{
+		    "name": "Band 8",
+		    "description": "Band 8"
+		},
+		{
+		    "name": "Band 9",
+		    "description": "Band 9"
+		},
+		{
+		    "name": "Band 10",
+		    "description": "Band 10"
+		},
+		{
+		    "name": "Band 11",
+		    "description": "Band 11"
+		},
+		{
+		    "name": "Band 12",
+		    "description": "Band 12"
+		},
+		{
+		    "name": "Band 13",
+		    "description": "Band 13"
+		},
+		{
+		    "name": "Band 14",
+		    "description": "Band 14"
+		},
+		{
+		    "name": "Band 15",
+		    "description": "Band 15"
+		},
+		{
+		    "name": "Band 16",
+		    "description": "Band 16"
+		},
+		{
+		    "name": "Band 17",
+		    "description": "Band 17"
+		},
+		{
+		    "name": "Band 18",
+		    "description": "Band 18"
+		},
+		{
+		    "name": "Band 19",
+		    "description": "Band 19"
+		},
+		{
+		    "name": "Band 20",
+		    "description": "Band 20"
+		},
+		{
+		    "name": "Band 21",
+		    "description": "Band 21"
+		},
+		{
+		    "name": "Band 22",
+		    "description": "Band 22"
+		},
+		{
+		    "name": "Band 23",
+		    "description": "Band 23"
+		},
+		{
+		    "name": "Band 24",
+		    "description": "Band 24"
+		},
+		{
+		    "name": "Band 25",
+		    "description": "Band 25"
+		},
+		{
+		    "name": "Band 26",
+		    "description": "Band 26"
+		},
+		{
+		    "name": "Band 27",
+		    "description": "Band 27"
+		},
+		{
+		    "name": "Band 28",
+		    "description": "Band 28"
+		},
+		{
+		    "name": "Band 29",
+		    "description": "Band 29"
+		},
+		{
+		    "name": "Band 30",
+		    "description": "Band 30"
+		},
+		{
+		    "name": "Band 31",
+		    "description": "Band 31"
+		},
+		{
+		    "name": "Band 32",
+		    "description": "Band 32"
+		},
+		{
+		    "name": "Band 33",
+		    "description": "Band 33"
+		},
+		{
+		    "name": "Band 34",
+		    "description": "Band 34"
+		},
+		{
+		    "name": "Band 35",
+		    "description": "Band 35"
+		},
+		{
+		    "name": "Band 36",
+		    "description": "Band 36"
+		},
+		{
+		    "name": "Band 37",
+		    "description": "Band 37"
+		},
+		{
+		    "name": "Band 38",
+		    "description": "Band 38"
+		},
+		{
+		    "name": "Band 39",
+		    "description": "Band 39"
+		},
+		{
+		    "name": "Band 40",
+		    "description": "Band 40"
+		}
+	    ],
+	    "raster_bands": [
+		{
+		    "name": "Band 1",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 2",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 3",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 4",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 5",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 6",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 7",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 8",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 9",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 10",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 11",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 12",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 13",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 14",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 15",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 16",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 17",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 18",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 19",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 20",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 21",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 22",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 23",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 24",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 25",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 26",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 27",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 28",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 29",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 30",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 31",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 32",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 33",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 34",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 35",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 36",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 37",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 38",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 39",
+		    "offset": 0,
+		    "scale": 0.004
+		},
+		{
+		    "name": "Band 40",
+		    "offset": 0,
+		    "scale": 0.004
+		}
+	    ]
+	}
+    }
+}

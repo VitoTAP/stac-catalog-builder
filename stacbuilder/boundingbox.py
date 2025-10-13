@@ -1,10 +1,10 @@
-"""For working with bounding boxes of the rasters, in various formats.
-"""
+"""For working with bounding boxes of the rasters, in various formats."""
+
 import dataclasses as dc
 from typing import Dict, List, Optional
 
 from shapely import to_wkt
-from shapely.geometry import mapping, Polygon, box
+from shapely.geometry import Polygon, box, mapping
 
 
 def bbox_list_to_dict(bbox: List[float]) -> Dict[str, float]:
@@ -146,4 +146,3 @@ class BoundingBox:
 
     def as_geometry_dict(self):
         return mapping(self.as_polygon())
-    

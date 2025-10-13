@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from time import sleep
 import pystac
 from upath import UPath
@@ -5,11 +6,27 @@ from pathlib import Path
 import pprint
 from getpass import getpass
 
+=======
+import pprint
+from pathlib import Path
+
+import pystac
+>>>>>>> origin/main
 from shapely.geometry import LineString, MultiPolygon, Polygon
 from shapely.ops import split
 
 # run pip install -e . in the root directory to install this package
+<<<<<<< HEAD
 from stacbuilder import *
+=======
+from stacbuilder import (
+    build_collection,
+    list_asset_metadata,
+    list_input_files,
+    list_stac_items,
+    validate_collection,
+)
+>>>>>>> origin/main
 
 # Collection configuration
 catalog_version = "v0.1"
@@ -101,7 +118,10 @@ def _slash_tile(tile: str):
 output_path = Path(__file__).parent.resolve() / "results"
 test_output_path = output_path / "test" / catalog_version
 publish_output_path = output_path / "publish" / catalog_version
+<<<<<<< HEAD
 overwrite = True
+=======
+>>>>>>> origin/main
 
 
 # list input files
@@ -131,7 +151,7 @@ def item_postprocessor(item: pystac.Item) -> pystac.Item:
     if tile.startswith("01") or tile.startswith("60"):
         polygon = Polygon(item.geometry["coordinates"][0])
         polygon = fix_antimeridian_split(polygon)
-        if type(polygon) == MultiPolygon:
+        if polygon is MultiPolygon:
             item.geometry["coordinates"] = [
                 polygon.__geo_interface__["coordinates"][0][0],
                 polygon.__geo_interface__["coordinates"][1][0],
@@ -175,7 +195,6 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=test_output_path,
-    overwrite=overwrite,
     link_items=False,
     item_postprocessor=item_postprocessor,
 )

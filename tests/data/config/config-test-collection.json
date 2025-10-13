@@ -23,7 +23,14 @@
     ],
     "layout_strategy_item_template": "${collection}/${year}",
     "input_path_parser": {
-        "classname": "MockPathParser"
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/observations_(?P<asset_type>2m-temp-monthly|tot-precip-monthly)_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}).tif$",
+            "period": "monthly",
+            "fixed_values": {
+                "item_id": "observations_{year}-{month}-{day}"
+            }
+        }
     },
     "item_assets": {
         "2m-temp-monthly": {

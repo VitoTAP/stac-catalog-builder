@@ -1,0 +1,359 @@
+{
+  "collection_id": "modis-09GA-061",
+  "title": "MODIS09GA daily surface reflectance",
+  "description": "Daily modis surface reflectance, corrected for atmospheric effects.",
+  "instruments": [],
+  "keywords": [],
+  "mission": [],
+  "platform": [],
+  "providers": [
+    {
+      "url": "https://lpdaac.usgs.gov/",
+      "name": "NASA LP DAAC at the USGS EROS Center",
+      "roles": [
+        "producer",
+        "licensor",
+        "processor"
+      ]
+    },
+    {
+      "name": "VITO",
+      "roles": [
+        "host"
+      ],
+      "url": "https://www.vito.be/"
+    }
+  ],
+  "links": [
+    {
+      "rel": "describedby",
+      "href": "https://lpdaac.usgs.gov/products/mod09gav061/",
+      "title": "MOD09GA"
+    },
+    {
+      "rel": "cite-as",
+      "href": "https://doi.org/10.5067/MODIS/MOD09GA.061",
+      "title": "LP DAAC - MOD09GA"
+    },
+    {
+      "rel": "license",
+      "href": "https://lpdaac.usgs.gov/data/data-citation-and-policies/",
+      "title": "LP DAAC - Data Citation and Policies"
+    }
+  ],
+  "layout_strategy_item_template": "${collection}/${year}",
+  "input_path_parser": {
+    "classname": "DefaultInputPathParser",
+    "parameters": {
+      "regex_pattern": ".*/MOD09GA.061_(?P<asset_type>.*)_1.*_(?P<item_id>doy(?P<year>\\d{4})(?P<doy>\\d{3}))_aid0001.tif$",
+      "period": "yearly",
+      "fixed_values": {
+      }
+    }
+  },
+  "item_assets": {
+    "sur_refl_b01": {
+      "title": "Surface Reflectance Band 1 (620-670 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b01",
+          "common_name": "red",
+          "center_wavelength": 0.645,
+          "full_width_half_max": 0.5
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "sur_refl_b02": {
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": [
+        "data",
+        "reflectance"
+      ],
+      "title": "Surface Reflectance Band 2 (841-876 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b02",
+          "common_name": "nir08",
+          "center_wavelength": 0.8585,
+          "full_width_half_max": 0.35
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "sur_refl_b03": {
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": [
+        "data",
+        "reflectance"
+      ],
+      "title": "Surface Reflectance Band 3 (459-479 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b03",
+          "common_name": "blue",
+          "center_wavelength": 0.469,
+          "full_width_half_max": 0.2
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "sur_refl_b04": {
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": [
+        "data",
+        "reflectance"
+      ],
+      "title": "Surface Reflectance Band 4 (545-565 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b04",
+          "common_name": "green",
+          "center_wavelength": 0.555,
+          "full_width_half_max": 0.2
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "sur_refl_b05": {
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": [
+        "data",
+        "reflectance"
+      ],
+      "title": "Surface Reflectance Band 5 (1230-1250 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b05",
+          "common_name": "lwir12",
+          "center_wavelength": 1.24,
+          "full_width_half_max": 0.2
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "sur_refl_b06": {
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": [
+        "data",
+        "reflectance"
+      ],
+      "title": "Surface Reflectance Band 6 (1628-1652 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b06",
+          "common_name": "swir16",
+          "center_wavelength": 1.64,
+          "full_width_half_max": 0.24
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "sur_refl_b07": {
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": [
+        "data",
+        "reflectance"
+      ],
+      "title": "Surface Reflectance Band 7 (2105-2155 nm)",
+      "description": "",
+      "eo:bands": [
+        {
+          "name": "sur_refl_b07",
+          "common_name": "swir22",
+          "center_wavelength": 2.13,
+          "full_width_half_max": 0.5
+        }
+      ],
+      "raster:bands": [
+        {
+          "scale": 0.0001,
+          "data_type": "int16",
+          "spatial_resolution": 500
+        }
+      ]
+    },
+    "SensorZenith": {
+      "title": "SensorZenith",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "SensorZenith",
+          "description": ""
+        }
+      ]
+    },
+    "SensorAzimuth": {
+      "title": "SensorAzimuth",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "SensorAzimuth",
+          "description": ""
+        }
+      ]
+    },
+    "SolarAzimuth": {
+      "title": "SolarAzimuth",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "SolarAzimuth",
+          "description": ""
+        }
+      ]
+    },
+    "SolarZenith": {
+      "title": "SolarZenith",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "SolarZenith",
+          "description": ""
+        }
+      ]
+    },
+    "gflags": {
+      "title": "gflags",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "gflags",
+          "description": ""
+        }
+      ]
+    },
+    "granule_pnt": {
+      "title": "granule_pnt",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "granule_pnt",
+          "description": ""
+        }
+      ]
+    },
+    "iobs_res": {
+      "title": "iobs_res",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "iobs_res",
+          "description": ""
+        }
+      ]
+    },
+    "num_observations": {
+      "title": "num_observations",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "num_observations",
+          "description": ""
+        }
+      ]
+    },
+    "obscov_500m": {
+      "title": "obscov_500m",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "obscov_500m",
+          "description": ""
+        }
+      ]
+    },
+    "QC_500m": {
+      "title": "QC_500m",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "QC_500m",
+          "description": ""
+        }
+      ]
+    },
+    "orbit_pnt": {
+      "title": "orbit_pnt",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "orbit_pnt",
+          "description": ""
+        }
+      ]
+    },
+    "Range": {
+      "title": "Range",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "Range",
+          "description": ""
+        }
+      ]
+    },
+    "state": {
+      "title": "state",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "state",
+          "description": ""
+        }
+      ]
+    },
+    "state_1km": {
+      "title": "state_1km",
+      "description": "",
+      "eo_bands": [
+        {
+          "name": "state_1km",
+          "description": ""
+        }
+      ]
+    }
+  }
+}

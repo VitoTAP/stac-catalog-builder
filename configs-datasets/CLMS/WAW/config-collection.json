@@ -1,0 +1,47 @@
+{
+    "collection_id": "WATER_AND_WETNESS_STATUS_2015",
+    "title": "Water and Wetness status 2015",
+    "description": "Provides at pan-European level in the spatial resolution of 20 m the occurrence of water and wet surfaces over the period from 2009 to 2015. More info: https://land.copernicus.eu/en/products/high-resolution-layer-water-and-wetness/water-and-wetness-status-2015",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "CLMS",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://land.copernicus.eu/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "",
+            "period": "yearly",
+            "fixed_values": {
+                "year" : 2015,
+                "asset_type" : "WAW"
+            }
+        }
+    },
+    "item_assets": {
+        "WAW": {
+            "title": "Water and Wetness status",
+            "description": "Water and Wetness status",
+            "eo_bands": [
+                {
+                    "name": "WAW",
+                    "description": "",
+                    "data_type": "int8",
+                    "sampling": "area",
+                    "spatial_resolution": 20
+                }
+            ]
+        }
+    }
+}

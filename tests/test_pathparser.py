@@ -4,16 +4,15 @@ from typing import List
 
 import pytest
 
-
+from stacbuilder.config import InputPathParserConfig
 from stacbuilder.pathparsers import (
     DefaultInputPathParser,
-    Period,
-    InputPathParserFactory,
-    RegexInputPathParser,
     ERA5LandInputPathParser,
+    InputPathParserFactory,
+    Period,
+    RegexInputPathParser,
     UnknownInputPathParserClass,
 )
-from stacbuilder.config import InputPathParserConfig
 
 
 def test_regexinputpathparser():

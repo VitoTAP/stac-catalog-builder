@@ -3,7 +3,6 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-# TODO: consider making the name lower case. Does PyPI make any difference based on casing?
 name = "stac-catalog-builder"
 authors = [
   { name="Johan Schreurs", email="johan.schreurs.ext@vito.be" },
@@ -14,6 +13,7 @@ description = """Tool to build a STAC collection from a directory of GeoTiff fil
 STAC: SpatioTemporal Asset Catalogs
 See https://stacspec.org
 """
+dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -24,28 +24,38 @@ classifiers = [
 dependencies = [
   "click==8.1.*",
   "dynaconf==3.2.*",
-  "geopandas==0.14.*",
-  "openeo==0.26.*",
+  "fsspec[http,s3]==2025.3.2",
+  "geopandas>=1.0",
+  "numpy",
+  "openeo>=0.36",
   "psutil",
-  "pyarrow==17.0.*",
+  "pyarrow==18.1.*",
   "pydantic==2.5.*",
-  "pyproj==3.6.*",
-  "pystac[validation]==1.8.*",
-  "rasterio==1.4.*",
+  "pyproj",
+  "pystac[validation]==1.11.*",
+  "rasterio==1.4.3",
   "requests==2.31.*",
   "requests_auth==7.0.*",
-  "requests-mock==1.11.*",
-  "rio-stac==0.8.*",
   "shapely==2.0.*",
-  "stac-validator==3.3.*",
-  "stactools==0.5.*",
-  "ipykernel",
-  "jupyter",
-  "pytest",
   "yarl==1.9.*",
   "universal_pathlib",
+  "ipykernel>=6.29.5",
+  "rio-cogeo>=5.4.2",
 ]
-dynamic = ["version"]
+
+[dependency-groups]
+hrvpp = [
+  "terracatalogueclient==0.1.14",
+]
+dev = [
+    "hatch>=1.14.1",
+    "nested-lookup>=0.2.25",
+    "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.2.1",
+    "pytest-xdist",
+    "requests-mock>=1.11.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/VitoTAP/stac-catalog-builder"
@@ -83,3 +93,14 @@ profile = "black"
 
 [tool.ruff]
 line-length = 120
+
+[tool.uv]
+default-groups = []
+
+[tool.uv.sources]
+terracatalogueclient = { index = "vito-atf" }
+
+[[tool.uv.index]]
+name = "vito-atf"
+url = "https://artifactory.vgt.vito.be/artifactory/api/pypi/python-packages-public/simple"
+explicit = true

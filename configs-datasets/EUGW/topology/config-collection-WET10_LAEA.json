@@ -1,0 +1,33 @@
+{
+    "collection_id": "WET10_LAEA",
+    "title": "Wetness 10m LAEA",
+    "description": "Wetness 10m LAEA",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "WAW(?P<year>\\d{4})/.*\\.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "WET10"
+            }
+        }
+    },
+    "item_assets": {
+        "WET10": {
+            "title": "Wetness",
+            "description": "Wetness",
+            "eo_bands": [
+                {
+                    "name": "Wetness",
+                    "description": "Wetness"
+                }
+            ]
+        }
+    }
+}

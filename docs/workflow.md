@@ -15,7 +15,8 @@ graph TD
     test_tiffs_found --> check_assetmetadata["list_metadata: check AssetMetadata are correct"]
     check_assetmetadata --> check_stac_items["list_stac_items: check STAC items are correct"]
     check_stac_items --> build_collection[build_collection]
-    build_collection --> END_NODE([end])
+    build_collection --> upload_to_stac_api["[OPTIONAL} Upload to STAC API"]
+    upload_to_stac_api --> END_NODE([end])
 ```
 
 ### Data flow

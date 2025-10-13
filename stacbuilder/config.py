@@ -11,28 +11,26 @@ import enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
-
+from openeo.util import dict_no_none
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pystac import MediaType
-from pystac.provider import ProviderRole, Provider
+from pystac.extensions.eo import Band, EOExtension
 from pystac.extensions.item_assets import AssetDefinition
+from pystac.extensions.raster import RasterBand, RasterExtension
+from pystac.provider import Provider, ProviderRole
 
-
-from openeo.util import dict_no_none
-
-
-DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = {
+DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = [
     ProviderRole.PRODUCER,
     ProviderRole.LICENSOR,
     ProviderRole.PROCESSOR,
-}
+]
 
 
 class ProviderModel(BaseModel):
     """Model for Providers in STAC."""
 
     name: str
-    roles: Set[ProviderRole] = DEFAULT_PROVIDER_ROLES
+    roles: List[ProviderRole] = DEFAULT_PROVIDER_ROLES
     url: Optional[HttpUrl] = None
 
     def to_provider(self) -> Provider:
@@ -72,12 +70,31 @@ class EOBandConfig(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    # TODO: the EO extension calls this common_name, maybe we should use that instead of 'name'
-    #   https://github.com/stac-extensions/eo#band-object
-    #   See GH issue: https://github.com/VitoTAP/stac-catalog-builder/issues/29
     name: str = Field(description="common_name of the band.")
 
     description: str = Field(description="Description of the band.")
+    common_name: Optional[str] = Field(
+        default=None, description="Common name of the band, such as 'red', 'green', 'blue', etc."
+    )
+    wavelength: Optional[float] = Field(
+        default=None,
+        description=("Wavelength of the band in nanometers. " + "This is a float value, e.g. 665.0 for the red band."),
+    )
+
+    def populate_asset_extension(self, ext: EOExtension) -> None:
+        """Populate the EOExtension with the values from this configuration."""
+        if not ext:
+            return None
+        eo_band = Band.create(
+            name=self.name,
+            common_name=self.common_name,
+            description=self.description,
+            center_wavelength=self.wavelength,
+        )
+        if not ext.bands:
+            ext.apply(bands=[eo_band])
+        else:
+            ext.bands = ext.bands + [eo_band]
 
 
 class SamplingType(enum.StrEnum):
@@ -88,9 +105,6 @@ class SamplingType(enum.StrEnum):
 
     AREA = "area"
     POINT = "point"
-
-    def __str__(self) -> str:
-        return super().__str__()
 
 
 class RasterBandConfig(BaseModel):
@@ -161,11 +175,25 @@ class RasterBandConfig(BaseModel):
         ),
     )
 
-    # statistics and histogram: Can not define defaults for these fields
-    #   They have to be read from the raster, with rasterio.
-    # Excerpt from Raster extension's docs:
-    # - statistics 	Statistics Object 	Statistics of all the pixels in the band.
-    # - histogram 	Histogram Object 	Histogram distribution information of the pixels values in the band.
+    def populate_asset_extension(self, ext: RasterExtension) -> None:
+        """Populate the RasterExtension with the values from this configuration."""
+        if not ext:
+            return None
+        raster_band = RasterBand.create(
+            name=self.name,
+            nodata=self.nodata,
+            data_type=self.data_type,
+            sampling=self.sampling,
+            bits_per_sample=self.bits_per_sample,
+            spatial_resolution=self.spatial_resolution,
+            unit=self.unit,
+            scale=self.scale,
+            offset=self.offset,
+        )
+        if not ext.bands:
+            ext.apply(bands=[raster_band])
+        else:
+            ext.bands = ext.bands + [raster_band]
 
 
 class AssetConfig(BaseModel):
@@ -186,11 +214,6 @@ class AssetConfig(BaseModel):
 
     def to_asset_definition(self) -> AssetDefinition:
         """Create an AssetDefinition object from this configuration."""
-        if self.eo_bands:
-            eo_bands = [dict_no_none(b.model_dump()) for b in self.eo_bands]
-        else:
-            eo_bands = None
-
         if self.raster_bands:
             raster_bands = [dict_no_none(b.model_dump()) for b in self.raster_bands]
         else:
@@ -201,16 +224,18 @@ class AssetConfig(BaseModel):
             "description": self.description,
             "roles": self.roles,
         }
-        if eo_bands:
-            # TODO: Switch to EOExtension to add eo:bands in the correct way.
-            #   Our content for eo:bands is not 100% standard: data_type belongs in raster:bands.
-            #   For the items we already use the EO extension, but we should do the same for STAC collection.
-            properties["eo:bands"] = eo_bands
+        asset_definition = AssetDefinition(properties=properties)
+        if self.eo_bands:
+            eo_ext = EOExtension.ext(asset_definition, add_if_missing=False)
+            for eo_band in self.eo_bands:
+                eo_band.populate_asset_extension(eo_ext)
 
         if raster_bands:
-            properties["raster:bands"] = raster_bands
+            raster_ext = RasterExtension.ext(asset_definition, add_if_missing=False)
+            for raster_band in self.raster_bands:
+                raster_band.populate_asset_extension(raster_ext)
 
-        return AssetDefinition(properties=properties)
+        return asset_definition
 
 
 class FileCollectorConfig(BaseModel):
@@ -237,11 +262,11 @@ class AlternateHrefConfig(BaseModel):
     See also: stacbuilder.builder.AlternateLinksGenerator
     In particular these methods:
     - AlternateLinksGenerator.from_config
-    - AlternateLinksGenerator.add_MEP
-    - AlternateLinksGenerator.add_basic_S3
+    - AlternateLinksGenerator.add_local
+    - AlternateLinksGenerator.add_S3
     """
 
-    add_MEP: bool = True
+    add_local: bool = True
     add_S3: bool = False
     s3_bucket: Optional[str] = None
     s3_root_path: Optional[str] = None
@@ -276,21 +301,6 @@ class CollectionConfig(BaseModel):
 
     asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
-
-    # TODO: general links (urls) that are often quite specific to the dataset, such as "about", or a link to a document that describes the dataset, etc.
-
-    # A set of specific fields we want to give a fixed value at the end.
-    # So this could override values that were generated.
-    # For example I have used to to correct the collection's extent as a
-    # temporary fix when there was something wrong, and to add a projected BBox as well.
-    # This is done at the very end in the post-processing step of the builder.
-    overrides: Optional[Dict[str, Any]] = None
-
-    # TODO: to simplify the use we want to include the config for the input files and output directory.
-    #   This will help us to ditch the makefiles that automate commands with lots of options,
-    #   which mainly consists of these paths.
-    #   For now we leave it out and just earmark this spot to added it here.
-    # input_files_config: Optional[FileCollectorConfig] = None
 
     @classmethod
     def from_json_str(cls, json_str: str) -> "CollectionConfig":

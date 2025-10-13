@@ -1,17 +1,18 @@
-import datetime as dt
 from pathlib import Path
 from typing import List
+
 import numpy as np
-from rasterio.io import DatasetWriter
-import rasterio
-
 import pytest
-from stacbuilder.collector import IMetadataCollector
+import rasterio
+from rasterio.io import DatasetWriter
 
-from stacbuilder.config import CollectionConfig, FileCollectorConfig, InputPathParserConfig
+from stacbuilder.collector import IMetadataCollector
+from stacbuilder.config import (
+    CollectionConfig,
+    FileCollectorConfig,
+    InputPathParserConfig,
+)
 from stacbuilder.metadata import AssetMetadata
-from stacbuilder.pathparsers import RegexInputPathParser
-from stacbuilder.builder import GeoTiffPipeline
 
 
 @pytest.fixture(scope="session")
@@ -47,28 +48,6 @@ def collection_output_dir(tmp_path_factory) -> Path:
 @pytest.fixture(scope="session")
 def grouped_collection_output_dir(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("collections-per-group")
-
-
-@pytest.fixture(scope="session")
-def geotiff_pipeline(collection_config_from_file, file_collector_config, collection_output_dir) -> GeoTiffPipeline:
-    return GeoTiffPipeline.from_config(
-        collection_config=collection_config_from_file,
-        file_coll_cfg=file_collector_config,
-        output_dir=collection_output_dir,
-        overwrite=False,
-    )
-
-
-@pytest.fixture(scope="session")
-def geotiff_pipeline_grouped(
-    grouped_collection_test_config, file_collector_config, grouped_collection_output_dir
-) -> GeoTiffPipeline:
-    return GeoTiffPipeline.from_config(
-        collection_config=grouped_collection_test_config,
-        file_coll_cfg=file_collector_config,
-        output_dir=grouped_collection_output_dir,
-        overwrite=False,
-    )
 
 
 @pytest.fixture(scope="session")
@@ -164,11 +143,12 @@ def create_geotiff_files(paths):
         create_mock_geotiff(file)
 
 
-# TODO: move create_mock_geotiff and test_create_tiffs to a non-test module that generates test data.
 def create_mock_geotiff(tif_path: Path):
     """Create GeoTIFF raster files for testing.
 
     The pixels form a simple gradient just to have some data.
+
+    This isn't being used in the tests, but is a utility to create mock data files.
     """
     # Based on the example in rasterio docs:
     # https://rasterio.readthedocs.io/en/stable/quickstart.html#opening-a-dataset-in-writing-mode
@@ -191,64 +171,6 @@ def create_mock_geotiff(tif_path: Path):
     )
     dataset.write(Z, 1)
     dataset.close()
-
-
-@pytest.mark.skip
-def test_create_tiffs(geotiff_paths):
-    # TODO: [refactor]: This method should not be a test but a script to generate test data.
-    #   Also, you only need to run that script one time. But now the test tiffs are
-    #   stored in git.
-    create_geotiff_files(geotiff_paths)
-
-
-class MockPathParser(RegexInputPathParser):
-    def __init__(self, *args, **kwargs) -> None:
-        type_converters = {
-            "year": int,
-            "month": int,
-            "day": int,
-        }
-        fixed_values = {"collection_id": "observations"}
-        regex_pattern = ".*observations_(?P<asset_type>.*)_(?P<year>\\d{4})-(?P<month>\\d{2})-(?P<day>\\d{2}).*\\.tif$"
-        super().__init__(
-            regex_pattern=regex_pattern, type_converters=type_converters, fixed_values=fixed_values, *args, **kwargs
-        )
-
-    def _post_process_data(self):
-        start_dt = self._derive_start_datetime()
-        self._data["datetime"] = start_dt
-        self._data["start_datetime"] = start_dt
-        self._data["end_datetime"] = self._derive_end_datetime()
-
-        year = self._data["year"]
-        self._data["item_id"] = f"observations_{self._data['asset_type']}_{year:04}"
-
-    def _derive_start_datetime(self):
-        """Derive the start datetime from other properties that were extracted."""
-        year = self._data.get("year")
-        month = self._data.get("month")
-        day = self._data.get("day")
-
-        if not (year and month and day):
-            print(
-                "WARNING: Could not find all date fields: "
-                + f"{year=}, {month=}, {day=}, {self._data=},\n{self._path=}\n{self._regex.pattern=}"
-            )
-            return None
-
-        return dt.datetime(year, month, day, 0, 0, 0, tzinfo=dt.timezone.utc)
-
-    def _derive_end_datetime(self):
-        """Derive the end datetime from other properties that were extracted."""
-        start_dt = self._derive_start_datetime()
-        if not start_dt:
-            print(
-                "WARNING: Could not determine start_datetime: " + f"{self._data=}, {self._path=}, {self._regex.pattern}"
-            )
-            return None
-
-        year = start_dt.year
-        return dt.datetime(year, 12, 31, 23, 59, 59, tzinfo=dt.timezone.utc)
 
 
 class MockMetadataCollector(IMetadataCollector):

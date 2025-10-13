@@ -1,0 +1,34 @@
+{
+    "collection_id": "TPI10_LAEA",
+    "title": "Topographic Position Index 10m LAEA",
+    "description": "Topographic Position Index 10m LAEA",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "year": 2015,
+                "asset_type": "TPI10"
+            }
+        }
+    },
+    "item_assets": {
+        "TPI10": {
+            "title": "Topographic Position Index",
+            "description": "Topographic Position Index",
+            "eo_bands": [
+                {
+                    "name": "Topographic Position Index",
+                    "description": "Topographic Position Index"
+                }
+            ]
+        }
+    }
+}

@@ -12,34 +12,26 @@ Rationale:
     to creating fake raster files, or fake API responses from a mock of the real API.
 """
 
-from dataclasses import dataclass
 import datetime as dt
-import json
+from dataclasses import dataclass
 from pathlib import Path
-# from types import NoneType
-from typing import Any, Dict, List, Optional, Tuple, Union
-
+from typing import Any, ClassVar, Dict, List, Optional
 
 import dateutil.parser
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from pystac import Collection, Item
-from shapely.geometry import Polygon, shape, MultiPolygon, mapping
+from pydantic import BaseModel, ConfigDict, field_validator
 from pystac.media_type import MediaType
+from shapely.geometry import Polygon, mapping
 
 from stacbuilder.boundingbox import BoundingBox
-from stacbuilder.exceptions import InvalidOperation
-from stacbuilder.pathparsers import InputPathParser
-
-
-BoundingBoxList = List[Union[float, int]]
-NoneType = type(None)
+from stacbuilder.projections import project_polygon
 
 
 @dataclass
 class BandMetadata:
-    """This class is temporary, will be refactored.
+    """
     Right now the focus is just to get the data out of rasterio.
     We do want a data structure that has everything we need for these extensions:
     eo:bands and raster:bands.
@@ -49,9 +41,16 @@ class BandMetadata:
     """
 
     data_type: np.dtype
+    """NumPy data type of the band (e.g., uint8, float32)."""
+
     nodata: Any
+    """Value representing no data/missing pixels in the band."""
+
     index: int
+    """Band index/number (typically 1-based)."""
+
     units: Optional[str] = None
+    """Physical units of the band values (e.g., 'meters', 'degrees')."""
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -64,50 +63,15 @@ class BandMetadata:
         return result
 
 
-# TODO: Eliminate RasterMetadata if possible and keep only the bands.
-@dataclass
-class RasterMetadata:
-    shape: Tuple[int, int]
-    bands: List[BandMetadata]
+class AssetMetadata(BaseModel):
+    """Intermediate metadata for one asset. This is the metadata used to create stac items."""
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "shape": self.shape,
-            "bands": [b.to_dict() for b in self.bands],
-        }
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+    )
 
-
-class AssetMetadata:
-    """Intermediate metadata that models the properties we actually use."""
-
-    # This is metadata of an asset that belongs to a STAC item, not really the metadata of one STAC item.
-    # (Realizing this now when reviewing the code, this class has been roughly the same since the earliest versions of the tool)
-    # We process files which correspond to assets.
-    # Those assets are grouped into STAC items.
-    # Also an asset can either be one band, or it can itself contain multiple bands.
-    #
-    # properties we want to collect:
-    # - item_id
-    # - path or href (How do we handle URLs?)
-    # - asset_type:
-    #       We use this to find the corresponding asset definition config in the CollectionConfig
-    # - everything to do with the date and time.
-    #       "datetime" is the standard name (To be confirmed)
-    #       But this could correspond to either the start datetime or end datetime, usually the start datetime.
-    #       Often it is easier to extract year, month and day as separate parts of the path.
-    #       Keep in mind some paths only contain a year, or a year and month.
-    # - bounding box and everything to do with the CRS (projected CRS)
-    #   - in lat-lon
-    #   - as well as projected + the CRS
-    #   - geometry of the bounding box
-    # - raster shape (height & width in pixels)
-    # - raster tags
-    #    TODO: Do we use raster tags in the STAC Items or collections? If not, can we remove this?
-    # - Metadata from the raster about the bands,
-    #       for the EO and Raster STAC extensions (eo:bands and raster:bands)
-    # TODO: will probably also need the spatial resolution.
-
-    PROPS_FROM_HREFS = [
+    PROPS_FROM_HREFS: ClassVar[List[str]] = [
         "item_id",
         "asset_id",
         "collection_id",
@@ -117,326 +81,222 @@ class AssetMetadata:
         "end_datetime",
         "title",
         "tile_id",
-        "item_href",
     ]
+    """Properties that can be extracted from href parsing."""
 
-    def __init__(
-        self,
-        extract_href_info: Optional[InputPathParser] = None,
-    ):
-        # original and modified path/href
-        self._href: Optional[str] = None
-        self._original_href: Optional[str] = None
+    asset_id: str
+    """The unique identifier for the asset."""
 
-        # Very often the input will be a (Posix) path to an asset file, for now only GeoTIFFs.
-        # When we start to support using URLs to convert those assets to STAC items, then
-        # `self._asset_path` could be None, or it could be set to the local path that the
-        # openEO server needs to access.
-        self._asset_path: Optional[Path] = None
+    href: str = None
+    """The file path or URL to the asset. At least one of href, original_href, or asset_path must be set."""
 
-        # components to convert data
-        self._extract_href_info = extract_href_info
+    original_href: str = None
+    """The original file path or URL before any modifications."""
 
-        # The raw dictionary of data extracted from the href
-        self._info_from_href: Dict[str, Any] = None
+    asset_path: Path = None
+    """Path object representing the asset location on the filesystem."""
 
-        #
-        # Essential asset info: what asset is it and what STAC item does it belong to
-        # What bands does it contain or correspond to.
-        #
+    item_id: str = None
+    """STAC item identifier that this asset belongs to.
 
-        self._asset_id: Optional[str] = None
-        """The asset ID normally corresponds to the file, unless the InputPathParser provides a value to override it."""
+    When a STAC item bundles multiple assets, the InputPathParser must provide
+    a value for item_id. When each asset corresponds to one STAC item, asset_id
+    and item_id will be identical. If no explicit value is provided, it defaults
+    to the same as asset_id.
+    """
 
-        self._item_id: Optional[str] = None
-        """Which STAC item this asset belongs to.
-        When a STAC item bundles multiple assets then the InputPathParser in extract_href_info
-        must provide a value for item_id.
-        However, when each asset corresponds to one STAC item then asset_id and item_id will
-        be identical. So if we don't get an explicit value for item_id we assume it is the same as
-        asset_id.
+    asset_type: Optional[str] = None
+    """Asset type used to find the corresponding asset definition in CollectionConfig."""
+
+    datetime: dt.datetime
+    """Primary datetime for the asset. This is the only required temporal field."""
+
+    start_datetime: Optional[dt.datetime] = None
+    """Start datetime for assets representing a time range."""
+
+    end_datetime: Optional[dt.datetime] = None
+    """End datetime for assets representing a time range."""
+
+    bbox_lat_lon: BoundingBox = None
+    """Bounding box in WGS84 latitude-longitude coordinates.
+
+    At least one spatial reference must be provided (bbox_lat_lon, bbox_projected,
+    geometry_lat_lon, or geometry_proj). If bbox_projected is not set, then
+    proj_epsg must also be provided.
+    """
+
+    bbox_projected: BoundingBox = None
+    """Bounding box in the projected coordinate system specified by proj_epsg."""
+
+    geometry_lat_lon: Polygon = None
+    """Geometry polygon in WGS84 latitude-longitude coordinates."""
+
+    geometry_proj: Polygon = None
+    """Geometry polygon in the projected coordinate system specified by proj_epsg."""
+
+    proj_epsg: int = None
+    """EPSG code for the projected coordinate reference system."""
+
+    transform: Optional[List[float]] = None
+    """Affine transformation matrix from the raster file for CRS conversions."""
+
+    shape: Optional[List[int]] = None
+    """Raster dimensions in pixels as [height, width]."""
+
+    file_size: Optional[int] = None
+    """File size in bytes (corresponds to file:size from FileInfo STAC extension)."""
+
+    tags: dict[str, str] = {}
+    """Metadata tags extracted from the raster file."""
+
+    bands: List[BandMetadata] = []
+    """Band information for multi-band raster files."""
+
+    tile_id: Optional[str] = None
+    """Identifier for the tile if the asset is part of a tiled dataset."""
+
+    media_type: Optional[MediaType] = None
+    """MIME type of the asset file (e.g., image/tiff, application/json)."""
+
+    # platforms: Optional[List[str]] = None
+    # instruments: Optional[List[str]] = None
+    # missions: Optional[List[str]] = None
+
+    @field_validator("geometry_lat_lon", "geometry_proj")
+    @classmethod
+    def validate_geometry(cls, v):
+        """Validate that geometry fields are Polygon instances."""
+        if v is not None and not isinstance(v, Polygon):
+            raise ValueError(f"Geometry must be a Polygon instance, got {type(v)}")
+        return v
+
+    @field_validator("datetime", "start_datetime", "end_datetime")
+    @classmethod
+    def validate_datetime_fields(cls, v):
+        """Validate and convert datetime fields on every assignment."""
+        if v is None:
+            return v
+        return check_datetime(v)
+
+    def model_post_init(self, context: Any):
         """
+        Pydantic method to overwrite that is ran after init of a new AssetMetadata instance.
+        Run some checks on the properties that are set and infer some properties"""
+        if not any([self.asset_id, self.item_id]):
+            raise ValueError("At least one of asset_id or item_id must be set.")
+        if not self.asset_path:
+            self.asset_path = Path(self.original_href)
+        if not self.href:
+            self.href = str(self.asset_path)
+        if not self.original_href:
+            self.original_href = str(self.href)
 
-        # We use asset_type to find the corresponding asset definition config in the CollectionConfig
-        self._asset_type: Optional[str] = None
+        if not self.item_id:
+            self.item_id = self.asset_id
 
-        # Temporal extent
-        # everything to do with the date + time and temporal extent this asset corresponds to.
-        self._datetime = None
-        self._start_datetime: Optional[dt.datetime] = None
-        self._end_datetime: Optional[dt.datetime] = None
+        self._ensure_geoms()
 
-        # The bounding boxes, in latitude-longitude and also the projected version.
-        self._bbox_lat_lon: Optional[BoundingBox] = None
-        self._bbox_projected: Optional[BoundingBox] = None
-        self._proj_epsg: Optional[int] = None
+    def _ensure_geoms(self):
+        """Ensure that the geometries and bounding boxes are set correctly based on the available properties."""
+        if self.bbox_projected:  # base case when bbox_projected is set
+            if not self.proj_epsg:
+                self.proj_epsg = self.bbox_projected.epsg
 
-        # The geometry is sometimes provided by the source data, and its coordinates
-        # might have more decimals than we get in the bounding box.
-        # TODO How to deal with this duplicate data in a consistent and understandable way?
-        self._geometry_lat_lon: Optional[Polygon] = None
+            if not self.geometry_proj:
+                self.geometry_proj = self.bbox_projected.as_polygon()
 
-        # Affine transform as the raster file states it, in case we need it for CRS conversions.
-        self.transform: Optional[List[float]] = None
+            if not self.geometry_lat_lon:
+                self.geometry_lat_lon = project_polygon(
+                    geometry=self.geometry_proj, from_crs=self.proj_epsg, to_crs=4326
+                )
 
-        # Raster shape in pixels
-        self.shape: Optional[List[int]] = None
+            if not self.bbox_lat_lon:
+                self.bbox_lat_lon = BoundingBox.from_list(self.geometry_lat_lon.bounds, epsg=4326)
+        elif not self.proj_epsg:
+            raise ValueError("proj_epsg must be set if bbox_projected is not set.")
+        elif self.bbox_lat_lon:  # base case when bbox_lat_lon is set
+            if not self.geometry_lat_lon:
+                self.geometry_lat_lon = self.bbox_lat_lon.as_polygon()
 
-        # file size, corresponds to file:size from FileInfo STAC extension
-        self.file_size: Optional[int] = None
+            if not self.geometry_proj:
+                self.geometry_proj = project_polygon(
+                    geometry=self.geometry_lat_lon, from_crs=4326, to_crs=self.proj_epsg
+                )
 
-        # Tags in the raster.
-        self.tags: List[str] = []
-
-        self.raster_metadata: Optional[RasterMetadata] = None
-
-        self.title: Optional[str] = None
-        self.collection_id: Optional[str] = None
-        self.tile_id: Optional[str] = None
-        self.item_href: Optional[str] = None
-        self.media_type: Optional[MediaType] = None
-
-        # TODO: add some properties that need to trickle up to the collection level, or not?
-        # These properties are really at the collection level, but in HRL VPP
-        # we might have to extract them from the products.
-        # Have to figure out what is the best way to handle this.
-        # self.platforms: Optional[List[str]] = None
-        # self.instruments: Optional[List[str]] = None
-        # self.missions: Optional[List[str]] = None
-
-    def process_href_info(self):
-        """Fills in metadata fields with values extracted from the asset's file path or href.
-        We receive the values as a dictionary, from the InputPathParser.
-
-        TODO: Generalize process_href_info, so the data can come from any source, not only from hrefs/paths.
-            Rationale:
-            - Essentially process_href_info only fills in a known set of fields, copying data from
-                a dict that we extracted from any source we want.
-            - Where we get the dictionary does not matter, as long as we can provide that information somehow.
-            - This set of fields are things we that AssetMetadata can not automatically derive.
-                They have to be received from the source data, but we support more than one source.
-                Currently we have two sources: OpenSearch and GeoTIFF files.
-                Likely, netCDF will  next.
-            - We don't have to keep this method, just the principle that we get a set of key-value pairs
-                from something that processes source data, and have a more standardized mechanism
-                to update the AssetMetadata object with that data.
-        """
-        href_info = self._extract_href_info.parse(self.href)
-        self._info_from_href = href_info
-        for key, value in href_info.items():
-            # Ignore keys that do not match any attribute that should come from the href.
-            if key in self.PROPS_FROM_HREFS:
-                setattr(self, key, value)
-
-    @property
-    def version(self) -> str:
-        # TODO: make name more specific: check what this version is about (STAC version most likely)
-        return "1.0.0"
-
-    @property
-    def href(self) -> Optional[str]:
-        return self._href
-
-    @href.setter
-    def href(self, value: str) -> None:
-        self._href = str(value)
-
-    @property
-    def original_href(self) -> Optional[str]:
-        return self._original_href
-
-    @original_href.setter
-    def original_href(self, value: str) -> None:
-        self._original_href = str(value)
-
-    @property
-    def asset_path(self) -> Optional[Path]:
-        return self._asset_path
-
-    @asset_path.setter
-    def asset_path(self, value: Union[Path, str]) -> None:
-        self._asset_path = Path(value) if value else None
-
-    @property
-    def asset_id(self) -> Optional[str]:
-        return self._asset_id
-
-    @asset_id.setter
-    def asset_id(self, value: str) -> None:
-        self._asset_id = value
-
-    @property
-    def item_id(self) -> Optional[str]:
-        return self._item_id
-
-    @item_id.setter
-    def item_id(self, value: str) -> None:
-        self._item_id = value
-
-    @property
-    def asset_type(self) -> Optional[str]:
-        return self._asset_type
-
-    @asset_type.setter
-    def asset_type(self, value: str) -> None:
-        self._asset_type = value
-
-    @property
-    def bbox_lat_lon(self) -> Optional[BoundingBox]:
-        return self._bbox_lat_lon
-
-    @bbox_lat_lon.setter
-    def bbox_lat_lon(self, bbox: BoundingBox) -> None:
-        self._bbox_lat_lon = bbox
+            self.bbox_projected = BoundingBox.from_list(self.geometry_proj.bounds, epsg=self.proj_epsg)
+        elif self.geometry_proj:
+            self.bbox_projected = BoundingBox.from_list(self.geometry_proj.bounds, epsg=self.proj_epsg)
+            self._ensure_geoms()
+        elif self.geometry_lat_lon:
+            self.bbox_lat_lon = BoundingBox.from_list(self.geometry_lat_lon.bounds, epsg=4326)
+            self._ensure_geoms()
+        else:
+            raise ValueError(
+                "At least one of bbox_lat_lon, bbox_projected, geometry_lat_lon, or geometry_proj must be set."
+            )
 
     @property
     def bbox_as_list(self) -> Optional[List[float]]:
-        if not self._bbox_lat_lon:
+        """Return the WGS84 bounding box as a list [min_x, min_y, max_x, max_y]."""
+        if not self.bbox_lat_lon:
             return None
-        return self._bbox_lat_lon.to_list()
-
-    @property
-    def bbox_projected(self) -> Optional[BoundingBox]:
-        return self._bbox_projected
-
-    @bbox_projected.setter
-    def bbox_projected(self, bbox: BoundingBox) -> None:
-        self._bbox_projected = bbox
-        if bbox and bbox.epsg:
-            self._proj_epsg = bbox.epsg
+        return self.bbox_lat_lon.to_list()
 
     @property
     def proj_bbox_as_list(self) -> Optional[List[float]]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        """Return the projected bounding box as a list [min_x, min_y, max_x, max_y]."""
+        if not self.bbox_projected:
             return None
-        return self._bbox_projected.to_list()
-
-    @property
-    def proj_epsg(self) -> Optional[int]:
-        return self._proj_epsg
-
-    @proj_epsg.setter
-    def proj_epsg(self, value: Optional[int]) -> None:
-        if not isinstance(value, (int, NoneType)):
-            raise TypeError("Value of proj_epsg must be an Integer or None." + f"{type(value)=}, {value=}")
-        self._proj_epsg = value
-
-    @property
-    def geometry_lat_lon(self) -> Polygon:
-        # If a value was not set explicitly, then derive it from
-        # bbox_lat_lon, if possible.
-        if not self._geometry_lat_lon and self._bbox_lat_lon:
-            self._geometry_lat_lon = self._bbox_lat_lon.as_polygon()
-        return self._geometry_lat_lon
-
-    @geometry_lat_lon.setter
-    def geometry_lat_lon(self, geometry: Polygon):
-        if not isinstance(geometry, (Polygon, MultiPolygon, NoneType)):
-            raise TypeError(
-                "geometry must be of type shapely.geometry.Polygon, shapely.geometry.MultiPolygon or else be None "
-                + f"but the type is {type(geometry)}, {geometry=}"
-            )
-        self._geometry_lat_lon = geometry
+        return self.bbox_projected.to_list()
 
     @property
     def geometry_lat_lon_as_dict(self) -> Optional[Dict[str, Any]]:
-        # TODO: [decide] convert this RO property to a method or not?
+        """Return the WGS84 geometry as a GeoJSON-like dictionary."""
         if not self.geometry_lat_lon:
             return None
         return mapping(self.geometry_lat_lon)
-    
-    @property
-    def geometry_proj(self) -> Optional[Polygon]:
-        return self._bbox_projected.as_polygon()
 
     @property
     def geometry_proj_as_dict(self) -> Optional[Dict[str, Any]]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        """Return the projected geometry as a GeoJSON-like dictionary."""
+        if not self.bbox_projected:
             return None
         return mapping(self.geometry_proj)
-    
+
     @property
     def proj_geometry_as_wkt(self) -> Optional[str]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        """Return the projected geometry as Well-Known Text (WKT) string."""
+        if not self.bbox_projected:
             return None
-        return self._bbox_projected.as_wkt()
+        return self.bbox_projected.as_wkt()
 
     @property
     def proj_bbox_as_polygon(self) -> Optional[Polygon]:
-        # TODO: [decide] convert this RO property to a method or not?
-        if not self._bbox_projected:
+        """Return the projected bounding box as a Shapely Polygon."""
+        if not self.bbox_projected:
             return None
-        return self._bbox_projected.as_polygon()
-
-    @property
-    def datetime(self) -> Optional[dt.datetime]:
-        return self._datetime
-
-    @datetime.setter
-    def datetime(self, value) -> None:
-        self._datetime = self.check_datetime(value)
-
-    @classmethod
-    def check_datetime(cls, value) -> dt.datetime:
-        if isinstance(value, dt.datetime):
-            return value
-
-        if isinstance(value, dt.date):
-            return cls.convert_date_to_datetime(value)
-
-        if isinstance(value, str):
-            # if not value.endswith("Z") and not "+" in value:
-            #     converted_value = value + "Z"
-            # else:
-            #     converted_value = value
-            converted_value = dateutil.parser.parse(value)
-            if not isinstance(converted_value, dt.datetime):
-                return cls.convert_date_to_datetime(converted_value)
-            else:
-                return converted_value
-
-        raise TypeError(f"Can not convert this time to datetime: type={type(value)}, {value=}")
-
-    @staticmethod
-    def convert_date_to_datetime(value: dt.date) -> dt.datetime:
-        return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)
-
-    @property
-    def start_datetime(self) -> Optional[dt.datetime]:
-        return self._start_datetime
-
-    @start_datetime.setter
-    def start_datetime(self, value: dt.datetime) -> None:
-        self._start_datetime = self.check_datetime(value)
-
-    @property
-    def end_datetime(self) -> Optional[dt.datetime]:
-        return self._end_datetime
-
-    @end_datetime.setter
-    def end_datetime(self, value: dt.datetime) -> None:
-        self._end_datetime = self.check_datetime(value)
+        return self.bbox_projected.as_polygon()
 
     @property
     def year(self) -> Optional[int]:
-        if not self._datetime:
+        """Extract the year from the datetime field."""
+        if not self.datetime:
             return None
-        return self._datetime.year
+        return self.datetime.year
 
     @property
     def month(self) -> Optional[int]:
-        if not self._datetime:
+        """Extract the month from the datetime field."""
+        if not self.datetime:
             return None
-        return self._datetime.month
+        return self.datetime.month
 
     @property
     def day(self) -> Optional[int]:
-        if not self._datetime:
+        """Extract the day from the datetime field."""
+        if not self.datetime:
             return None
-        return self._datetime.day
+        return self.datetime.day
 
     def to_dict(self, include_internal=False) -> Dict[str, Any]:
         """Convert to a dictionary for troubleshooting (output) or for other processing.
@@ -448,12 +308,9 @@ class AssetMetadata:
         data = {
             "asset_id": self.asset_id,
             "item_id": self.item_id,
-            "collection_id": self.collection_id,
             "tile_id": self.tile_id,
-            "title": self.title,
             "href": self.href,
             "original_href": self.original_href,
-            "item_href": self.item_href,
             "asset_path": self.asset_path,
             "asset_type": self.asset_type,
             "media_type": self.media_type,
@@ -466,8 +323,8 @@ class AssetMetadata:
             "bbox_projected": self.bbox_projected.to_dict() if self.bbox_projected else None,
             "transform": self.transform,
             "geometry_lat_lon": self.geometry_lat_lon,
-            "raster_metadata": self.raster_metadata.to_dict() if self.raster_metadata else None,
             "file_size": self.file_size,
+            "bands": [band.to_dict() for band in self.bands],
         }
         # Include internal information for debugging.
         if include_internal:
@@ -484,18 +341,26 @@ class AssetMetadata:
         media_type_map = {mt.value: mt for mt in MediaType}
         return media_type_map.get(mime_string)
 
+    def update_from_dict(self, data: Dict[str, Any]) -> None:
+        """Update the metadata from a dictionary."""
+        for key, value in data.items():
+            if key in self.PROPS_FROM_HREFS:
+                setattr(self, key, value)
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AssetMetadata":
+        """Create an AssetMetadata instance from a dictionary.
+
+        :param data: Dictionary containing asset metadata fields.
+        :return: AssetMetadata instance populated with the dictionary data.
+        """
         metadata = AssetMetadata()
         metadata.asset_id = cls.__get_str_from_dict("asset_id", data)
         metadata.item_id = cls.__get_str_from_dict("item_id", data)
-        metadata.collection_id = cls.__get_str_from_dict("collection_id", data)
         metadata.tile_id = cls.__get_str_from_dict("tile_id", data)
-        metadata.title = cls.__get_str_from_dict("title", data)
 
         metadata.href = cls.__get_str_from_dict("href", data)
         metadata.original_href = cls.__get_str_from_dict("original_href", data)
-        metadata.item_href = cls.__get_str_from_dict("item_href", data)
         metadata.asset_path = cls.__as_type_from_dict("asset_path", Path, data)
 
         metadata.asset_type = cls.__get_str_from_dict("asset_type", data)
@@ -511,17 +376,7 @@ class AssetMetadata:
         metadata.shape = data.get("shape")
         metadata.tags = data.get("tags")
 
-        bbox_dict = data.get("bbox_lat_lon")
-        if bbox_dict:
-            bbox = BoundingBox.from_dict(bbox_dict)
-            assert bbox.epsg in (4326, None)
-            metadata.bbox_lat_lon = bbox
-        else:
-            metadata.bbox_lat_lon = None
-
         metadata.transform = data.get("transform")
-
-        metadata.geometry_lat_lon = data.get("geometry_lat_lon") or data.get("geometry")
 
         proj_bbox_dict = data.get("bbox_projected")
         if proj_bbox_dict:
@@ -530,12 +385,15 @@ class AssetMetadata:
         else:
             metadata.bbox_projected = None
 
-        metadata.raster_metadata = data.get("raster_metadata")
-
         return metadata
 
     @classmethod
     def from_geoseries(cls, series: gpd.GeoSeries) -> "AssetMetadata":
+        """Create an AssetMetadata instance from a GeoPandas GeoSeries.
+
+        :param series: GeoPandas GeoSeries containing asset metadata.
+        :return: AssetMetadata instance populated with the series data.
+        """
         # Delegate the conversion to `from_dict` for consistency.
         return cls.from_dict(series.to_dict())
 
@@ -564,28 +422,24 @@ class AssetMetadata:
 
         return all(
             [
-                self._asset_id == other._asset_id,
-                self._item_id == other._item_id,
-                self._href == other._href,
-                self._original_href == other._original_href,
-                self._asset_path == other._asset_path,
-                self._asset_type == other._asset_type,
-                self._datetime == other._datetime,
-                self._start_datetime == other._start_datetime,
-                self._end_datetime == other._end_datetime,
-                self._bbox_lat_lon == other._bbox_lat_lon,
-                self._bbox_projected == other._bbox_projected,
-                self._proj_epsg == other._proj_epsg,
-                self._geometry_lat_lon == other._geometry_lat_lon,
+                self.asset_id == other.asset_id,
+                self.item_id == other.item_id,
+                self.href == other.href,
+                self.original_href == other.original_href,
+                self.asset_path == other.asset_path,
+                self.asset_type == other.asset_type,
+                self.datetime == other.datetime,
+                self.start_datetime == other.start_datetime,
+                self.end_datetime == other.end_datetime,
+                self.bbox_lat_lon == other.bbox_lat_lon,
+                self.bbox_projected == other.bbox_projected,
+                self.proj_epsg == other.proj_epsg,
+                self.geometry_lat_lon == other.geometry_lat_lon,
                 self.transform == other.transform,
                 self.shape == other.shape,
                 self.file_size == other.file_size,
                 self.tags == other.tags,
-                self.raster_metadata == other.raster_metadata,
-                self.title == other.title,
-                self.collection_id == other.collection_id,
                 self.tile_id == other.tile_id,
-                self.item_href == other.item_href,
                 self.media_type == other.media_type,
             ]
         )
@@ -594,27 +448,33 @@ class AssetMetadata:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id > other._asset_id
+        return self.asset_id > other.asset_id
 
     def __ge__(self, other) -> bool:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id >= other._asset_id
+        return self.asset_id >= other.asset_id
 
     def __lt__(self, other) -> bool:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id < other._asset_id
+        return self.asset_id < other.asset_id
 
     def __le__(self, other) -> bool:
         # for sorting support
         if other is self:
             return True
-        return self._asset_id <= other._asset_id
+        return self.asset_id <= other.asset_id
 
-    def get_differences(self, other) -> Dict[str, Any]:
+    def get_differences(self, other: "AssetMetadata") -> Dict[str, Any]:
+        """Compare this AssetMetadata with another and return the differences.
+
+        :param other: Another AssetMetadata instance to compare against.
+        :return: Dictionary where keys are field names and values are tuples of
+                 (self_value, other_value) for fields that differ.
+        """
         if other is self:
             return {}
 
@@ -628,123 +488,40 @@ class AssetMetadata:
         return differences
 
 
-class GeodataframeExporter:
-    """Utility class to export metadata and STAC items as geopandas GeoDataframes.
+def check_datetime(value) -> dt.datetime:
+    """Convert various datetime representations to a timezone-aware datetime object.
 
-    TODO: This is currently a class with only static methods, perhaps a module would be beter.
+    :param value: Input value that can be a datetime, date, or string representation.
+    :return: A timezone-aware datetime object (assumes UTC if no timezone provided).
+    :raises TypeError: If the value cannot be converted to a datetime.
     """
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is None:
+            # If the datetime has no timezone, assume it is UTC.
+            value = value.replace(tzinfo=dt.UTC)
+        return value
 
-    @classmethod
-    def stac_items_to_geodataframe(cls, stac_item_list: List[Item]) -> gpd.GeoDataFrame:
-        if not stac_item_list:
-            raise InvalidOperation("stac_item_list is empty or None. Can not create a GeoDataFrame")
+    if isinstance(value, dt.date):
+        return convert_date_to_datetime(value)
 
-        if not isinstance(stac_item_list, list):
-            stac_item_list = list(stac_item_list)
+    if isinstance(value, str):
+        # if not value.endswith("Z") and not "+" in value:
+        #     converted_value = value + "Z"
+        # else:
+        #     converted_value = value
+        converted_value = dateutil.parser.parse(value)
+        if not isinstance(converted_value, dt.datetime):
+            return convert_date_to_datetime(converted_value)
+        else:
+            return converted_value
 
-        epsg = stac_item_list[0].properties.get("proj:epsg", 4326)
-        records = cls.convert_dict_records_to_strings(i.to_dict() for i in stac_item_list)
-        # TODO: limit the number of fields to what we need to see. Something like the code below.
-        #
-        # Not working yet, coming back to this but it is not a priority.
-        #
-        # it: Item
-        # records = cls.convert_records_to_strings(
-        #     (it.id, it.collection_id, it.bbox, it.datetime) for it in stac_item_list
-        # )
-        shapes = [shape(item.geometry) for item in stac_item_list]
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=shapes)
+    raise TypeError(f"Can not convert this time to datetime: type={type(value)}, {value=}")
 
-    @staticmethod
-    def stac_items_to_dataframe(stac_item_list: List[Item]) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the STAC Items, without the geometry."""
-        return pd.DataFrame.from_records(md.to_dict() for md in stac_item_list)
 
-    @classmethod
-    def metadata_to_geodataframe(cls, metadata_list: List[AssetMetadata]) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame representing the intermediate metadata."""
-        if not metadata_list:
-            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
+def convert_date_to_datetime(value: dt.date) -> dt.datetime:
+    """Convert a date object to a datetime object at midnight UTC.
 
-        epsg = metadata_list[0].proj_epsg
-        geoms = [m.proj_bbox_as_polygon for m in metadata_list]
-        records = cls.convert_dict_records_to_strings(m.to_dict() for m in metadata_list)
-
-        return gpd.GeoDataFrame(records, crs=epsg, geometry=geoms)
-
-    @staticmethod
-    def metadata_to_dataframe(metadata_list: List[AssetMetadata]) -> pd.DataFrame:
-        """Return a pandas DataFrame representing the intermediate metadata, without the geometry."""
-        if not metadata_list:
-            raise InvalidOperation("Metadata_list is empty or None. Can not create a GeoDataFrame")
-
-        return pd.DataFrame.from_records(md.to_dict() for md in metadata_list)
-
-    @staticmethod
-    def convert_dict_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        out_records = [dict(rec) for rec in records]
-        for rec in out_records:
-            for key, val in rec.items():
-                if isinstance(val, dt.datetime):
-                    rec[key] = val.isoformat()
-                elif isinstance(val, list):
-                    rec[key] = json.dumps(val)
-                elif isinstance(val, (int, float, bool, str)):
-                    rec[key] = val
-                else:
-                    rec[key] = str(val)
-        return out_records
-
-    @staticmethod
-    def convert_records_to_strings(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        temp_records = list(records)
-        out_records = []
-
-        for record in temp_records:
-            convert_record = []
-            for column in record:
-                if isinstance(column, dt.datetime):
-                    convert_record.append(column.isoformat())
-                elif isinstance(column, list):
-                    convert_record.append(json.dumps(column))
-                elif isinstance(column, (int, float, bool, str)):
-                    convert_record.append(column)
-                else:
-                    convert_record.append(str(column))
-            out_records.append(convert_record)
-        return out_records
-
-    @staticmethod
-    def save_geodataframe(gdf: gpd.GeoDataFrame, out_dir: Path, table_name: str) -> None:
-        shp_dir = out_dir / "shp"
-        if not shp_dir.exists():
-            shp_dir.mkdir(parents=True)
-
-        csv_path = out_dir / f"{table_name}.pipe.csv"
-        shapefile_path = out_dir / f"shp/{table_name}.shp"
-        parquet_path = out_dir / f"{table_name}.parquet"
-
-        print(f"Saving pipe-separated CSV file to: {csv_path}")
-        gdf.to_csv(csv_path, sep="|")
-
-        # TODO: Shapefile has too many problems with unsupported column types. Going to remove it (but in a separate branch/PR).
-        print(f"Saving shapefile to: {shapefile_path }")
-        gdf.to_file(shapefile_path)
-
-        print(f"Saving geoparquet to: {parquet_path}")
-        gdf.to_parquet(parquet_path)
-
-    @staticmethod
-    def visualization_dir(collection: Collection):
-        collection_path = Path(collection.self_href)
-        return collection_path.parent / "tmp" / "visualization" / collection.id
-
-    @classmethod
-    def export_item_bboxes(cls, collection: Collection):
-        out_dir: Path = cls.visualization_dir(collection)
-        if not out_dir.exists():
-            out_dir.mkdir(parents=True)
-
-        items = collection.get_all_items()
-        gdf: gpd.GeoDataFrame = cls.stac_items_to_geodataframe(items)
-        cls.save_geodataframe(gdf, out_dir, "stac_item_bboxes")
+    :param value: A date object to convert.
+    :return: A datetime object representing midnight on the given date in UTC.
+    """
+    return dt.datetime(value.year, value.month, value.day, 0, 0, 0, tzinfo=dt.UTC)
