@@ -19,7 +19,6 @@ tiffs_glob = "*/*/2020/*_MAP.tif"
 output_path = Path(__file__).parent.resolve() / "results"
 test_output_path = output_path / "test" / catalog_version
 publish_output_path = output_path / "publish" / catalog_version
-overwrite = True
 
 
 # list input files
@@ -55,12 +54,12 @@ def item_postprocessor(item: pystac.Item) -> pystac.Item:
             "openIdConnectUrl": "https://sso.terrascope.be/auth/realms/terrascope/.well-known/openid-configuration",
         }
     }
-    item.stac_extensions[2] = "https://stac-extensions.github.io/authentication/v1.1.0/schema.json"
+    item.stac_extensions.append("https://stac-extensions.github.io/authentication/v1.1.0/schema.json")
 
     item.assets["MAP"].extra_fields["auth:refs"] = ["oidc"]
 
     item.assets["MAP"].extra_fields["alternate"] = {"local": {"href": "file://" + item.assets["MAP"].href}}
-    item.stac_extensions[4] = "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
+    item.stac_extensions.append("https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json")
     item.assets["MAP"].href = "https://services.terrascope.be/download/" + item.assets["MAP"].href[11:]
 
     return item
@@ -87,12 +86,11 @@ build_collection(
     glob=tiffs_glob,
     input_dir=tiff_input_path,
     output_dir=test_output_path,
-    overwrite=overwrite,
     link_items=False,
     item_postprocessor=item_postprocessor,
 )
 
 # validate collection
 validate_collection(
-    collection_file=test_output_path / "collection.json",
+    collection_file=test_output_path / ".." / "collection.json",
 )
