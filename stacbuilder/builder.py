@@ -15,6 +15,7 @@ from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional
 
 # Third party libraries
 import deprecated
+from pyproj import CRS
 from pystac import (
     Asset,
     CatalogType,
@@ -25,6 +26,12 @@ from pystac import (
     TemporalExtent,
 )
 from pystac.errors import STACValidationError
+from pystac.extensions.datacube import (
+    AdditionalDimension,
+    DatacubeExtension,
+    SpatialDimension,
+    TemporalDimension,
+)
 from pystac.extensions.eo import EOExtension
 from pystac.extensions.file import FileExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
@@ -360,6 +367,9 @@ class CollectionBuilder:
 
         self._extent: Optional[Extent] = None
 
+        self._epsg: Optional[int] = None
+        self._step: Optional[float] = None
+
     def reset(self):
         self._collection = None
 
@@ -413,6 +423,12 @@ class CollectionBuilder:
 
         item_counter = 0
         for item in stac_items:
+            if self._collection_config.enable_datacube_extension:
+                # Check that all items have the same EPSG code and step size if datacube extension is enabled.
+                # If not break the loop as soon as possible.
+                self._check_unique_epsg(item.properties.get("proj:epsg"))
+                self._check_unique_step(item.properties.get("proj:transform", [None])[0])
+
             self._process_item(item=item)
             item_counter += 1
             if item_counter % 1000 == 0:
@@ -428,6 +444,9 @@ class CollectionBuilder:
             self._collection.extent = self._extent
 
         self.normalize_hrefs()
+
+        if self._collection_config.enable_datacube_extension:
+            self._add_datacube_extension()
 
         if save_collection:
             self.save_collection()
@@ -461,6 +480,51 @@ class CollectionBuilder:
                 item_path.parent.mkdir(parents=True)
             item.save_object(dest_href=item_path.as_posix(), include_self_link=False)
             self._update_extent_from_item(item)
+
+    def _check_unique_epsg(self, epsg: int) -> None:
+        """Check that all items have the same EPSG code."""
+        if self._epsg is None:
+            self._epsg = epsg
+        elif self._epsg != epsg:
+            raise ValueError(
+                f"All items in the collection must have the same EPSG code when datacube extension is enabled. Found both {self._epsg} and {epsg}."
+            )
+
+    def _check_unique_step(self, step: float) -> None:
+        """Check that all items have the same pixel size (step)."""
+        if self._step is None:
+            self._step = step
+        elif self._step != step:
+            raise ValueError(
+                f"All items in the collection must have the same pixel size (step) when datacube extension is enabled. Found both {self._step} and {step}."
+            )
+
+    def _add_datacube_extension(self) -> None:
+        """Add the datacube extension to the collection."""
+
+        if self._collection is None:
+            raise InvalidOperation("Collection is not created yet. Cannot add datacube extension.")
+
+        if self._epsg is None or self._step is None:
+            raise InvalidOperation("Cannot add datacube extension without EPSG and step size being set.")
+
+        x_extent = [self._extent.spatial.bboxes[0][0], self._extent.spatial.bboxes[0][2]]
+        y_extent = [self._extent.spatial.bboxes[0][1], self._extent.spatial.bboxes[0][3]]
+        temporal_extent = [self._extent.temporal.intervals[0][0], self._extent.temporal.intervals[0][1]]
+
+        x_dimension = SpatialDimension(
+            properties={"extent": x_extent, "reference_system": CRS.from_epsg(self._epsg).to_json(), "step": self._step}
+        )
+        y_dimension = SpatialDimension(
+            properties={"extent": y_extent, "reference_system": CRS.from_epsg(self._epsg).to_json(), "step": self._step}
+        )
+        t_dimension = TemporalDimension(properties={"extent": temporal_extent})
+        band_dimension = AdditionalDimension(
+            properties={"type": "bands", "values": list(self._collection_config.item_assets.keys())}
+        )
+
+        datacube_ext = DatacubeExtension.ext(self._collection, add_if_missing=True)
+        datacube_ext.dimensions = {"x": x_dimension, "y": y_dimension, "t": t_dimension, "bands": band_dimension}
 
     def _update_extent_from_item(self, item: Item):
         """Update the extent of the collection based on the item."""

@@ -302,6 +302,9 @@ class CollectionConfig(BaseModel):
     asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
 
+    # Indicates whether to add the datacube extension to the collection.
+    enable_datacube_extension: Optional[bool] = False
+
     @classmethod
     def from_json_str(cls, json_str: str) -> "CollectionConfig":
         return CollectionConfig.model_validate_json(json_str)
