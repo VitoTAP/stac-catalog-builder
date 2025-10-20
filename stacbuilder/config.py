@@ -34,7 +34,7 @@ class ProviderModel(BaseModel):
     url: Optional[HttpUrl] = None
 
     def to_provider(self) -> Provider:
-        return Provider(name=self.name, url=self.url.unicode_string(), roles=list(self.roles))
+        return Provider(name=self.name, url=self.url.unicode_string() if self.url else None, roles=list(self.roles))
 
 
 class InputPathParserConfig(BaseModel):

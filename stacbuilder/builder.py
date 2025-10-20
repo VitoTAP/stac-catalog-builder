@@ -23,12 +23,13 @@ from pystac import (
     Item,
     SpatialExtent,
     TemporalExtent,
+    ItemAssetDefinition
 )
 from pystac.errors import STACValidationError
 from pystac.extensions.eo import EOExtension
 from pystac.extensions.file import FileExtension
 from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
-from pystac.extensions.projection import ItemProjectionExtension
+from pystac.extensions.projection import ItemProjectionExtension, ProjectionExtension
 from pystac.extensions.raster import RasterBand, RasterExtension
 from pystac.layout import TemplateLayoutStrategy
 
@@ -360,6 +361,9 @@ class CollectionBuilder:
 
         self._extent: Optional[Extent] = None
 
+        self._item_assets = {}
+        self._item_assets_counter = {}
+
     def reset(self):
         self._collection = None
 
@@ -418,6 +422,24 @@ class CollectionBuilder:
             if item_counter % 1000 == 0:
                 self._log_progress_message(f"Processed {item_counter} items so far.")
 
+        for name,count in self._item_assets_counter.items():
+            if count == 1:
+                _logger.warning(f"Asset '{name}' is only present in one item.")
+                self._item_assets.pop(name)
+                continue
+            elif count < item_counter:
+                _logger.warning(f"Asset '{name}' is only present in {count} out of {item_counter} items.")
+            predefined_item_asset = self._collection.item_assets.get(name,None)
+
+            #give precedence to the predefined item asset in the collection config
+            item_asset_dict = self._item_assets[name].to_dict()
+            if predefined_item_asset is not None:
+                item_asset_dict.update(predefined_item_asset.to_dict())
+
+            self._item_assets[name] = ItemAssetDefinition(properties=item_asset_dict, owner=self._collection)
+        self._collection.item_assets = self._item_assets
+
+
         if self.link_items:
             self._log_progress_message("updating collection extent")
             self._collection.update_extent_from_items()
@@ -436,6 +458,28 @@ class CollectionBuilder:
 
         return self.collection
 
+    @classmethod
+    def intersect_dicts(cls,dict1, dict2):
+        """
+        Recursively intersect two dictionaries, retaining keys that have equal values.
+
+        :param dict1: The first dictionary.
+        :param dict2: The second dictionary.
+        :return: A dictionary containing only the intersecting keys with equal values.
+        """
+        result = {}
+        for key in dict1:
+            if key in dict2:
+                if isinstance(dict1[key], dict) and isinstance(dict2[key], dict):
+                    # Recursively intersect nested dictionaries
+                    nested_result = cls.intersect_dicts(dict1[key], dict2[key])
+                    if nested_result:  # Only add if the nested result is not empty
+                        result[key] = nested_result
+                elif dict1[key] == dict2[key]:
+                    # Retain the key-value pair if values are equal
+                    result[key] = dict1[key]
+        return result
+
     def _process_item(
         self,
         item: Item,
@@ -450,6 +494,19 @@ class CollectionBuilder:
             raise ValueError("Argument 'stac_items' can not be None. It must be a list of STAC Items.")
         if not isinstance(item, Item):
             raise TypeError(f"Argument 'stac_items' should be of type Item, got {type(item)}")
+
+        for name, asset in item.assets.items():
+            if name not in self._item_assets:
+                copy = asset.clone()
+                copy.href = None
+                self._item_assets[name] = copy
+                self._item_assets_counter[name] = 1
+            else:
+                item_asset = self._item_assets[name].to_dict()
+                asset_dict = asset.to_dict()
+                merged_asset = self.intersect_dicts(item_asset,asset_dict)
+                self._item_assets[name] = ItemAssetDefinition(merged_asset)
+                self._item_assets_counter[name] = 1 + self._item_assets_counter[name]
 
         if self.link_items:
             self._collection.add_item(item)
@@ -532,7 +589,7 @@ class CollectionBuilder:
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
 
-        self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
+        self._collection.save(catalog_type=CatalogType.SELF_CONTAINED, dest_href=str(self.output_dir ))
         self._log_progress_message("DONE: Saving collection.")
 
     @property
