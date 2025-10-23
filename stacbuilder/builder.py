@@ -49,6 +49,7 @@ from stacbuilder.config import (
 # Modules from this project
 from stacbuilder.exceptions import InvalidConfiguration, InvalidOperation
 from stacbuilder.metadata import AssetMetadata, BandMetadata
+from stacbuilder.projections import reproject_bounding_box
 
 ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
 
@@ -501,6 +502,7 @@ class CollectionBuilder:
 
     def _add_datacube_extension(self) -> None:
         """Add the datacube extension to the collection."""
+        self._log_progress_message("START: add_datacube_extension")
 
         if self._collection is None:
             raise InvalidOperation("Collection is not created yet. Cannot add datacube extension.")
@@ -508,9 +510,16 @@ class CollectionBuilder:
         if self._epsg is None or self._step is None:
             raise InvalidOperation("Cannot add datacube extension without EPSG and step size being set.")
 
-        x_extent = [self._extent.spatial.bboxes[0][0], self._extent.spatial.bboxes[0][2]]
-        y_extent = [self._extent.spatial.bboxes[0][1], self._extent.spatial.bboxes[0][3]]
-        temporal_extent = [self._extent.temporal.intervals[0][0], self._extent.temporal.intervals[0][1]]
+        # Spatial extents in the datacube extension must be in the native CRS of the assets.
+        native_crs_bounding_box = reproject_bounding_box(
+            *self._extent.spatial.bboxes[0],
+            from_crs=4326,
+            to_crs=self._epsg
+        )
+
+        x_extent = [native_crs_bounding_box[0], native_crs_bounding_box[2]]
+        y_extent = [native_crs_bounding_box[1], native_crs_bounding_box[3]]
+        temporal_extent = [self._extent.temporal.intervals[0][0].isoformat(), self._extent.temporal.intervals[0][1].isoformat()]
 
         x_dimension = SpatialDimension(
             properties={"extent": x_extent, "reference_system": CRS.from_epsg(self._epsg).to_json(), "step": self._step}
@@ -519,12 +528,14 @@ class CollectionBuilder:
             properties={"extent": y_extent, "reference_system": CRS.from_epsg(self._epsg).to_json(), "step": self._step}
         )
         t_dimension = TemporalDimension(properties={"extent": temporal_extent})
-        band_dimension = AdditionalDimension(
+        bands_dimension = AdditionalDimension(
             properties={"type": "bands", "values": list(self._collection_config.item_assets.keys())}
         )
 
         datacube_ext = DatacubeExtension.ext(self._collection, add_if_missing=True)
-        datacube_ext.dimensions = {"x": x_dimension, "y": y_dimension, "t": t_dimension, "bands": band_dimension}
+        datacube_ext.dimensions = {"x": x_dimension, "y": y_dimension, "t": t_dimension, "bands": bands_dimension}
+
+        self._log_progress_message("DONE: add_datacube_extension")
 
     def _update_extent_from_item(self, item: Item):
         """Update the extent of the collection based on the item."""
