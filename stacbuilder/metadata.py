@@ -331,7 +331,7 @@ class AssetMetadata(BaseModel):
             "href": self.href,
             "original_href": self.original_href,
             # Path -> str
-            "asset_path": str(self.asset_path) if self.asset_path is not None else None,
+            "asset_path": str(self.asset_path.as_posix()) if self.asset_path is not None else None,
             "asset_type": self.asset_type,
             # Enum -> value (string) for parquet friendliness
             "media_type": self.media_type.value if self.media_type else None,
