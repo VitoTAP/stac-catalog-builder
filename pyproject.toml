@@ -42,6 +42,7 @@ dependencies = [
   "universal_pathlib",
   "ipykernel>=6.29.5",
   "rio-cogeo>=5.4.2",
+  "uv>=0.8.22",
 ]
 
 [dependency-groups]

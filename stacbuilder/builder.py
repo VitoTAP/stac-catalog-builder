@@ -12,11 +12,10 @@ from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional, Tuple
-import psutil
-
 
 # Third party libraries
 import deprecated
+import psutil
 from pystac import (
     Asset,
     CatalogType,
@@ -34,6 +33,7 @@ from pystac.extensions.projection import ItemProjectionExtension
 from pystac.extensions.raster import RasterBand, RasterExtension
 from pystac.layout import TemplateLayoutStrategy
 
+from stacbuilder.async_utils import AsyncTaskPoolMixin
 from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import (
     AlternateHrefConfig,
@@ -286,11 +286,12 @@ class ItemBuilder:
         :param metadata: The metadata containing the band information.
         :param asset_config: The asset configuration containing the band information.
         """
+        asset_raster = RasterExtension.ext(asset, add_if_missing=True)
+
         # Case 1: If the asset configuration does not specify raster bands, we create them based on the metadata.
         if not asset_config.raster_bands:
             # There is no information to fill in default values for raster:bands
             # Just fill in what we do have from asset metadata.
-            asset_raster = RasterExtension.ext(asset, add_if_missing=True)
             raster_bands = []
             for band_md in metadata.bands:
                 new_band: RasterBand = RasterBand.create(
@@ -302,22 +303,31 @@ class ItemBuilder:
             asset_raster.apply(raster_bands)
         # Case 2: If the asset configuration specifies raster bands, we fill in the missing values from the metadata.
         else:
-            raster_bands: List[RasterBand] = asset.ext.raster.bands
-            assert len(raster_bands) == len(metadata.bands), (
-                f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
-                f"does not match the number of raster bands in asset config ({len(raster_bands)})"
-            )
-            for i, raster_band in enumerate(raster_bands):
-                band_md: BandMetadata = metadata.bands[i]
+            raster_bands: List[RasterBand] = asset_raster.bands
+            # assert len(raster_bands) == len(metadata.bands), (
+            #     f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
+            #     f"does not match the number of raster bands in asset config ({len(raster_bands)})"
+            # )
+            if len(raster_bands) == len(metadata.bands):
+                for i, raster_band in enumerate(raster_bands):
+                    band_md: BandMetadata = metadata.bands[i]
 
-                if not isinstance(raster_band, RasterBand):
-                    raise InvalidConfiguration(
-                        f"Expected raster band to be of type RasterBand, got {type(raster_band)}"
+                    if not isinstance(raster_band, RasterBand):
+                        raise InvalidConfiguration(
+                            f"Expected raster band to be of type RasterBand, got {type(raster_band)}"
+                        )
+                    raster_band.apply(
+                        data_type=raster_band.data_type or band_md.data_type,
+                        nodata=raster_band.nodata or band_md.nodata,
+                        unit=raster_band.unit or band_md.units,
                     )
-                raster_band.apply(
-                    data_type=raster_band.data_type or band_md.data_type,
-                    nodata=raster_band.nodata or band_md.nodata,
-                    unit=raster_band.unit or band_md.units,
+            elif len(metadata.bands) == 0:
+                # No band metadata available, skip filling in raster band details
+                pass
+            else:
+                raise InvalidConfiguration(
+                    f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
+                    f"does not match the number of raster bands in asset config ({len(raster_bands)})"
                 )
 
     def _get_assets_definitions(self) -> List[AssetDefinition]:
@@ -336,7 +346,7 @@ class ItemBuilder:
         return self.item_assets_configs[asset_type]
 
 
-class CollectionBuilder:
+class CollectionBuilder(AsyncTaskPoolMixin):
     """Class to build a STAC Collection from a list of STAC Items.
 
     Once initialized, you can use the `build_collection_from_items()` method to create a collection.
@@ -361,6 +371,8 @@ class CollectionBuilder:
         self._collection: Collection = None
 
         self._extent: Optional[Extent] = None
+        # Initialize async task pool (only used when link_items is False)
+        self._init_async_task_pool()
 
     def reset(self):
         self._collection = None
@@ -408,9 +420,9 @@ class CollectionBuilder:
 
         :param stac_items: An iterable of STAC Items to be added to the collection.
         :param group: Optional group identifier to create a collection with a different ID and title.
-        :param save_collection: If True, the collection will be saved to the output directory."""
+        :param save_collection: If True, the collection will be saved to the output directory.
+        :return: The created STAC Collection."""
         self.reset()
-
         self.create_empty_collection(group=group)
 
         item_counter = 0
@@ -419,6 +431,10 @@ class CollectionBuilder:
             item_counter += 1
             if item_counter % 1000 == 0:
                 self._log_progress_message(f"Processed {item_counter} items so far.")
+
+        if not self.link_items:
+            # Ensure asynchronous tasks complete
+            self._wait_for_tasks()
 
         if self.link_items:
             self._log_progress_message("updating collection extent")
@@ -435,7 +451,7 @@ class CollectionBuilder:
             self.save_collection()
 
         self._log_progress_message("DONE: build_collection")
-
+        gc.collect()
         return self.collection
 
     def _process_item(
@@ -443,8 +459,6 @@ class CollectionBuilder:
         item: Item,
     ):
         """Fills the collection with stac items."""
-        self._log_progress_message("START: add_items_to_collection")
-
         if self._collection is None:
             raise InvalidOperation("Can not add items to a collection that has not been created yet.")
 
@@ -456,13 +470,16 @@ class CollectionBuilder:
         if self.link_items:
             self._collection.add_item(item)
         else:
-            # If we do not link items, we save them to the output directory.
-            item.collection = self._collection
+            # Non-blocking save: update extent first, then submit async save.
+            # Items are not linked; they exist only as standalone JSON on disk.
+            item.collection = self._collection  # Needed so pystac can resolve relative links if required
             item_path = self.get_item_path(item)
             if not item_path.parent.exists():
                 item_path.parent.mkdir(parents=True)
-            item.save_object(dest_href=item_path.as_posix(), include_self_link=False)
             self._update_extent_from_item(item)
+            self._submit_async_task(
+                lambda it=item, p=item_path: it.save_object(dest_href=p.as_posix(), include_self_link=False)
+            )
 
     def _update_extent_from_item(self, item: Item):
         """Update the extent of the collection based on the item."""
@@ -718,7 +735,7 @@ class AssetMetadataPipeline:
         while groups:
             # Pop a group from the dictionary to process and immediately free its memory
             group_key, assets = groups.popitem()
-            
+
             if i % progress_chunk_size == 0:
                 fraction_done = i / num_groups
                 gc.collect()
@@ -726,7 +743,7 @@ class AssetMetadataPipeline:
                 self._log_progress_message(
                     f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%}) - Memory: {memory_mb:.1f} MB"
                 )
-                
+
             sub_groups = self._split_group_by_latlon(
                 assets
             )  # Ensure that all the assets have the same lat-lon bounding box
@@ -736,9 +753,9 @@ class AssetMetadataPipeline:
                     if self.item_postprocessor is not None:
                         stac_item = self.item_postprocessor(stac_item)
                     yield stac_item
-            
+
             i += 1
-        
+
         # groups is now empty, but del it anyway for clarity
         del groups
         self.metadata_collector.reset()

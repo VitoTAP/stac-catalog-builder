@@ -1927,6 +1927,7 @@ dependencies = [
     { name = "rio-stac" },
     { name = "shapely" },
     { name = "universal-pathlib" },
+    { name = "uv" },
     { name = "yarl" },
 ]
 
@@ -1968,6 +1969,7 @@ requires-dist = [
     { name = "rio-stac", specifier = "==0.10" },
     { name = "shapely", specifier = "==2.0.*" },
     { name = "universal-pathlib" },
+    { name = "uv", specifier = ">=0.8.22" },
     { name = "yarl", specifier = "==1.9.*" },
 ]
 

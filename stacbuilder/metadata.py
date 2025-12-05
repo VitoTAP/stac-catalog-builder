@@ -305,26 +305,57 @@ class AssetMetadata(BaseModel):
             Include internal information for debugging, defaults to False.
         :return: A dictionary that represents the same metadata.
         """
+
+        # IMPORTANT: Keep only parquet/arrow friendly primitive types in this dict.
+        # Complex objects (Path, Enum, numpy dtype, custom classes) are converted to str or
+        # a JSON-serialisable structure to avoid ArrowInvalid errors when persisting via pandas/geopandas.
+        def _serialise_band(band: BandMetadata) -> dict[str, Any]:
+            band_dict = band.to_dict()
+            # Convert numpy dtype to its name representation (e.g. 'uint16')
+            if isinstance(band_dict.get("data_type"), np.dtype):
+                band_dict["data_type"] = str(band_dict["data_type"].name)
+            else:
+                band_dict["data_type"] = str(band_dict.get("data_type"))
+            return band_dict
+
+        # Prepare tags (avoid empty struct -> ArrowNotImplementedError)
+        raw_tags = {str(k): (None if v is None else str(v)) for k, v in (self.tags or {}).items()}
+        tags_value = raw_tags if raw_tags else {}
+
+        bands_list = [_serialise_band(b) for b in self.bands]
+
         data = {
             "asset_id": self.asset_id,
             "item_id": self.item_id,
             "tile_id": self.tile_id,
             "href": self.href,
             "original_href": self.original_href,
-            "asset_path": self.asset_path,
+            # Path -> str
+            "asset_path": str(self.asset_path) if self.asset_path is not None else None,
             "asset_type": self.asset_type,
-            "media_type": self.media_type,
+            # Enum -> value (string) for parquet friendliness
+            "media_type": self.media_type.value if self.media_type else None,
+            # Datetimes remain as datetime objects (pyarrow handles these)
             "datetime": self.datetime,
             "start_datetime": self.start_datetime,
             "end_datetime": self.end_datetime,
+            # Projection
+            "proj_epsg": self.proj_epsg,
+            # Simple list[int]
             "shape": self.shape,
-            "tags": self.tags,
-            "bbox_lat_lon": self.bbox_lat_lon.to_dict() if self.bbox_lat_lon else None,
-            "bbox_projected": self.bbox_projected.to_dict() if self.bbox_projected else None,
+            # Tags: ensure it's a plain dict[str, str]
+            "tags": tags_value,
+            # Bounding boxes -> flat list to prevent nested struct issues (optional)
+            "bbox_lat_lon": self.bbox_lat_lon.to_list() if self.bbox_lat_lon else None,
+            "bbox_projected": self.bbox_projected.to_list() if self.bbox_projected else None,
+            # Affine transform list[float]
             "transform": self.transform,
+            # Geometry excluded here (geometry handled separately in GeoDataFrame);
+            # still include raw geometry for cases where caller explicitly wants it.
             "geometry_lat_lon": self.geometry_lat_lon,
             "file_size": self.file_size,
-            "bands": [band.to_dict() for band in self.bands],
+            # Bands -> list[dict]
+            "bands": bands_list,
         }
         # Include internal information for debugging.
         if include_internal:
@@ -354,38 +385,70 @@ class AssetMetadata(BaseModel):
         :param data: Dictionary containing asset metadata fields.
         :return: AssetMetadata instance populated with the dictionary data.
         """
-        metadata = AssetMetadata()
-        metadata.asset_id = cls.__get_str_from_dict("asset_id", data)
-        metadata.item_id = cls.__get_str_from_dict("item_id", data)
-        metadata.tile_id = cls.__get_str_from_dict("tile_id", data)
+        kwargs: Dict[str, Any] = {}
 
-        metadata.href = cls.__get_str_from_dict("href", data)
-        metadata.original_href = cls.__get_str_from_dict("original_href", data)
-        metadata.asset_path = cls.__as_type_from_dict("asset_path", Path, data)
+        # Simple string fields
+        kwargs["asset_id"] = cls.__get_str_from_dict("asset_id", data)
+        kwargs["item_id"] = cls.__get_str_from_dict("item_id", data)
+        kwargs["tile_id"] = cls.__get_str_from_dict("tile_id", data)
+        kwargs["href"] = cls.__get_str_from_dict("href", data)
+        kwargs["original_href"] = cls.__get_str_from_dict("original_href", data)
+        kwargs["asset_type"] = cls.__get_str_from_dict("asset_type", data)
 
-        metadata.asset_type = cls.__get_str_from_dict("asset_type", data)
-        metadata.file_size = cls.__as_type_from_dict("file_size", int, data)
+        # Paths / sizes
+        kwargs["asset_path"] = cls.__as_type_from_dict("asset_path", Path, data)
+        kwargs["file_size"] = cls.__as_type_from_dict("file_size", int, data)
 
+        # Media type (convert mime string if provided)
         media_type = data.get("media_type")
-        metadata.media_type = cls.mime_to_media_type(media_type)
+        if media_type:
+            kwargs["media_type"] = cls.mime_to_media_type(media_type)
 
-        metadata.datetime = cls.__as_type_from_dict("datetime", pd.Timestamp.to_pydatetime, data)
-        metadata.start_datetime = cls.__as_type_from_dict("start_datetime", pd.Timestamp.to_pydatetime, data)
-        metadata.end_datetime = cls.__as_type_from_dict("end_datetime", pd.Timestamp.to_pydatetime, data)
+        # Temporal fields
+        kwargs["datetime"] = cls.__as_type_from_dict("datetime", pd.Timestamp.to_pydatetime, data)
+        kwargs["start_datetime"] = cls.__as_type_from_dict("start_datetime", pd.Timestamp.to_pydatetime, data)
+        kwargs["end_datetime"] = cls.__as_type_from_dict("end_datetime", pd.Timestamp.to_pydatetime, data)
 
-        metadata.shape = data.get("shape")
-        metadata.tags = data.get("tags")
+        # Misc
+        kwargs["shape"] = data.get("shape")
+        tags = data.get("tags", {}) or {}
+        if not isinstance(tags, dict):
+            if len(tags) == 0:
+                tags = {}
+            else:
+                raise ValueError(f"tags must be a dictionary, got {type(tags)}")
+        kwargs["tags"] = tags
+        kwargs["transform"] = data.get("transform")
 
-        metadata.transform = data.get("transform")
+        # Projection EPSG (may be needed for reconstruction)
+        proj_epsg = data.get("proj_epsg")
+        if proj_epsg is not None:
+            try:
+                proj_epsg = int(proj_epsg)
+            except (TypeError, ValueError):
+                proj_epsg = None
+        kwargs["proj_epsg"] = proj_epsg
 
-        proj_bbox_dict = data.get("bbox_projected")
-        if proj_bbox_dict:
-            proj_bbox = BoundingBox.from_dict(proj_bbox_dict)
-            metadata.bbox_projected = proj_bbox
-        else:
-            metadata.bbox_projected = None
+        # Bounding boxes using helper (supports dict or list). Priority: projected bbox first, then lat/lon.
+        bbox_proj_val = data.get("bbox_projected")
+        bbox_latlon_val = data.get("bbox_lat_lon")
 
-        return metadata
+        # Reconstruct projected bbox if possible
+        if bbox_proj_val is not None:
+            if isinstance(bbox_proj_val, dict) and not proj_epsg:
+                # Extract epsg if present before construction
+                epsg_candidate = bbox_proj_val.get("epsg") if isinstance(bbox_proj_val, dict) else None
+                if epsg_candidate:
+                    kwargs["proj_epsg"] = int(epsg_candidate)
+                    proj_epsg = kwargs["proj_epsg"]
+            # Use provided proj_epsg (may now be updated)
+            kwargs["bbox_projected"] = BoundingBox.from_any(bbox_proj_val, default_epsg=proj_epsg)
+
+        # Fallback to lat/lon bbox only if no projected bbox produced
+        if "bbox_projected" not in kwargs and bbox_latlon_val is not None:
+            kwargs["bbox_lat_lon"] = BoundingBox.from_any(bbox_latlon_val, default_epsg=4326)
+
+        return cls(**{k: v for k, v in kwargs.items() if v is not None})
 
     @classmethod
     def from_geoseries(cls, series: gpd.GeoSeries) -> "AssetMetadata":
