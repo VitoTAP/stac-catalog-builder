@@ -21,9 +21,9 @@ collection_config_path = current_dir / "config.json"
 assert collection_config_path.exists(), f"Collection config file not found at {collection_config_path}"
 
 # Input Paths
-tiff_input_path = current_dir   
-tiffs_glob = "*/*.tif"         
-data_path = f"/data/open/vici/archive"
+tiff_input_path = current_dir
+tiffs_glob = "*/*.tif"
+data_path = "/data/open/vici/archive"
 data_subpath = "/".join(data_path.split("/")[-2:])
 # Output Paths
 output_path = current_dir / "results" / catalog_version
@@ -34,7 +34,6 @@ input_files = list_input_files(glob=tiffs_glob, input_dir=tiff_input_path, max_f
 print(f"Found {len(input_files)} input files. 10 first files:")
 for i in input_files[:10]:
     print(i)
-
 
 
 # list meta data
@@ -51,20 +50,17 @@ def postprocess_item(item: pystac.Item) -> pystac.Item:
     for asset_name, asset_metadata in item.assets.items():
         # Extract filename from metadata.href instead of using asset_name directly
         full_filename = os.path.basename(asset_metadata.href)  # Extracts 'percentiles15_0101.tif'
-        
+
         # Construct the correct local path
         # Add the alternate field to each asset
         # get country from path
         country = Path(asset_metadata.href).parent.name
         asset_metadata.href = f"https://services.terrascope.be/download/open/{data_subpath}/{country}/{full_filename}"
-        
-        asset_metadata.extra_fields["alternate"] = {
-            "local": {
-                "href": f"{data_path}/{country}/{full_filename}" 
-            }
-        }
+
+        asset_metadata.extra_fields["alternate"] = {"local": {"href": f"{data_path}/{country}/{full_filename}"}}
         item.properties["country"] = country
     return item
+
 
 # list items
 stac_items, failed_files = list_stac_items(
@@ -79,9 +75,7 @@ if failed_files:
     print(f"Failed files: {failed_files}")
 
 if not stac_items:
-    raise RuntimeError(
-        "No STAC items created — check regex in config.json and folder structure"
-    )
+    raise RuntimeError("No STAC items created — check regex in config.json and folder structure")
 
 # build collection
 build_collection(
@@ -100,9 +94,7 @@ if collection_file.exists():
     validate_collection(collection_file=collection_file)
     print("Collection validation complete.")
 else:
-    raise FileNotFoundError(
-        f"collection.json not found at {collection_file}. Build likely failed."
-    )
+    raise FileNotFoundError(f"collection.json not found at {collection_file}. Build likely failed.")
 
 
 auth_settings = AuthSettings(
