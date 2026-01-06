@@ -1,7 +1,8 @@
+import os
 import pprint
 from getpass import getpass
 from pathlib import Path
-import os
+
 import pystac
 
 from stacbuilder import (
