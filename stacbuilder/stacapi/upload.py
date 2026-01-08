@@ -2,7 +2,6 @@ import inspect
 import itertools
 import logging
 from pathlib import Path
-from time import sleep
 from typing import Iterable
 
 import pystac
@@ -94,7 +93,6 @@ class Uploader(AsyncTaskPoolMixin):
             start_index = index * self.bulk_size
             self._log_progress_message(f"Uploading bulk from item {start_index} to {start_index + len(chunk)}")
             self._submit_async_task(self._items_endpoint.ingest_bulk, chunk.copy())
-            sleep(1)
 
         # Wait for all uploads to complete
         try:
@@ -102,6 +100,7 @@ class Uploader(AsyncTaskPoolMixin):
             self._log_progress_message("All items uploaded")
         except RuntimeError as e:
             self._log_progress_message(f"Some items failed to upload: {e}")
+            raise e
 
     def upload_collection_and_items(
         self,
