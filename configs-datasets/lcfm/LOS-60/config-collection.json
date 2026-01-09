@@ -1,0 +1,55 @@
+{
+    "collection_id": "LCFM_LOS-60_v100",
+    "title": "LCFM LOS 60 v100",
+    "description": "LCFM LOS 60m V100",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".LCFM_LOS_V100_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})T(?P<hour>\\d{2})(?P<minute>\\d{2})(?P<second>\\d{2})_\\d+T\\d+_(?P<tileId>\\w+)_PROBS_60M.tif$",
+            "period": "secondly",
+            "fixed_values": {
+                "asset_type": "los"
+            }
+        }
+    },
+    "item_assets": {
+        "los": {
+            "title": "LCFM LOS 60 v100",
+            "description": "",
+            "eo_bands": [
+                {
+                    "name": "PROB-SURFACE",
+                    "description": "",
+                    "data_type": "int8",
+                    "sampling": "area",
+                    "spatial_resolution": 60
+                },
+                {
+                    "name": "PROB-CLOUDS",
+                    "description": "",
+                    "data_type": "int8",
+                    "sampling": "area",
+                    "spatial_resolution": 60
+                },{
+                    "name": "PROB-SHADOWS",
+                    "description": "",
+                    "data_type": "int8",
+                    "sampling": "area",
+                    "spatial_resolution": 60
+                },{
+                    "name": "PROB-SNOW",
+                    "description": "",
+                    "data_type": "int8",
+                    "sampling": "area",
+                    "spatial_resolution": 60
+                }
+            ]
+        }
+    }
+}
