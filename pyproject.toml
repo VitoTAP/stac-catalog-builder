@@ -35,17 +35,19 @@ dependencies = [
   "pystac[validation]==1.11.*",
   "rasterio==1.4.3",
   "requests==2.31.*",
-  "requests_auth==7.0.*",
+  "requests_auth>=6.0, <8.0",
+  "rio-stac==0.10",
   "shapely==2.0.*",
   "yarl==1.9.*",
   "universal_pathlib",
   "ipykernel>=6.29.5",
   "rio-cogeo>=5.4.2",
+  "uv>=0.8.22",
 ]
 
 [dependency-groups]
 hrvpp = [
-  "terracatalogueclient==0.1.14",
+  "terracatalogueclient==0.1.19",
 ]
 dev = [
     "hatch>=1.14.1",
@@ -55,6 +57,10 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-xdist",
     "requests-mock>=1.11.0",
+]
+notebooks = [
+  "ipykernel",
+  
 ]
 
 [project.urls]

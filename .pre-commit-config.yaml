@@ -1,6 +1,8 @@
 # https://pre-commit.com
 default_stages: [pre-commit, manual]
 fail_fast: true
+default_language_version:
+  python: python3.11
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.

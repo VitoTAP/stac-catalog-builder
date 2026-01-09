@@ -1,6 +1,5 @@
 import datetime as dt
 import re
-from pathlib import Path
 
 import pytest
 from dateutil.tz import tzoffset
@@ -61,7 +60,7 @@ class TestAssetMetadata:
             "tile_id": None,
             "href": "/local/path/to/asset.tif",
             "original_href": "/local/path/to/asset.tif",
-            "asset_path": Path("/local/path/to/asset.tif"),
+            "asset_path": "/local/path/to/asset.tif",
             "asset_type": None,
             "media_type": None,
             "datetime": dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
@@ -69,8 +68,9 @@ class TestAssetMetadata:
             "end_datetime": None,
             "shape": None,
             "tags": {},
-            "bbox_lat_lon": {"north": 52.0, "south": 51.0, "east": 5.0, "west": 4.0, "epsg": 4326},
-            "bbox_projected": {"north": 52.0, "south": 51.0, "east": 5.0, "west": 4.0, "epsg": 4326},
+            "bbox_lat_lon": [4.0, 51.0, 5.0, 52.0],
+            "bbox_projected": [4.0, 51.0, 5.0, 52.0],
+            "proj_epsg": 4326,
             "geometry_lat_lon": Polygon(((5.0, 51.0), (5.0, 52.0), (4.0, 52.0), (4.0, 51.0), (5.0, 51.0))),
             "transform": None,
             "bands": [],
