@@ -1,7 +1,7 @@
 {
-    "collection_id": "LCFM_TCD-10_v100",
-    "title": "LCFM TCD 10 v100",
-    "description": "LCFM Tree Cover Density 10m v100",
+    "collection_id": "lcfm-lcm-10",
+    "title": "LCFM LCM 10 v100",
+    "description": "LCFM Land Cover Map 10m v100",
     "instruments": [],
     "keywords": [],
     "mission": [],
@@ -11,7 +11,7 @@
     "input_path_parser": {
         "classname": "DefaultInputPathParser",
         "parameters": {
-            "regex_pattern": ".*/LCFM_TCD-10_V100_(?P<year>\\d{4})_(?P<tile_id>[A-Z]\\d{2}[A-Z]\\d{3})_MAP.tif$",
+            "regex_pattern": ".*/LCFM_LCM-10_V100_(?P<year>\\d{4})_(?P<tile_id>[A-Z]\\d{2}[A-Z]\\d{3})_MAP.tif$",
             "period": "yearly",
             "fixed_values": {
                 "asset_type": "MAP"
@@ -20,8 +20,9 @@
     },
     "item_assets": {
         "MAP": {
-            "title": "Tree Cover Density Map 10m",
-            "description": "Tree Cover Density Map at 10m resolution"
+            "title": "MAP",
+            "description": "Per pixel land cover map at 10 m resolution"
         }
-    }
+    },
+    "overrides": {}
 }
