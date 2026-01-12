@@ -428,7 +428,9 @@ class CollectionBuilder(AsyncTaskPoolMixin):
             if item_counter % 10_000 == 0:
                 gc.collect()
                 memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-                logger.info(f"Saved {item_counter} items so far - Memory: {memory_mb:.1f} MB - Last item ID: {item.id}")
+                logger.info(
+                    f"Saved {item_counter:,} items so far - Memory: {memory_mb:.1f} MB - Last item ID: {item.id}"
+                )
 
         if not self.link_items:
             # Ensure asynchronous tasks complete
