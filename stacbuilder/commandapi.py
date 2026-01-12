@@ -21,7 +21,6 @@ The module is organized into the following functional areas:
 - upload_items_to_stac_api: Upload only items to STAC API
 """
 
-import logging
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
@@ -35,17 +34,6 @@ from stacbuilder.collector import FileCollector, MetadataCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.stacapi import Settings, Uploader
-
-log_level = logging.INFO
-# create console handler with a higher log level
-console_handler = logging.StreamHandler()
-console_handler.setLevel(log_level)
-# create formatter and add it to the handlers
-formatter = logging.Formatter("%(levelname)-7s | %(asctime)s | %(message)s")
-console_handler.setFormatter(formatter)
-logging.basicConfig(handlers=[console_handler], level=log_level)
-logging.getLogger("botocore").setLevel(logging.WARNING)
-logging.getLogger("boto3").setLevel(logging.WARNING)
 
 # Organized by functionality for better discoverability
 __all__ = [
@@ -73,6 +61,7 @@ def build_collection(
     max_files: Optional[int] = -1,
     link_items: bool = True,
     item_postprocessor: Optional[Callable] = None,
+    single_asset_per_item: bool = False,
 ) -> None:
     """
     Build a STAC collection from a directory of files.
@@ -82,6 +71,9 @@ def build_collection(
     :param input_dir: Root directory where the files are located.
     :param output_dir: Directory where the STAC collection will be saved.
     :param max_files: Maximum number of files to process.
+    :param link_items: Whether to create links between collection and items.
+    :param item_postprocessor: Optional function to postprocess each STAC item.
+    :param single_asset_per_item: Whether each STAC item has only one asset. This can speed up processing.
     """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -101,6 +93,7 @@ def build_collection(
         output_dir=output_dir,
         link_items=link_items,
         item_postprocessor=item_postprocessor,
+        single_asset_per_item=single_asset_per_item,
     )
 
     pipeline.build_collection()

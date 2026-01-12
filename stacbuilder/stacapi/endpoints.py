@@ -1,16 +1,13 @@
-import logging
 from typing import Iterable
 
 import requests
 import requests.status_codes
+from loguru import logger
 from pystac import Collection, Item, ItemCollection
 from requests.auth import AuthBase
 from yarl import URL
 
 from stacbuilder.exceptions import InvalidOperation
-
-_logger = logging.getLogger(__name__)
-
 
 _EXPECTED_STATUS_GET = [requests.status_codes.codes.ok]
 _EXPECTED_STATUS_POST = [
@@ -37,7 +34,7 @@ def _check_response_status(response: requests.Response, expected_status_codes: l
         if raise_exc:
             raise Exception(message)
         else:
-            _logger.warning(message)
+            logger.warning(message)
 
     # Always raise errors on 4xx and 5xx status codes.
     response.raise_for_status()
@@ -399,7 +396,7 @@ class ItemsEndpoint:
         item.validate()
 
         response = self._rest_api.post(self.get_items_url(item.collection_id), json=item.to_dict())
-        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
 
         _check_response_status(response, _EXPECTED_STATUS_POST)
         return response.json()
@@ -408,14 +405,14 @@ class ItemsEndpoint:
         item.validate()
 
         response = self._rest_api.put(self.get_items_url_for_id(item.collection_id, item.id), json=item.to_dict())
-        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
 
         _check_response_status(response, _EXPECTED_STATUS_PUT)
         return response.json()
 
     def ingest_bulk(self, items: Iterable[Item], max_retries=5, retries=0) -> dict:
         if retries > 0:
-            _logger.debug(f"ingest_bulk retry: retries={retries}, max_retries={max_retries}")
+            logger.debug(f"ingest_bulk retry: retries={retries}, max_retries={max_retries}")
 
         collection_id = items[0].collection_id
         if not all(i.collection_id == collection_id for i in items):
@@ -425,16 +422,16 @@ class ItemsEndpoint:
         data = {"method": "upsert", "items": {item.id: item.to_dict() for item in items}}
 
         try:
-            _logger.debug(f"Rost request to {url_path}: {data}")
+            logger.debug(f"Rost request to {url_path}: {data}")
             response = self._rest_api.post(url_path, json=data)
-            _logger.debug(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+            logger.debug(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
             _check_response_status(response, _EXPECTED_STATUS_POST)
         except Exception as e:
-            _logger.debug(f"ingest_bulk failed: retries={retries}, max_retries={max_retries}")
+            logger.debug(f"ingest_bulk failed: retries={retries}, max_retries={max_retries}")
             if retries < max_retries:
                 return self.ingest_bulk(items, max_retries, retries + 1)
             else:
-                _logger.error(
+                logger.error(
                     f"ingest_bulk failed after {max_retries} retries for items: {items[0].id} to {items[-1].id}. error: {e}"
                 )
                 raise e
@@ -458,7 +455,7 @@ class ItemsEndpoint:
             )
 
         response = self._rest_api.delete(self.get_items_url_for_id(collection_id, item_id))
-        _logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
+        logger.info(f"HTTP response: {response.status_code} - {response.reason}: body: {response.json()}")
 
         _check_response_status(response, _EXPECTED_STATUS_DELETE)
 

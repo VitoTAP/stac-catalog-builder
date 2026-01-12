@@ -6,8 +6,6 @@ This contains the classes that generate the STAC catalogs, collections and items
 # Standard libraries
 import datetime as dt
 import gc
-import inspect
-import logging
 from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
@@ -16,6 +14,7 @@ from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional
 # Third party libraries
 import deprecated
 import psutil
+from loguru import logger
 from pystac import (
     Asset,
     CatalogType,
@@ -46,9 +45,6 @@ from stacbuilder.exceptions import InvalidConfiguration, InvalidOperation
 from stacbuilder.metadata import AssetMetadata, BandMetadata
 
 ALTERNATE_ASSETS_SCHEMA = "https://stac-extensions.github.io/alternate-assets/v1.1.0/schema.json"
-
-
-_logger = logging.getLogger(__name__)
 
 
 class AlternateHrefGenerator:
@@ -194,7 +190,7 @@ class ItemBuilder:
                 "None of the assets is defined in collection configuration. "
                 + f"{[a.asset_type for a in assets]} not found in {list(self.item_assets_configs.keys())}"
             )
-            _logger.warning(error_msg)
+            logger.warning(error_msg)
             return None
 
         first_asset = known_assets[0]  # The first asset is used to create the item.
@@ -429,18 +425,20 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         for item in stac_items:
             self._process_item(item=item)
             item_counter += 1
-            if item_counter % 1000 == 0:
-                self._log_progress_message(f"Processed {item_counter} items so far.")
+            if item_counter % 10_000 == 0:
+                gc.collect()
+                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                logger.info(f"Saved {item_counter} items so far - Memory: {memory_mb:.1f} MB - Last item ID: {item.id}")
 
         if not self.link_items:
             # Ensure asynchronous tasks complete
             self._wait_for_tasks()
 
         if self.link_items:
-            self._log_progress_message("updating collection extent")
+            logger.info("updating collection extent")
             self._collection.update_extent_from_items()
         else:
-            self._log_progress_message("updating collection extent from items")
+            logger.info("updating collection extent from items")
             if self._extent is None:
                 raise InvalidOperation("Extent is not set. Cannot update collection extent without items.")
             self._collection.extent = self._extent
@@ -450,7 +448,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         if save_collection:
             self.save_collection()
 
-        self._log_progress_message("DONE: build_collection")
+        logger.info("DONE: build_collection")
         gc.collect()
         return self.collection
 
@@ -529,22 +527,22 @@ class CollectionBuilder(AsyncTaskPoolMixin):
 
     def validate_collection(self, collection: Collection):
         """Run STAC validation on the collection."""
-        self._log_progress_message("START: validate_collection")
+        logger.info("START: validate_collection")
         try:
             num_items_validated = collection.validate_all(recursive=True)
         except STACValidationError as exc:
-            print(exc)
+            logger.error(f"STAC validation error: {exc}")
             raise
         except RemoteDisconnected:
-            print("Skipped this step validation due to RemoteDisconnected.")
+            logger.warning("Skipped validation due to RemoteDisconnected.")
         else:
-            print(f"Collection valid: number of items validated: {num_items_validated}")
+            logger.success(f"Collection valid: number of items validated: {num_items_validated}")
 
-        self._log_progress_message("DONE: validate_collection")
+        logger.info("DONE: validate_collection")
 
     def save_collection(self) -> None:
         """Save the STAC collection to file."""
-        self._log_progress_message("START: Saving collection ...")
+        logger.info("START: Saving collection ...")
 
         self._collection.links.sort(key=lambda x: repr(x))
 
@@ -552,7 +550,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
             self.output_dir.mkdir(parents=True)
 
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
-        self._log_progress_message("DONE: Saving collection.")
+        logger.info("DONE: Saving collection.")
 
     @property
     def providers(self):
@@ -560,7 +558,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
 
     def create_empty_collection(self, group: Optional[str | int] = None) -> None:
         """Creates a STAC Collection with no STAC items."""
-        self._log_progress_message("START: create_empty_collection")
+        logger.debug("START: create_empty_collection")
 
         coll_config: CollectionConfig = self._collection_config
 
@@ -591,7 +589,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         EOExtension.add_to(collection)
 
         self._collection = collection
-        self._log_progress_message("DONE: create_empty_collection")
+        logger.info(f"Created empty collection with ID: {id}")
 
     def get_default_extent(self) -> Extent:
         end_dt = dt.datetime.now(dt.timezone.utc)
@@ -625,10 +623,6 @@ class CollectionBuilder(AsyncTaskPoolMixin):
 
         return asset_definitions
 
-    def _log_progress_message(self, message: str) -> None:
-        calling_method_name = inspect.stack()[1][3]
-        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
-
 
 class AssetMetadataPipeline:
     """
@@ -644,6 +638,7 @@ class AssetMetadataPipeline:
         output_dir: Optional[Path] = None,
         link_items: Optional[bool] = True,
         item_postprocessor: Optional[Callable] = None,
+        single_asset_per_item: Optional[bool] = False,
     ) -> None:
         if output_dir and not isinstance(output_dir, Path):
             raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
@@ -659,6 +654,7 @@ class AssetMetadataPipeline:
         self._collection_dir: Path = output_dir
         self._link_items = bool(link_items)
         self.collection_config: CollectionConfig = collection_config
+        self.single_asset_per_item: bool = bool(single_asset_per_item)
 
         # Components / dependencies that must be provided
         self.metadata_collector: IMetadataCollector = metadata_collector
@@ -719,51 +715,71 @@ class AssetMetadataPipeline:
 
     def get_metadata(self) -> Iterable[AssetMetadata]:
         """Tells the metadata collector to collect the metadata and return it."""
-        self.metadata_collector.collect()
-        _logger.info("Metadata collection done.")
-        return self.metadata_collector.metadata_list
+        if self.metadata_collector is None:
+            raise InvalidOperation("Metadata collector is not set. Cannot collect metadata.")
+        try:
+            logger.debug("Using streaming metadata collection.")
+            for metadata in self.metadata_collector.collect_stream():
+                yield metadata
+        except NotImplementedError:
+            logger.warning("Using legacy non-stream metadata collection.")
+            self.metadata_collector.collect()
+            logger.info("Metadata collection done.")
+            for metadata in self.metadata_collector.metadata_list:
+                yield metadata
 
     def collect_stac_items(self):
         """Generate the intermediate STAC Item objects."""
-        self._log_progress_message("START: collect_stac_items")
 
-        groups = self._group_metadata_by_item_id(self.get_metadata())
-        num_groups = len(groups)
+        def _item_from_assets(assets: List[AssetMetadata]) -> Item:
+            stac_item = self.item_builder.create_item(assets)
+            if stac_item and self.item_postprocessor is not None:
+                stac_item = self.item_postprocessor(stac_item)
+            return stac_item
 
-        progress_chunk_size = 10_000
-        i = 0
-        while groups:
-            # Pop a group from the dictionary to process and immediately free its memory
-            group_key, assets = groups.popitem()
+        if self.single_asset_per_item:  # Handle the simple case where each item has only one asset
+            logger.info("Using single_asset_per_item mode for STAC Item creation.")
+            counter = 0
+            for asset_metadata in self.get_metadata():
+                yield _item_from_assets([asset_metadata])
+                counter += 1
+                if counter % 10_000 == 0:
+                    gc.collect()
+                    memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                    logger.debug(f"Converted {counter} AssetMetadata to STAC Items - Memory: {memory_mb:.1f} MB")
+        else:  # Handle the general case where items can have multiple assets
+            # Assets need to be grouped by item_id so all assets need to be collected first
+            groups = self._group_metadata_by_item_id(self.get_metadata())
+            num_groups = len(groups)
 
-            if i % progress_chunk_size == 0:
-                fraction_done = i / num_groups
-                gc.collect()
-                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-                self._log_progress_message(
-                    f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%}) - Memory: {memory_mb:.1f} MB"
-                )
+            i = 0
+            while groups:
+                # Pop a group from the dictionary to process and immediately free its memory
+                group_key, assets = groups.popitem()
 
-            sub_groups = self._split_group_by_latlon(
-                assets
-            )  # Ensure that all the assets have the same lat-lon bounding box
-            for sub_group_assets in sub_groups.values():
-                stac_item = self.item_builder.create_item(sub_group_assets)
-                if stac_item:
-                    if self.item_postprocessor is not None:
-                        stac_item = self.item_postprocessor(stac_item)
-                    yield stac_item
+                if i % 1_000 == 0:
+                    fraction_done = i / num_groups
+                    memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                    logger.debug(
+                        f"Converted {i} of {num_groups} AssetMetadata to STAC Items ({fraction_done:.1%}) - Memory: {memory_mb:.1f} MB"
+                    )
 
-            i += 1
+                sub_groups = self._split_group_by_latlon(
+                    assets
+                )  # Ensure that all the assets have the same lat-lon bounding box
+                for sub_group_assets in sub_groups.values():
+                    yield _item_from_assets(sub_group_assets)
 
-        # groups is now empty, but del it anyway for clarity
-        del groups
+                i += 1
+
+            # groups is now empty, but del it anyway for clarity
+            del groups
         self.metadata_collector.reset()
         gc.collect()
-        self._log_progress_message("DONE: collect_stac_items")
+        logger.info("DONE: collect_stac_items")
 
     def _group_metadata_by_item_id(self, iter_metadata: Iterable[AssetMetadata]) -> Dict[str, List[Item]]:
-        self._log_progress_message("START: group_metadata_by_item_id")
+        logger.info("START: group_metadata_by_item_id")
         groups: Dict[str, AssetMetadata] = {}
 
         for metadata in iter_metadata:
@@ -774,7 +790,7 @@ class AssetMetadataPipeline:
 
             groups[item_id].append(metadata)
 
-        self._log_progress_message("DONE: group_metadata_by_item_id")
+        logger.info("DONE: group_metadata_by_item_id")
         return groups
 
     def _split_group_by_latlon(self, metadata_list: List[AssetMetadata]) -> Dict[Tuple[int, int], List[AssetMetadata]]:
@@ -796,7 +812,7 @@ class AssetMetadataPipeline:
         self,
     ):
         """Build the entire STAC collection."""
-        self._log_progress_message("START: build_collection")
+        logger.debug("START: build_collection")
 
         assert self._collection_dir, "Collection directory must be set before building the collection."
 
@@ -856,7 +872,7 @@ class AssetMetadataPipeline:
         return groups
 
     def build_grouped_collections(self):
-        self._log_progress_message("START: build_grouped_collections")
+        logger.info("START: build_grouped_collections")
 
         assert self._collection_dir, "Collection directory must be set before building grouped collections."
 
@@ -886,8 +902,4 @@ class AssetMetadataPipeline:
         self._root_collection_builder.collection.update_extent_from_items()
         self._root_collection_builder.save_collection()
 
-        self._log_progress_message("DONE: build_grouped_collections")
-
-    def _log_progress_message(self, message: str) -> None:
-        calling_method_name = inspect.stack()[1][3]
-        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+        logger.info("DONE: build_grouped_collections")

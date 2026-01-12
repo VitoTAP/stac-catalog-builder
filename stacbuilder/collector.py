@@ -5,18 +5,18 @@ It provides a MetadataCollector class that can be used to collect metadata from 
 It is designed to be flexible and can be extended to support different file types and metadata mapping strategies.
 """
 
-import logging
 from itertools import islice
 from pathlib import Path
-from typing import Iterable, List, Literal, Optional, Protocol, Union
+from queue import Queue
+from typing import Any, Generator, Iterable, List, Literal, Optional, Protocol, Union
 
+from loguru import logger
 from upath import UPath
 
+from stacbuilder.async_utils import AsyncTaskPoolMixin
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.mapper import MapGeoTiffToAssetMetadata
 from stacbuilder.metadata import AssetMetadata
-
-logger = logging.getLogger(__name__)
 
 FileType = Literal["GeoTiff"]
 
@@ -33,15 +33,26 @@ class IDataCollector(Protocol):
         At the level of this class here we could only add a method that returns
         `Any`, and with a generic name that will be a bit too vague.
         """
-        ...
+        raise NotImplementedError("collect method must be implemented by subclasses.")
+
+    def collect_stream(self) -> Generator[Any, None, None]:
+        """Collect the data and yield it as a stream.
+
+        Each implementation needs to add a method to access the collected data,
+        because a specific method will be more clear that what we could add here.
+
+        At the level of this class here we could only add a method that returns
+        `Any`, and with a generic name that will be a bit too vague.
+        """
+        raise NotImplementedError("collect_stream method must be implemented by subclasses.")
 
     def has_collected(self) -> bool:
         """Has the collection been done/ does the collector contain any data."""
-        ...
+        raise NotImplementedError("has_collected method must be implemented by subclasses.")
 
     def reset(self) -> None:
         """Empty the collected data."""
-        ...
+        raise NotImplementedError("reset method must be implemented by subclasses.")
 
 
 class FileCollector(IDataCollector):
@@ -72,16 +83,30 @@ class FileCollector(IDataCollector):
             max_files=config.max_files if config.max_files is not None else -1,
         )
 
-    def collect(self):
-        """Collect files matching the glob pattern in the input directory. Once collected, the files can be accessed via the `input_files` property."""
-        logger.info(f"START collecting files in '{self.input_dir}' with glob '{self.glob}'")
-        input_files = self.input_dir.glob(self.glob)
+    def collect_stream(self) -> Iterable[Path]:
+        """Get an iterator that collects files matching the glob pattern in the input directory and yields them one by one."""
+        if self.input_dir is None:
+            raise ValueError("Input directory is not set for FileCollector.")
+        if not self.input_dir.exists():
+            raise FileNotFoundError(f"Input directory does not exist: {self.input_dir}")
+        logger.info(f"FileCollector: collecting files in '{self.input_dir}' with glob '{self.glob}'")
+        input_files_gen = self.input_dir.glob(self.glob)
 
         if self.max_files > 0:
-            input_files = islice(input_files, self.max_files)
+            input_files_gen = islice(input_files_gen, self.max_files)
 
-        self._input_files = [f for f in input_files if f.is_file()]
-        logger.info(f"DONE collecting files. Found {len(self._input_files)} files.")
+        for file_path in input_files_gen:
+            if not file_path.is_file():
+                continue
+            yield file_path
+
+    def collect(self) -> None:
+        """Collect files matching the glob pattern in the input directory. Once collected, the files can be accessed via the `input_files` property."""
+        if self.has_collected():
+            logger.info("Files have already been collected, skipping collection.")
+            return None
+        self._input_files = list(self.collect_stream())
+        logger.info(f"DONE collecting files. Total {len(self._input_files)} files collected.")
 
     def has_collected(self) -> bool:
         """Whether or not the data has been collected.
@@ -140,10 +165,10 @@ class IMetadataCollector(IDataCollector):
 
     @property
     def metadata_list(self) -> List[AssetMetadata]:
-        return self._metadata_list
+        return list(self._metadata_list)
 
 
-class MetadataCollector(IMetadataCollector):
+class MetadataCollector(IMetadataCollector, AsyncTaskPoolMixin):
     """
     Class responsible for collecting AssetMetadata from input files.
     It uses a FileCollector to gather the files and a Mapper to convert files to AssetMetadata.
@@ -154,6 +179,7 @@ class MetadataCollector(IMetadataCollector):
         self,
         file_collector: FileCollector,
         metadata_mapper: MapGeoTiffToAssetMetadata,
+        max_outstanding_tasks: int = 10_000,
     ):
         super().__init__()
         if file_collector is None:
@@ -166,6 +192,9 @@ class MetadataCollector(IMetadataCollector):
 
         self._file_collector = file_collector
         self._metadata_mapper = metadata_mapper
+
+        # Initialize with callback that appends results as they complete
+        self._max_outstanding_tasks = max_outstanding_tasks
 
     @staticmethod
     def from_config(
@@ -200,6 +229,10 @@ class MetadataCollector(IMetadataCollector):
     def metadata_mapper(self) -> MapGeoTiffToAssetMetadata:
         return self._metadata_mapper
 
+    def _append_metadata(self, metadata: AssetMetadata) -> None:
+        """Callback to append metadata as results complete."""
+        self._metadata_list.append(metadata)
+
     def reset(self) -> None:
         super().reset()
         self._file_collector.reset()
@@ -207,58 +240,72 @@ class MetadataCollector(IMetadataCollector):
     def get_input_files(self) -> Iterable[Path]:
         """Collect the input files for processing."""
         if not self.file_collector.has_collected():
-            self.file_collector.collect()
+            for f in self.file_collector.collect_stream():
+                yield f
+        else:
+            for f in self.file_collector.input_files:
+                yield f
 
-        for file in self.file_collector.input_files:
-            yield file
+    def collect_stream(self) -> Generator[AssetMetadata, None, None]:
+        """Collect metadata from input files, yielding results as they become available.
+
+        This is a generator that yields AssetMetadata objects as soon as they are ready,
+        allowing for streaming processing without waiting for all tasks to complete.
+
+        Yields:
+            AssetMetadata objects as they are collected from input files.
+        """
+        logger.debug("START streaming metadata collection from input files")
+
+        # Use a queue to collect results as they complete
+        result_queue: Queue[AssetMetadata] = Queue()
+
+        def queue_callback(metadata: AssetMetadata):
+            """Callback that puts results into the queue."""
+            result_queue.put(metadata)
+
+        self._init_async_task_pool(max_outstanding_tasks=self._max_outstanding_tasks, result_callback=queue_callback)
+
+        submitted_count = 0
+        completed_count = 0
+
+        # Submit all tasks
+        for file in self.get_input_files():
+            self._submit_async_task(self.metadata_mapper.to_metadata, file)
+            submitted_count += 1
+
+            # Yield any completed results from the queue (non-blocking)
+            while not result_queue.empty():
+                completed_count += 1
+                yield result_queue.get()
+
+            # Log progress
+            if submitted_count % self._max_outstanding_tasks == 0:
+                pending = len(self._task_futures)
+                logger.debug(
+                    f"MetadataCollector: Submitted {submitted_count}, yielded {completed_count}, {pending} pending"
+                )
+
+        logger.info(f"All {submitted_count} files submitted. Collecting remaining results...")
+
+        # Wait for all remaining tasks to complete
+        self._wait_for_tasks(shutdown=True)
+
+        # Yield all remaining results from the queue
+        while not result_queue.empty():
+            completed_count += 1
+            yield result_queue.get()
+
+        logger.debug(f"DONE streaming collection. Total {completed_count} metadata items yielded.")
 
     def collect(self) -> None:
-        """Collect metadata from the input files using the metadata mapper."""
-        logger.info("START collecting metadata from input files")
-        self._metadata_list = []
+        """Collect metadata from the input files using the metadata mapper.
 
-        from concurrent.futures import (
-            FIRST_COMPLETED,
-            ThreadPoolExecutor,
-            as_completed,
-            wait,
-        )
-
-        with ThreadPoolExecutor(max_workers=100) as executor:
-            max_futures = 1000  # limit the number of concurrent futures to avoid memory issues
-            futures = []
-            submitted_count = 0
-            finished_count = 0
-
-            for file in self.get_input_files():
-                while (submitted_count - finished_count) >= max_futures:
-                    # Check for completed futures before submitting new ones
-                    completed_futures = wait(futures, return_when=FIRST_COMPLETED)
-                    for completed_future in completed_futures:
-                        self._metadata_list.append(completed_future.result())
-                        futures.remove(completed_future)
-                        finished_count += 1
-
-                        # Log progress every 1000 finished items
-                        if finished_count % max_futures == 0:
-                            logger.info(f"Progress: {finished_count} files completed, {len(futures)} pending")
-
-                # Submit new task
-                future = executor.submit(self.metadata_mapper.to_metadata, file)
-                futures.append(future)
-                submitted_count += 1
-                if submitted_count % max_futures == 0:
-                    logger.info(f"Submitted {submitted_count} files for processing, currently {len(futures)} pending")
-
-            logger.info(f"All {submitted_count} files submitted. Collecting remaining results...")
-
-            # Collect results from any remaining futures
-            for future in as_completed(futures):
-                self._metadata_list.append(future.result())
-                finished_count += 1
-
-                # Log progress every 1000 finished items during final collection
-                if finished_count % max_futures == 0:
-                    logger.info(f"Collected {finished_count} of {submitted_count} results")
-
-            logger.info(f"DONE metadata collection. Total {finished_count} metadata items collected.")
+        This method collects all metadata and stores it in self._metadata_list.
+        For streaming results, use collect_stream() instead.
+        """
+        if self.has_collected():
+            logger.warning("Metadata has already been collected, skipping collection.")
+            return None
+        self._metadata_list = list(self.collect_stream())
+        logger.info(f"DONE collecting metadata. Total {len(self._metadata_list)} items collected.")

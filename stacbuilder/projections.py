@@ -2,17 +2,14 @@
 For converting bounding boxes to a different Coordinate Reference System.
 """
 
-import logging
 from functools import lru_cache
 from typing import Any, Callable, List, Tuple
 
 import pyproj
 import pyproj.exceptions
+from loguru import logger
 from shapely import get_coordinates
 from shapely.geometry import box, polygon
-
-logger = logging.getLogger(__name__)
-
 
 XYCoordinate = Tuple[float, float]
 XYTransform = Callable[[float, float, bool], XYCoordinate]

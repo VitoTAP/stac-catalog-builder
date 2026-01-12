@@ -1,10 +1,10 @@
 import inspect
 import itertools
-import logging
 from pathlib import Path
 from typing import Iterable
 
 import pystac
+from loguru import logger
 from pystac import Collection, Item
 from requests.auth import AuthBase
 from yarl import URL
@@ -13,8 +13,6 @@ from stacbuilder.async_utils import AsyncTaskPoolMixin
 from stacbuilder.stacapi.auth import get_auth
 from stacbuilder.stacapi.config import Settings
 from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
-
-_logger = logging.getLogger(__name__)
 
 
 class Uploader(AsyncTaskPoolMixin):
@@ -110,7 +108,7 @@ class Uploader(AsyncTaskPoolMixin):
         offset: int = -1,
     ) -> None:
         collection_out = self.upload_collection(collection)
-        _logger.info(f"Uploaded collections, result={collection_out}")
+        logger.info(f"Uploaded collections, result={collection_out}")
 
         self.upload_items(collection, items, limit=limit, offset=offset)
 
@@ -127,23 +125,23 @@ class Uploader(AsyncTaskPoolMixin):
 
         items_out: list[Item] = items or []
         if not items:
-            _logger.info(f"Using STAC items linked to the collection: {collection.id=}")
+            logger.info(f"Using STAC items linked to the collection: {collection.id=}")
             items_out = collection.get_all_items()
         elif isinstance(items, Path):
             item_dir: Path = items
-            _logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
+            logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
             item_paths = list(item_dir.glob(item_glob))
-            _logger.info(f"Number of STAC item files found: {len(item_paths)}")
+            logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 
         start = None
         stop = None
         if offset > 0:
             start = offset
-            _logger.info(f"User requested to start item upload at offset {offset=}")
+            logger.info(f"User requested to start item upload at offset {offset=}")
 
         if limit > 0:
-            _logger.info(f"User requested to limit the number of items to {limit=}")
+            logger.info(f"User requested to limit the number of items to {limit=}")
             if offset > 0:
                 stop = offset + limit
             else:
@@ -164,4 +162,4 @@ class Uploader(AsyncTaskPoolMixin):
 
     def _log_progress_message(self, message: str) -> None:
         calling_method_name = inspect.stack()[1][3]
-        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+        logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
