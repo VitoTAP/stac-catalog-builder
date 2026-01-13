@@ -745,10 +745,10 @@ class AssetMetadataPipeline:
             for asset_metadata in self.get_metadata():
                 yield _item_from_assets([asset_metadata])
                 counter += 1
-                if counter % 10_000 == 0:
+                if counter % 1_000 == 0:
                     gc.collect()
                     memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-                    logger.debug(f"Converted {counter} AssetMetadata to STAC Items - Memory: {memory_mb:.1f} MB")
+                    logger.debug(f"Converted {counter:,} AssetMetadata to STAC Items - Memory: {memory_mb:.1f} MB")
         else:  # Handle the general case where items can have multiple assets
             # Assets need to be grouped by item_id so all assets need to be collected first
             groups = self._group_metadata_by_item_id(self.get_metadata())

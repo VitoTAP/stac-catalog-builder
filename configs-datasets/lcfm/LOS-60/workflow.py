@@ -28,7 +28,7 @@ assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
 tiffs_glob = f"{year}/products/LCFM/LOS/v100/tiles_utm/*/*/*/*/*/*_PROBS_60M.tif"
 
 # Output Paths
-output_path = workflow_base_path / "results"
+output_path = Path("/data/users/Private/victor.verhaert/stac-collections/LCFM/LOS")
 print(f"Output path: {output_path}")
 
 
