@@ -26,6 +26,7 @@ dependencies = [
   "dynaconf==3.2.*",
   "fsspec[http,s3]==2025.3.2",
   "geopandas>=1.0",
+  "loguru>=0.7.0",
   "numpy",
   "openeo>=0.36",
   "psutil",

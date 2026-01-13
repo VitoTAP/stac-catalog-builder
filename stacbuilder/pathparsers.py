@@ -6,15 +6,14 @@ Normally these are paths to GeoTIFF files, but this could include other file for
 import abc
 import calendar
 import datetime as dt
-import logging
 import re
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
-from stacbuilder.config import InputPathParserConfig
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+from stacbuilder.config import InputPathParserConfig
 
 
 class UnknownInputPathParserClass(Exception):
@@ -317,9 +316,8 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
         day = data.get("day")
 
         if not (year and month and day):
-            print(
-                "WARNING: Could not find all date fields: "
-                + f"{year=}, {month=}, {day=}, {data=},\n{path=}\n{self._regex.pattern=}"
+            logger.warning(
+                f"Could not find all date fields: {year=}, {month=}, {day=}, {data=}, {path=}, {self._regex.pattern=}"
             )
             return None
 
@@ -329,7 +327,7 @@ class PeopleEAIncaCFactorInputPathParser(RegexInputPathParser):
         """Derive the end datetime from other properties that were extracted."""
         start_dt = self._derive_start_datetime(data, path)
         if not start_dt:
-            print("WARNING: Could not determine start_datetime: " + f"{data=}, {path=}, {self._regex.pattern}")
+            logger.warning(f"Could not determine start_datetime: {data=}, {path=}, {self._regex.pattern}")
             return None
 
         year = start_dt.year

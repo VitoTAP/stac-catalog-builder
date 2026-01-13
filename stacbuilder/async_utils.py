@@ -17,12 +17,11 @@ Features:
 
 from __future__ import annotations
 
-import logging
 import os
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
-_logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class AsyncTaskPoolMixin:
@@ -31,11 +30,25 @@ class AsyncTaskPoolMixin:
     _executor: Optional[ThreadPoolExecutor]
     _task_futures: List[Future]
     _max_outstanding_tasks: int
+    _result_callback: Optional[Callable[[Any], None]]
 
-    def _init_async_task_pool(self, max_outstanding_tasks: int = 10_000):  # to be called by subclass __init__
+    def _init_async_task_pool(
+        self,
+        max_outstanding_tasks: int = 10_000,
+        result_callback: Optional[Callable[[Any], None]] = None,
+    ):  # to be called by subclass __init__
+        """Initialize the async task pool.
+
+        Args:
+            max_outstanding_tasks: Maximum number of concurrent futures.
+            result_callback: Optional callback to process results as they complete.
+                           Called with the result of each completed task.
+                           If None, results are not processed during throttling.
+        """
         self._executor = None
         self._task_futures = []
         self._max_outstanding_tasks = max_outstanding_tasks
+        self._result_callback = result_callback
 
     def _log(self, msg: str):
         """Legacy support for custom logging method in consumer class."""
@@ -45,7 +58,7 @@ class AsyncTaskPoolMixin:
                 return
             except Exception:  # pragma: no cover
                 pass
-        _logger.info(msg)
+        logger.info(msg)
 
     def _ensure_executor(self):
         if self._executor is None:
@@ -55,16 +68,32 @@ class AsyncTaskPoolMixin:
                 max_workers = 8
             self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="stac-save")
 
+    def _handle_finished_future(self, fut: Future) -> Optional[Exception]:
+        """Process a finished future and return any exception that occurred.
+
+        Args:
+            fut: The completed future to process
+
+        Returns:
+            Exception if an error occurred, None otherwise
+        """
+        exc = fut.exception()
+        if exc:
+            return exc
+        if self._result_callback:
+            try:
+                result = fut.result()
+                self._result_callback(result)
+            except Exception as e:
+                return e
+        return None
+
     def _enforce_futures_cap(self):
         if not self._task_futures:
             return
         while len(self._task_futures) >= self._max_outstanding_tasks:
             done, not_done = wait(self._task_futures, return_when=FIRST_COMPLETED)
-            errors = []
-            for fut in done:
-                exc = fut.exception()
-                if exc:
-                    errors.append(exc)
+            errors = [err for fut in done if (err := self._handle_finished_future(fut)) is not None]
             self._task_futures = [f for f in not_done]
             if errors:
                 raise RuntimeError(
@@ -92,11 +121,7 @@ class AsyncTaskPoolMixin:
             return
         self._log(f"Waiting for {len(self._task_futures)} asynchronous task(s) to complete ...")
         wait(self._task_futures)
-        errors: List[Exception] = []
-        for fut in self._task_futures:
-            exc = fut.exception()
-            if exc:
-                errors.append(exc)
+        errors = [err for fut in self._task_futures if (err := self._handle_finished_future(fut)) is not None]
         self._task_futures.clear()
         if shutdown:
             self.shutdown_executor()

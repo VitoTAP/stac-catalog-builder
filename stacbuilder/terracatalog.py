@@ -6,9 +6,7 @@ This is done via the terracatalogueclient.
 
 import datetime as dt
 import gc
-import inspect
 import itertools
-import logging
 from pathlib import Path
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import geopandas as gpd
 import pandas as pd
 import psutil
+from loguru import logger
 from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
 
@@ -40,9 +39,6 @@ from stacbuilder.config import (
 )
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
-
-_logger = logging.getLogger(__name__)
-
 
 # EPSG code for "lat-long", or WGS84 to be more precise;
 # Using a constant in order to avoid magic numbers.
@@ -290,43 +286,27 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             raise TypeError(f"Value for max_products must be an int. {type(value)=}, {value=}")
         self._max_products = int(value) if value else -1
 
-    def _log_progress_message(self, message: str, level=logging.INFO) -> None:
-        calling_method_name = inspect.stack()[1][3]
-        match level:
-            case logging.DEBUG:
-                _logger.debug(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
-            case logging.INFO:
-                _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
-            case logging.WARNING:
-                _logger.warning(f"PROGRESS: {self.__class__name__}.{calling_method_name}: {message}")
-            case logging.ERROR:
-                _logger.error(f"PROGRESS: {self.__class__name__}.{calling_method_name}: {message}")
-            case _:
-                _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
-
     def collect(self) -> None:
         """Collect and store the AssetMetadata objects."""
-        self._log_progress_message("START: collect")
+        logger.info("START: collect")
 
         if self.has_collected():
-            _logger.info("Already collected data. Returning")
+            logger.info("Already collected data. Returning")
             return
 
         if not self._products_df:
-            self._log_progress_message(
-                "Downloading products to dataframe. Max products to retrieve: {self.max_products}"
-            )
+            logger.info(f"Downloading products to dataframe. Max products to retrieve: {self.max_products}")
             self.get_products_as_dataframe()
             # self._save_dataframes()
 
-        _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
+        logger.info("Converting GeoDataFrame to list of AssetMetadata objects")
         self._metadata_list = self._convert_to_asset_metadata(self._products_df)
 
         # Free up memory
         self._products_df = None
         gc.collect()
 
-        self._log_progress_message("DONE: collect")
+        logger.info("DONE: collect")
 
     def _save_dataframes(self) -> None:
         if self.temp_dir:
@@ -341,9 +321,9 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             self.temp_dir.mkdir(parents=True)
 
         geodataframe_path = self.temp_dir / f"{table_name}.parquet"
-        self._log_progress_message(f"Saving {table_name} as GeoDataFrame (geoparquet), path={geodataframe_path}")
+        logger.info(f"Saving {table_name} as GeoDataFrame (geoparquet), path={geodataframe_path}")
         gdf.to_parquet(path=geodataframe_path, index=True)
-        self._log_progress_message(f"DONE saved download products to {geodataframe_path}")
+        logger.info(f"DONE saved download products to {geodataframe_path}")
         return geodataframe_path
 
     def _get_intermediate_relative_path(self, index: str) -> Path:
@@ -354,7 +334,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
         if not self.temp_dir:
             return None
 
-        self._log_progress_message("Storing intermediate results to disk", level=logging.INFO)
+        logger.info("Storing intermediate results to disk")
         intermediates_dir = self.temp_dir / "intermediates"
         intermediates_dir.mkdir(parents=True, exist_ok=True)
 
@@ -377,23 +357,20 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
     def _restore_asset_metadata_from_disk(self, paths: List[Path]) -> None:
         """Restore the AssetMetadata objects from disk."""
         if self.temp_dir:
-            self._log_progress_message(f"Restoring AssetMetadata products from disk. {paths}", level=logging.INFO)
+            logger.info(f"Restoring AssetMetadata products from disk. {paths}")
             for path in paths:
                 if not path.exists():
-                    self._log_progress_message(f"Path {path} does not exist. Skipping.", level=logging.WARNING)
+                    logger.warning(f"Path {path} does not exist. Skipping.")
                     continue
                 if self._products_df is None:
                     self._products_df = gpd.read_parquet(path)
                 else:
                     self._products_df = pd.concat([self._products_df, gpd.read_parquet(path)])
                     # self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
-                self._log_progress_message(
-                    f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB",
-                    level=logging.DEBUG,
+                logger.debug(
+                    f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB"
                 )
-            self._log_progress_message(
-                f"Restored {len(self._products_df):_} AssetMetadata products from disk.", level=logging.INFO
-            )
+            logger.info(f"Restored {len(self._products_df):_} AssetMetadata products from disk.")
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
         """Get the terracatalogueclient's Catalogue to query data from."""
@@ -483,7 +460,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
         num_prods = catalogue.get_product_count(collection.id)
         max_prods_to_process = self._max_products if self._max_products > 0 else num_prods
 
-        _logger.info(f"product count for coll_id {collection.id}: {num_prods}")
+        logger.info(f"product count for coll_id {collection.id}: {num_prods}")
 
         query_slots = self._get_product_query_slots(frequency=self._query_by_frequency)
         limit_reached = False
@@ -501,7 +478,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
                     self.temp_dir / self._get_intermediate_relative_path(slice_idx).with_suffix(".parquet")
                 )
                 total_products_processed += num_products_in_slice
-                self._log_progress_message(f"Slot {slice_idx} already stored ({num_products_in_slice:_} products).")
+                logger.info(f"Slot {slice_idx} already stored ({num_products_in_slice:_} products).")
                 continue
 
             # Process a slice of query slots
@@ -525,7 +502,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
 
             total_products_processed = len(self._products_df) if self._products_df is not None else 0
             percent_processed = total_products_processed / max_prods_to_process
-            self._log_progress_message(
+            logger.info(
                 f"Progress: {total_products_processed} of {max_prods_to_process} "
                 f"({percent_processed:.1%}) Memory: {psutil.Process().memory_info().rss // 1024**2:_}MB"
             )
@@ -551,24 +528,20 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             self._restore_asset_metadata_from_disk(intermediate_paths)
 
         # Sanity checks
-        self._log_progress_message("Running sanity checks...")
+        logger.info("Running sanity checks...")
         final_product_ids = set(self._products_df.index)
 
         # Check for duplicates
         if len(final_product_ids) != len(self._products_df):
-            self._log_progress_message(
-                f"Duplicate products found: {len(self._products_df)} rows but only {len(final_product_ids)} unique IDs",
-                level=logging.ERROR,
+            logger.error(
+                f"Duplicate products found: {len(self._products_df)} rows but only {len(final_product_ids)} unique IDs"
             )
 
         # Check we got all products (only when not limiting)
         if not self.max_products and len(final_product_ids) != num_prods:
-            self._log_progress_message(
-                f"Product count mismatch: expected {num_prods}, got {len(final_product_ids)}",
-                level=logging.ERROR,
-            )
+            logger.error(f"Product count mismatch: expected {num_prods}, got {len(final_product_ids)}")
 
-        self._log_progress_message("DONE: get_products_as_dataframe", level=logging.DEBUG)
+        logger.debug("DONE: get_products_as_dataframe")
         return self._products_df
 
     def _fetch_timeslot(self, slot_start: dt.datetime, slot_end: dt.datetime, prod_type: str) -> List[tcc.Product]:
@@ -578,9 +551,8 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
         num_prods_in_slot = catalogue.get_product_count(
             collection.id, start=slot_start, end=slot_end, productType=prod_type
         )
-        self._log_progress_message(
-            f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}, number of products in slot: {num_prods_in_slot}",
-            level=logging.DEBUG,
+        logger.debug(
+            f"Retrieving products for time slot from {slot_start} to {slot_end}, {prod_type=}, number of products in slot: {num_prods_in_slot}"
         )
         products = list(
             catalogue.get_products(
@@ -591,14 +563,11 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
                 accessedFrom="S3",
             )
         )
-        self._log_progress_message(
-            f"# Retrieved {len(products)} products for time slot {slot_start} to {slot_end}, {prod_type=}",
-            level=logging.DEBUG,
-        )
+        logger.debug(f"# Retrieved {len(products)} products for time slot {slot_start} to {slot_end}, {prod_type=}")
         return products
 
     def _add_items_to_gdf(self, new_products):
-        self._log_progress_message("START: adding new assets (deferred AssetMetadata objects) ...", level=logging.DEBUG)
+        logger.debug("START: adding new assets (deferred AssetMetadata objects) ...")
         # We now only build lightweight dict rows + geometry; AssetMetadata instantiation is deferred
         records = []
         geometries = []
@@ -618,7 +587,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             # Drop duplicates early to keep memory lower
             self._products_df = self._products_df[~self._products_df.index.duplicated(keep="first")]
 
-        self._log_progress_message("DONE: adding new assets (deferred AssetMetadata objects)", level=logging.DEBUG)
+        logger.debug("DONE: adding new assets (deferred AssetMetadata objects).")
 
     def _build_row_dict(self, product: tcc.Product) -> tuple[dict, Any]:
         """Return minimal dict + geometry for a product. Mirrors create_asset_metadata but avoids object creation.
@@ -636,7 +605,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             try:
                 assert first_link.get("href") == href
             except AssertionError:
-                _logger.debug("Mismatch between data link href and product data href for %s", product.id)
+                logger.debug(f"Mismatch between data link href and product data href for {product.id}")
 
         product_type = props.get("productInformation", {}).get("productType")
         num_chars_to_remove = 1 + len(product_type) if product_type else 0
@@ -660,7 +629,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
                 try:
                     epsg_code = int(parts[-1])
                 except Exception:
-                    _logger.debug("Could not parse EPSG from %s", epsg_url, exc_info=True)
+                    logger.debug(f"Could not parse EPSG from {epsg_url}", exc_info=True)
         if epsg_code is None and tile_id:
             import re
 
@@ -668,7 +637,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             if results:
                 epsg_code = int("326" + results[0])
         if epsg_code is None:
-            _logger.debug("Could not determine EPSG code for product %s; defaulting to 4326", product.id)
+            logger.debug(f"Could not determine EPSG code for product {product.id}; defaulting to 4326")
         proj_epsg = epsg_code or EPSG_4326_LATLON
 
         bbox_lat_lon_list = product.bbox
@@ -699,7 +668,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
 
     def _convert_to_asset_metadata(self, df: pd.DataFrame) -> List[AssetMetadata]:
         """Convert the pandas dataframe to a list of AssetMetadata objects."""
-        self._log_progress_message("START: _convert_to_asset_metadata")
+        logger.debug("START: _convert_to_asset_metadata")
         md_list = []
 
         # Log some progress every 10 000 records. Without this output it is hard to see what is happening.
@@ -710,7 +679,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
             if i % progress_chunk_size == 0:
                 fraction_done = i / num_products if num_products else 1
                 gc.collect()
-                self._log_progress_message(
+                logger.info(
                     f"Converted {i} of {num_products} to AssetMetadata ({fraction_done:.1%}). Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB"
                 )
 
@@ -736,7 +705,7 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
                         )
                         bbox_projected = BoundingBox.from_list(proj_bbox_vals, row.proj_epsg)
                     except Exception:
-                        _logger.debug("Reprojection failed for %s; using lat/lon bbox", row.asset_id, exc_info=True)
+                        logger.debug(f"Reprojection failed for {row.asset_id}; using lat/lon bbox", exc_info=True)
                         bbox_projected = bbox_lat_lon
                 else:
                     bbox_projected = bbox_lat_lon
@@ -761,12 +730,12 @@ class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
                 metadata = AssetMetadata(**{k: v for k, v in kwargs.items() if v is not None})
                 md_list.append(metadata)
             except Exception:
-                _logger.error(
-                    "Failed to convert row %s to AssetMetadata", getattr(row, "asset_id", "<unknown>"), exc_info=True
+                logger.error(
+                    f"Failed to convert row {getattr(row, 'asset_id', '<unknown>')} to AssetMetadata", exc_info=True
                 )
 
-        self._log_progress_message(f"DONE: {i + 1} of {num_products} converted to AssetMetadata")
-        self._log_progress_message("DONE: _convert_to_asset_metadata", level=logging.DEBUG)
+        logger.info(f"DONE: {i + 1} of {num_products} converted to AssetMetadata")
+        logger.debug("DONE: _convert_to_asset_metadata")
         return md_list
 
 

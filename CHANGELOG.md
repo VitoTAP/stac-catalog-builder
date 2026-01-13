@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Replaced Python's standard `logging` module with `loguru` throughout the package
+- Removed custom `_log_progress_message()` methods from classes (replaced with direct loguru calls)
 - Limit the number of concurrent futures to avoid memory issues during metadata collection. Current setting is 1000. 
 - Improve logging to show progress every 1000 files processed.
 
