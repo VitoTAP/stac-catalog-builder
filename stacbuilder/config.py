@@ -180,7 +180,6 @@ class RasterBandConfig(BaseModel):
         if not ext:
             return None
         raster_band = RasterBand.create(
-            name=self.name,
             nodata=self.nodata,
             data_type=self.data_type,
             sampling=self.sampling,

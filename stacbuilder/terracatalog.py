@@ -2,12 +2,8 @@
 Support for extracting data from HRVPP.
 
 This is done via the terracatalogueclient.
-
-At present, all code in this module is still very experimental (d.d. 2024-01-29)
-
 """
 
-import concurrent.futures
 import datetime as dt
 import gc
 import inspect
@@ -19,15 +15,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import geopandas as gpd
 import pandas as pd
-
-# import resource
 import psutil
 from pystac.media_type import MediaType
 from pystac.provider import ProviderRole
 
 try:
     import terracatalogueclient as tcc
-    from terracatalogueclient import ProductFile
     from terracatalogueclient.config import CatalogueConfig, CatalogueEnvironment
 except ImportError:
     raise ImportError(
@@ -35,6 +28,7 @@ except ImportError:
     )
 
 
+from stacbuilder.async_utils import AsyncTaskPoolMixin
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import (
@@ -240,21 +234,30 @@ class CollectionConfigBuilder:
         return self.get_product_info().get("productType")
 
 
-class HRLVPPMetadataCollector(IMetadataCollector):
+class HRLVPPMetadataCollector(AsyncTaskPoolMixin, IMetadataCollector):
     """Collects AssetMetadata for further processing for the HRL VPP collections from OpenSearch."""
 
-    def __init__(self, temp_dir: Path | None = None, query_by_frequency: str | None = "QS"):
+    def __init__(
+        self,
+        temp_dir: Path | None = None,
+        query_by_frequency: str | None = "QS",
+        save_intermediates: bool = False,
+        slice_length: int = 100,
+    ):
         super().__init__()
+        self._init_async_task_pool(max_outstanding_tasks=10_000)
 
         # components: objects that we delegate work to.
         self._cfg_builder: CollectionConfigBuilder = None
 
         # state / collected information
-        self._df_asset_metadata: Optional[gpd.GeoDataFrame] = None
+        self._products_df: Optional[gpd.GeoDataFrame] = None
 
         self._collection_id: Optional[str] = None
         self._max_products = -1
         self._query_by_frequency: str = query_by_frequency or "QS"
+        self._save_intermediates: bool = save_intermediates
+        self._slice_length: int = slice_length
 
         self.temp_dir: Path = Path(temp_dir) if temp_dir else None
 
@@ -309,18 +312,18 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             _logger.info("Already collected data. Returning")
             return
 
-        if not self._df_asset_metadata:
+        if not self._products_df:
             self._log_progress_message(
                 "Downloading products to dataframe. Max products to retrieve: {self.max_products}"
             )
             self.get_products_as_dataframe()
-            self._save_dataframes()
+            # self._save_dataframes()
 
         _logger.info("PROGRESS: converting GeoDataFrame to list of AssetMetadata objects")
-        self._metadata_list = self._convert_to_asset_metadata(self._df_asset_metadata)
+        self._metadata_list = self._convert_to_asset_metadata(self._products_df)
 
         # Free up memory
-        self._df_asset_metadata = None
+        self._products_df = None
         gc.collect()
 
         self._log_progress_message("DONE: collect")
@@ -330,8 +333,8 @@ class HRLVPPMetadataCollector(IMetadataCollector):
             if not self.temp_dir.exists():
                 self.temp_dir.mkdir(parents=True)
 
-            if self._df_asset_metadata is not None:
-                self._save_geodataframe(self._df_asset_metadata, f"asset_metadata-{self.collection_id}")
+            if self._products_df is not None:
+                self._save_geodataframe(self._products_df, f"asset_metadata-{self.collection_id}")
 
     def _save_geodataframe(self, gdf: gpd.GeoDataFrame, table_name: str) -> Path:
         if not self.temp_dir.exists():
@@ -346,15 +349,19 @@ class HRLVPPMetadataCollector(IMetadataCollector):
     def _get_intermediate_relative_path(self, index: str) -> Path:
         return Path(f"intermediates/{index}-asset_metadata-{self.collection_id}")
 
-    def _store_asset_metadata_and_clear_memory(self, index: int):
+    def _store_asset_metadata_and_clear_memory(self, index: int) -> Optional[Path]:
         """Store the AssetMetadata objects to disk and clear the memory."""
-        if self.temp_dir:
-            self._log_progress_message("Storing AssetMetadata to disk", level=logging.INFO)
-            if not (self.temp_dir / "intermediates").exists():
-                (self.temp_dir / "intermediates").mkdir(parents=True, exist_ok=True)
-            gdf_path = self._save_geodataframe(self._df_asset_metadata, self._get_intermediate_relative_path(index))
-            self._df_asset_metadata = None
-            return gdf_path
+        if not self.temp_dir:
+            return None
+
+        self._log_progress_message("Storing intermediate results to disk", level=logging.INFO)
+        intermediates_dir = self.temp_dir / "intermediates"
+        intermediates_dir.mkdir(parents=True, exist_ok=True)
+
+        gdf_path = self._save_geodataframe(self._products_df, self._get_intermediate_relative_path(index))
+        self._products_df = None
+        gc.collect()
+        return gdf_path
 
     def _is_intermediate_stored(self, index: int) -> bool:
         if self.temp_dir:
@@ -375,17 +382,17 @@ class HRLVPPMetadataCollector(IMetadataCollector):
                 if not path.exists():
                     self._log_progress_message(f"Path {path} does not exist. Skipping.", level=logging.WARNING)
                     continue
-                if self._df_asset_metadata is None:
-                    self._df_asset_metadata = gpd.read_parquet(path)
+                if self._products_df is None:
+                    self._products_df = gpd.read_parquet(path)
                 else:
-                    self._df_asset_metadata = pd.concat([self._df_asset_metadata, gpd.read_parquet(path)])
+                    self._products_df = pd.concat([self._products_df, gpd.read_parquet(path)])
                     # self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
                 self._log_progress_message(
                     f"Restored {path} from disk. Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB",
                     level=logging.DEBUG,
                 )
             self._log_progress_message(
-                f"Restored {len(self._df_asset_metadata):_} AssetMetadata products from disk.", level=logging.INFO
+                f"Restored {len(self._products_df):_} AssetMetadata products from disk.", level=logging.INFO
             )
 
     def get_tcc_catalogue(self) -> tcc.Catalogue:
@@ -461,8 +468,7 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         return results
 
     def get_products_as_dataframe(self) -> gpd.GeoDataFrame:
-        """Collect the products / assets info from the terracatalogueclient, into a GeoDataframe,
-        and save the GeoDataframe to disk.
+        """Collect the products / assets info from the terracatalogueclient into a GeoDataframe.
 
         This allows us to retrieve all products first and then process them. This makes it easier
         to group the products that belong to one STAC item, because we don't have much control
@@ -470,134 +476,100 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         """
         self._log_progress_message("START: get_products_as_dataframe")
 
-        self._df_asset_metadata = None
-
-        # HACK parameters to split up calculation into smaller chunks
-        slice_length = 100  # limits the active threads to prevent OOM errors
-        limit_chunks = False
-        min_chunk, max_chunk = 0, 1000  # limits the number of chunks we process
-
+        self._products_df = None
         catalogue = self.get_tcc_catalogue()
         collection = self.get_tcc_collection()
-        num_products_processed = 0
-        num_products_stored = 0
         product_ids = set()
         num_prods = catalogue.get_product_count(collection.id)
         max_prods_to_process = self._max_products if self._max_products > 0 else num_prods
 
         _logger.info(f"product count for coll_id {collection.id}: {num_prods}")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            query_slots = self._get_product_query_slots(frequency=self._query_by_frequency)
+        query_slots = self._get_product_query_slots(frequency=self._query_by_frequency)
+        limit_reached = False
+        intermediate_paths = []
+        total_products_processed = 0
 
-            limit_reached = False
-            intermediate_paths = []
+        for slice_idx in range(0, len(query_slots), self._slice_length):
+            if limit_reached:
+                break
 
-            for query_slots_iterator in range(0, len(query_slots), slice_length):
-                if limit_reached:
-                    break
+            # Check if we can reuse intermediate results
+            if self._save_intermediates and self._is_intermediate_stored(slice_idx):
+                num_products_in_slice = self._get_num_products_from_intermediate(slice_idx)
+                intermediate_paths.append(
+                    self.temp_dir / self._get_intermediate_relative_path(slice_idx).with_suffix(".parquet")
+                )
+                total_products_processed += num_products_in_slice
+                self._log_progress_message(f"Slot {slice_idx} already stored ({num_products_in_slice:_} products).")
+                continue
 
-                if limit_chunks and (not (min_chunk <= query_slots_iterator < max_chunk)):
-                    # This is a temporary measure to prevent OOM errors.
-                    # We should find a better way to limit the number of products we process.
-                    self._log_progress_message(
-                        f"Skipping query slot {query_slots_iterator} as it is not in the range we want to process.",
-                        level=logging.INFO,
-                    )
-                    continue
+            # Process a slice of query slots
+            query_slots_slice = query_slots[slice_idx : slice_idx + self._slice_length]
+            futures = [
+                self._submit_async_task(self._fetch_timeslot, slot_start, slot_end, prod_type)
+                for (slot_start, slot_end), prod_type in query_slots_slice
+            ]
 
-                if self._is_intermediate_stored(query_slots_iterator):
-                    futures = []
-                    num_products_processed = self._get_num_products_from_intermediate(query_slots_iterator)
-                    intermediate_paths.append(
-                        self.temp_dir
-                        / self._get_intermediate_relative_path(query_slots_iterator).with_suffix(".parquet")
-                    )
-                    self._log_progress_message(
-                        f"Slot {query_slots_iterator} is already stored. It conatains {num_products_processed:_} products."
-                    )
+            # Wait for all futures in this chunk to complete
+            for future in futures:
+                products = future.result()
+                new_products = [p for p in products if p.id not in product_ids]
 
-                else:
-                    query_slots_slice = query_slots[query_slots_iterator : query_slots_iterator + slice_length]
-                    futures = (
-                        executor.submit(self._fetch_timeslot, slot_start, slot_end, prod_type)
-                        for (slot_start, slot_end), prod_type in query_slots_slice
-                    )
+                if new_products:
+                    product_ids.update(p.id for p in new_products)
+                    self._add_items_to_gdf(new_products)
 
-                    for future in concurrent.futures.as_completed(futures):
-                        future_result = future.result()
-                        new_products = [p for p in future_result if p.id not in product_ids]
+            # Wait for all tasks in this slice to complete before continuing
+            self._wait_for_tasks(shutdown=False)
 
-                        if not new_products:
-                            # Avoid doing unnecessary work, might add empty dataframes to the total dataframe.
-                            continue
-                        self._log_progress_message(f"Number of new products {len(new_products)}", level=logging.DEBUG)
-                        product_ids.update([p.id for p in new_products])
-                        self._log_progress_message(f"Number of unique products {len(product_ids)}", level=logging.DEBUG)
-
-                        self._add_items_to_gdf(new_products)
-                        del future
-
-                        self._log_progress_message(
-                            f"Number of new products {len(self._df_asset_metadata) - num_products_processed}.",
-                            level=logging.DEBUG,
-                        )
-
-                        num_products_processed = len(self._df_asset_metadata)
-                        percent_processed = (num_products_processed + num_products_stored) / max_prods_to_process
-                        self._log_progress_message(
-                            f"Progress: {num_products_processed + num_products_stored} of {max_prods_to_process} ({percent_processed:.1%}) Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB"
-                        )  # {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss:_}
-                        if num_products_processed > max_prods_to_process:
-                            executor.shutdown(wait=False)
-                            limit_reached = True
-                            break
-                    intermediate_paths.append(self._store_asset_metadata_and_clear_memory(query_slots_iterator))
-                num_products_stored += num_products_processed
-                del futures
-                gc.collect()
-
-        self._restore_asset_metadata_from_disk(intermediate_paths)
-        # Verify we have no duplicate products,
-        # i.e. the number of unique product IDs must be == to the number of products.
-        self._log_progress_message("START sanity checks: no duplicate products present and received all products ...")
-        product_ids = set(self._df_asset_metadata.index)
-
-        if len(product_ids) != len(self._df_asset_metadata):
-            # raise DataValidationError(
-            #     "Sanity check failed in get_products_as_dataframe:"
-            #     + " Each products should correspond to exactly 1 AssetMetadata instance."
-            #     + " len(product_ids) != len(self._df_asset_metadata)"
-            #     + f" {len(product_ids)=} {len(self._df_asset_metadata)=}"
-            # )
+            total_products_processed = len(self._products_df) if self._products_df is not None else 0
+            percent_processed = total_products_processed / max_prods_to_process
             self._log_progress_message(
-                "Sanity check failed in get_products_as_dataframe:"
-                + " Each products should correspond to exactly 1 AssetMetadata instance."
-                + " len(product_ids) != len(self._df_asset_metadata)"
-                + f" {len(product_ids)=} {len(self._df_asset_metadata)=}",
+                f"Progress: {total_products_processed} of {max_prods_to_process} "
+                f"({percent_processed:.1%}) Memory: {psutil.Process().memory_info().rss // 1024**2:_}MB"
+            )
+
+            if total_products_processed >= max_prods_to_process:
+                limit_reached = True
+                break
+
+            # Optionally save intermediate results
+            if self._save_intermediates:
+                path = self._store_asset_metadata_and_clear_memory(slice_idx)
+                if path:
+                    intermediate_paths.append(path)
+                    total_products_processed = 0  # Reset since we cleared memory
+
+            gc.collect()
+
+        # Shutdown the executor now that all processing is complete
+        self.shutdown_executor()
+
+        # Restore from intermediates if we saved them
+        if self._save_intermediates and intermediate_paths:
+            self._restore_asset_metadata_from_disk(intermediate_paths)
+
+        # Sanity checks
+        self._log_progress_message("Running sanity checks...")
+        final_product_ids = set(self._products_df.index)
+
+        # Check for duplicates
+        if len(final_product_ids) != len(self._products_df):
+            self._log_progress_message(
+                f"Duplicate products found: {len(self._products_df)} rows but only {len(final_product_ids)} unique IDs",
                 level=logging.ERROR,
             )
 
-        # Check that we have processed all products, based on the product count reported by the terracatalogueclient.
-        if not self.max_products:
-            if len(product_ids) != num_prods:
-                # raise DataValidationError(
-                #     "Sanity check failed in get_products_as_dataframe:"
-                #     + "Number of products in result must be the product count reported by terracataloguiclient"
-                #     + " len(product_ids) != num_prods"
-                #     + f" {len(product_ids)=} product count: {num_prods=}"
-                # )
-                self._log_progress_message(
-                    "Sanity check failed in get_products_as_dataframe:"
-                    + "Number of products in result must be the product count reported by terracataloguiclient"
-                    + " len(product_ids) != num_prods"
-                    + f" {len(product_ids)=} product count: {num_prods=}",
-                    level=logging.ERROR,
-                )
-        self._log_progress_message("DONE sanity checks")
+        # Check we got all products (only when not limiting)
+        if not self.max_products and len(final_product_ids) != num_prods:
+            self._log_progress_message(
+                f"Product count mismatch: expected {num_prods}, got {len(final_product_ids)}",
+                level=logging.ERROR,
+            )
 
         self._log_progress_message("DONE: get_products_as_dataframe", level=logging.DEBUG)
-        return self._df_asset_metadata
+        return self._products_df
 
     def _fetch_timeslot(self, slot_start: dt.datetime, slot_end: dt.datetime, prod_type: str) -> List[tcc.Product]:
         catalogue = self.get_tcc_catalogue()
@@ -626,45 +598,104 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         return products
 
     def _add_items_to_gdf(self, new_products):
-        self._log_progress_message("START: adding new assets to AssetMetadata GeoDataFrame ...", level=logging.DEBUG)
-        assets_md = [self.create_asset_metadata(p) for p in new_products]
-        asset_records = [{k: v for k, v in md.to_dict().items() if k != "geometry_lat_lon"} for md in assets_md]
-        asset_geoms = [md.geometry_lat_lon for md in assets_md]
-        gdf_asset_md = gpd.GeoDataFrame(data=asset_records, crs=EPSG_4326_LATLON, geometry=asset_geoms)
-        gdf_asset_md.index = gdf_asset_md["asset_id"]
-        gdf_asset_md.sort_index()
+        self._log_progress_message("START: adding new assets (deferred AssetMetadata objects) ...", level=logging.DEBUG)
+        # We now only build lightweight dict rows + geometry; AssetMetadata instantiation is deferred
+        records = []
+        geometries = []
+        for product in new_products:
+            row_dict, geom = self._build_row_dict(product)
+            records.append(row_dict)
+            geometries.append(geom)
 
-        if self._df_asset_metadata is None:
-            self._df_asset_metadata = gdf_asset_md
+        gdf_new = gpd.GeoDataFrame(data=records, crs=EPSG_4326_LATLON, geometry=geometries)
+        gdf_new.index = gdf_new["asset_id"]
+        gdf_new.sort_index()
+
+        if self._products_df is None:
+            self._products_df = gdf_new
         else:
-            self._df_asset_metadata = pd.concat([self._df_asset_metadata, gdf_asset_md])
-            self._df_asset_metadata = self._df_asset_metadata.drop_duplicates(subset=["asset_id"])
+            self._products_df = pd.concat([self._products_df, gdf_new])
+            # Drop duplicates early to keep memory lower
+            self._products_df = self._products_df[~self._products_df.index.duplicated(keep="first")]
 
-        self._log_progress_message("DONE: adding new assets to AssetMetadata GeoDataFrame", level=logging.DEBUG)
+        self._log_progress_message("DONE: adding new assets (deferred AssetMetadata objects)", level=logging.DEBUG)
 
-    def _product_to_dict(self, product: tcc.Product) -> dict[str, Any]:
-        return {
-            "id": product.id,
-            "title": product.title,
-            "geojson": product.geojson,
-            "geometry": product.geometry,
-            "bbox": product.bbox,
-            "beginningDateTime": product.beginningDateTime,
-            "endingDateTime": product.endingDateTime,
-            "properties": product.properties,
-            "data": [self._product_file_to_dict(f) for f in product.data],
-            "related": [self._product_file_to_dict(f) for f in product.related],
-            "previews": [self._product_file_to_dict(f) for f in product.previews],
+    def _build_row_dict(self, product: tcc.Product) -> tuple[dict, Any]:
+        """Return minimal dict + geometry for a product. Mirrors create_asset_metadata but avoids object creation.
+
+        This reduces per-product overhead (no dataclass / validation) and defers any heavy logic to final conversion.
+        """
+        props = product.properties
+        data_links = props.get("links", {}).get("data", [])
+        first_link = data_links[0]
+        first_prod_data = product.data[0] if product.data else None
+
+        href = first_prod_data.href if first_prod_data else first_link.get("href")
+        if data_links and first_prod_data:
+            # quick consistency assertion kept light (can downgrade to debug later)
+            try:
+                assert first_link.get("href") == href
+            except AssertionError:
+                _logger.debug("Mismatch between data link href and product data href for %s", product.id)
+
+        product_type = props.get("productInformation", {}).get("productType")
+        num_chars_to_remove = 1 + len(product_type) if product_type else 0
+        item_id = product.id[:-num_chars_to_remove] if num_chars_to_remove else product.id
+
+        acquisitionInformation = props.get("acquisitionInformation") or []
+        tile_id = None
+        if acquisitionInformation:
+            tile_id = acquisitionInformation[0].get("acquisitionParameters", {}).get("tileId")
+
+        asset_type = first_prod_data.title if first_prod_data else None
+        media_type = AssetMetadata.mime_to_media_type(first_prod_data.type) if first_prod_data else None
+        file_size = first_prod_data.length if first_prod_data else None
+
+        # EPSG detection (same logic, condensed)
+        epsg_code = None
+        if data_links:
+            epsg_url = first_link.get("conformsTo")
+            if epsg_url and "EPSG" in epsg_url:
+                parts = epsg_url.split("/")
+                try:
+                    epsg_code = int(parts[-1])
+                except Exception:
+                    _logger.debug("Could not parse EPSG from %s", epsg_url, exc_info=True)
+        if epsg_code is None and tile_id:
+            import re
+
+            results = re.findall(r"\d+", tile_id)
+            if results:
+                epsg_code = int("326" + results[0])
+        if epsg_code is None:
+            _logger.debug("Could not determine EPSG code for product %s; defaulting to 4326", product.id)
+        proj_epsg = epsg_code or EPSG_4326_LATLON
+
+        bbox_lat_lon_list = product.bbox
+        # Defer creation of BoundingBox objects; store raw values to minimize overhead
+        # We'll reconstruct BoundingBox in final conversion step.
+
+        record = {
+            "href": href,
+            "original_href": href,
+            "asset_id": product.id,
+            "item_id": item_id,
+            "tile_id": tile_id,
+            "asset_type": asset_type,
+            "media_type": media_type,
+            "file_size": file_size,
+            "proj_epsg": proj_epsg,
+            "bbox_lat_lon_minx": bbox_lat_lon_list[0],
+            "bbox_lat_lon_miny": bbox_lat_lon_list[1],
+            "bbox_lat_lon_maxx": bbox_lat_lon_list[2],
+            "bbox_lat_lon_maxy": bbox_lat_lon_list[3],
+            "datetime": product.beginningDateTime,
+            "start_datetime": product.beginningDateTime,
+            "end_datetime": product.endingDateTime,
         }
-
-    def _product_file_to_dict(self, product_file: ProductFile) -> dict[str, Any]:
-        return {
-            "href": product_file.href,
-            "length": product_file.length,
-            "title": product_file.title,
-            "type": product_file.type,
-            "category": product_file.category,
-        }
+        # geometry kept separate for GeoDataFrame geometry column
+        geometry = product.geometry
+        return record, geometry
 
     def _convert_to_asset_metadata(self, df: pd.DataFrame) -> List[AssetMetadata]:
         """Convert the pandas dataframe to a list of AssetMetadata objects."""
@@ -674,120 +705,69 @@ class HRLVPPMetadataCollector(IMetadataCollector):
         # Log some progress every 10 000 records. Without this output it is hard to see what is happening.
         progress_chunk_size = 10_000
         num_products = len(df)
-        for i in range(num_products):
+        # Iterate using itertuples for lower overhead
+        for i, row in enumerate(df.itertuples(index=False)):
             if i % progress_chunk_size == 0:
-                fraction_done = i / num_products
-                self._log_progress_message(f"Converted {i} of {num_products} to AssetMetadata ({fraction_done:.1%})")
+                fraction_done = i / num_products if num_products else 1
+                gc.collect()
+                self._log_progress_message(
+                    f"Converted {i} of {num_products} to AssetMetadata ({fraction_done:.1%}). Memory usage: {psutil.Process().memory_info().rss // 1024**2:_}MB"
+                )
 
-            record = df.iloc[i, :]
-            metadata = AssetMetadata.from_geoseries(record)
-            md_list.append(metadata)
+            try:
+                # Reconstruct BoundingBox lazily
+                bbox_lat_lon = BoundingBox(
+                    row.bbox_lat_lon_minx,
+                    row.bbox_lat_lon_miny,
+                    row.bbox_lat_lon_maxx,
+                    row.bbox_lat_lon_maxy,
+                    EPSG_4326_LATLON,
+                )
+                # Projected bbox only if proj differs
+                if row.proj_epsg != EPSG_4326_LATLON:
+                    try:
+                        proj_bbox_vals = reproject_bounding_box(
+                            row.bbox_lat_lon_minx,
+                            row.bbox_lat_lon_miny,
+                            row.bbox_lat_lon_maxx,
+                            row.bbox_lat_lon_maxy,
+                            from_crs=EPSG_4326_LATLON,
+                            to_crs=row.proj_epsg,
+                        )
+                        bbox_projected = BoundingBox.from_list(proj_bbox_vals, row.proj_epsg)
+                    except Exception:
+                        _logger.debug("Reprojection failed for %s; using lat/lon bbox", row.asset_id, exc_info=True)
+                        bbox_projected = bbox_lat_lon
+                else:
+                    bbox_projected = bbox_lat_lon
+
+                kwargs = {
+                    "href": row.href,
+                    "original_href": row.original_href,
+                    "asset_id": row.asset_id,
+                    "item_id": row.item_id,
+                    "tile_id": getattr(row, "tile_id", None),
+                    "asset_type": getattr(row, "asset_type", None),
+                    "media_type": getattr(row, "media_type", None),
+                    "file_size": getattr(row, "file_size", None),
+                    "proj_epsg": row.proj_epsg,
+                    "bbox_lat_lon": bbox_lat_lon,
+                    "geometry_lat_lon": row.geometry,
+                    "bbox_projected": bbox_projected,
+                    "datetime": row.datetime,
+                    "start_datetime": row.start_datetime,
+                    "end_datetime": row.end_datetime,
+                }
+                metadata = AssetMetadata(**{k: v for k, v in kwargs.items() if v is not None})
+                md_list.append(metadata)
+            except Exception:
+                _logger.error(
+                    "Failed to convert row %s to AssetMetadata", getattr(row, "asset_id", "<unknown>"), exc_info=True
+                )
 
         self._log_progress_message(f"DONE: {i + 1} of {num_products} converted to AssetMetadata")
         self._log_progress_message("DONE: _convert_to_asset_metadata", level=logging.DEBUG)
         return md_list
-
-    def create_asset_metadata(self, product: tcc.Product) -> AssetMetadata:
-        """Create a AssetMetadata object containing all relevant info from the product in OpenSearch/terracatalogueclient"""
-        props = product.properties
-        data_links = props.get("links", {}).get("data", [])
-        # TODO: it seems we can have multiple links for multiple assets here: how to handle them?
-        #   Is each link a separate asset in STAC terms?
-        #   And does our data even use this or does the list only ever contain one element?
-        first_link = data_links[0]
-        first_prod_data = product.data[0] if product.data else None
-
-        href = first_prod_data.href
-        # TODO: remove temporary assert for development. The above method to get href seems better but want to verify that they are indeed identical.
-        href2 = first_link.get("href") if data_links else None
-        assert href2 == href
-
-        asset_metadata = AssetMetadata()
-        asset_metadata.href = href
-        asset_metadata.original_href = href
-        asset_metadata.asset_id = product.id
-
-        # product type is a shorter code than what corresponds to asset_metadata.asset_type
-        # The product type is more general. But the OpenSearch title (asset_type for is) appends the spatial resolution.
-        # For example: product_type="PPI", title="PPI_10M"
-        product_type = props.get("productInformation", {}).get("productType")
-        # item_id is the asset_id without the product_type/band name at the end
-        num_chars_to_remove = 1 + len(product_type)
-        asset_metadata.item_id = asset_metadata.asset_id[:-num_chars_to_remove]
-
-        # In this case we should get the title and description from the source in
-        # OpenSearch rather than our own collection config file
-        # TODO: Add title + description to AssetMetadata, or some other intermediate for STAC items.
-        acquisitionInformation = props.get("acquisitionInformation")
-        tile_id = None
-        if acquisitionInformation:
-            acquisitionInformation = acquisitionInformation[0]
-            tile_id = acquisitionInformation.get("acquisitionParameters", {}).get("tileId")
-            asset_metadata.tile_id = tile_id
-
-        if product.data:
-            first_prod_data = product.data[0]
-            asset_metadata.asset_type = first_prod_data.title
-            asset_metadata.media_type = AssetMetadata.mime_to_media_type(first_prod_data.type)
-            asset_metadata.file_size = first_prod_data.length
-
-        epsg_code = None
-        if data_links:
-            # example:
-            #   conformsTo': 'http://www.opengis.net/def/crs/EPSG/0/3035'
-            epsg_url = first_link.get("conformsTo")
-            parts_epsg_code = epsg_url.split("/")
-            if "EPSG" in parts_epsg_code:
-                try:
-                    epsg_code = int(parts_epsg_code[-1])
-                except Exception:
-                    _logger.error(
-                        f"Could not get EPSG code for product with ID={product.id}, {epsg_url=}", exc_info=True
-                    )
-                    raise
-        if epsg_code is None and asset_metadata.tile_id:
-            import re
-
-            results = re.findall("""\d+""", asset_metadata.tile_id)
-            epsg_code = int("326" + results[0])
-        if epsg_code is None:
-            logging.warn(f"Could not determine EPSG code for product with ID={product.id} assuming LatLon")
-        asset_metadata.proj_epsg = epsg_code or EPSG_4326_LATLON
-
-        asset_metadata.bbox_lat_lon = BoundingBox.from_list(product.bbox, epsg=EPSG_4326_LATLON)
-        asset_metadata.geometry_lat_lon = product.geometry
-        if epsg_code:
-            proj_bbox = reproject_bounding_box(*product.bbox, from_crs=EPSG_4326_LATLON, to_crs=epsg_code)
-            asset_metadata.bbox_projected = BoundingBox.from_list(proj_bbox, epsg_code)
-        else:
-            asset_metadata.bbox_projected = asset_metadata.bbox_lat_lon
-
-        asset_metadata.datetime = product.beginningDateTime
-        asset_metadata.start_datetime = product.beginningDateTime
-        asset_metadata.end_datetime = product.endingDateTime
-
-        # TODO: should we also process the following keys in the product.properties dict?
-        # 'acquisitionInformation': [{'acquisitionParameters': {'acquisitionType': 'NOMINAL', 'beginningDateTime': '2017-04-01T00:00:00.000Z', 'endingDateTime': '2017-04-01T23:59:59.999Z', 'tileId': 'E09N27'},
-        #                             'platform': {'platformSerialIdentifier': 'S2A, S2B', 'platformShortName': 'SENTINEL-2'}}],
-        # 'additionalAttributes': {'resolution': 10},
-        # 'available': '2022-10-17T15:16:33Z',
-        # 'date': '2017-04-01T00:00:00.000Z',
-        # 'identifier': 'ST_20170401T000000_S2_E09N27-03035-010m_V101_PPI',
-        # 'links': {'alternates': [],
-        #         'data': [{'conformsTo': 'http://www.opengis.net/def/crs/EPSG/0/3035',
-        #                     'href': 'https://phenology.vgt.vito.be/download/ST_LAEA_V01/2017/CLMS/Pan-European/Biophysical/ST_LAEA/v01/2017/04/01/ST_20170401T000000_S2_E09N27-03035-010m_V101_PPI.tif',
-        #                     'length': 3264953,
-        #                     'title': 'PPI_10M',
-        #                     'type': 'image/tiff'}],
-        #         'previews': [],
-        #         'related': []},
-        # 'parentIdentifier': 'copernicus_r_3035_x_m_hrvpp-st_p_2017-now_v01',
-        # 'productInformation': {'availabilityTime': '2022-10-17T15:16:33Z', 'processingCenter': 'VITO', 'processingDate': '2021-08-23T15:07:52.759Z', 'productType': 'PPI', 'productVersion': 'V101'},
-        # 'published': '2022-10-17T15:16:33Z',
-        # 'status': 'ARCHIVED',
-        # 'title': 'Seasonal Trajectories 2017-now (raster 010m) - version 1 revision 01 : PPI E09N27 20170401T000000',
-        # 'updated': '2021-08-23T15:07:52.759Z'}
-        return asset_metadata
 
 
 def parse_tile_id(tile_id: str) -> Tuple[str, str]:
