@@ -1,0 +1,49 @@
+{
+    "collection_id": "MDVI",
+    "title": "Max DVI",
+    "description": "Max DVI as input for PPI calculation",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*MDVI/(?P<version>\\d{3})/(?P<tileId>\\w+).tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "asset_type": "MDVI",
+                "year": 2015,
+                "item_id": "MDVI_{tileId}_{version}"
+            }
+        }
+    },
+    "item_assets": {
+        "MDVI": {
+            "title": "MDVI",
+            "description": "MDVI",
+            "eo_bands": [
+                {
+                    "name": "dvi_max",
+                    "description": "dvi max"
+                },
+                {
+                    "name": "dvi_soil",
+                    "description": "dvi soil"
+                }
+            ]
+        }
+    }
+}
