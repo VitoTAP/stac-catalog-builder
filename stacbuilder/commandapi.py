@@ -21,10 +21,12 @@ The module is organized into the following functional areas:
 - upload_items_to_stac_api: Upload only items to STAC API
 """
 
+from functools import wraps
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from deprecated import deprecated
+from loguru import logger
 from pystac import Collection, Item
 
 from stacbuilder.builder import (
@@ -53,6 +55,19 @@ __all__ = [
 ]
 
 
+def log_and_reraise(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.exception(f"Error in {func.__name__}")
+            raise
+
+    return wrapper
+
+
+@log_and_reraise
 def build_collection(
     collection_config_path: Path,
     glob: str,
@@ -100,6 +115,7 @@ def build_collection(
 
 
 @deprecated(reason="use build_collection instead")
+@log_and_reraise
 def build_grouped_collections(
     collection_config_path: Path,
     glob: str,
@@ -141,6 +157,7 @@ def build_grouped_collections(
     pipeline.build_grouped_collections()
 
 
+@log_and_reraise
 def list_input_files(
     glob: str,
     input_dir: Path,
@@ -167,6 +184,7 @@ def list_input_files(
     return collector.input_files
 
 
+@log_and_reraise
 def list_asset_metadata(
     collection_config_path: Path,
     glob: str,
@@ -196,6 +214,7 @@ def list_asset_metadata(
     return collector.metadata_list
 
 
+@log_and_reraise
 def list_stac_items(
     collection_config_path: Path,
     glob: str,
@@ -259,6 +278,7 @@ def validate_collection(
     collection.validate_all()
 
 
+@log_and_reraise
 def upload_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):
@@ -269,6 +289,7 @@ def upload_to_stac_api(collection_path: Path, settings: Settings, limit: int = -
     uploader.upload_collection_and_items(collection_path, items=collection_path.parent, limit=limit, offset=offset)
 
 
+@log_and_reraise
 def upload_items_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):

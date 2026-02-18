@@ -524,7 +524,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
 
         out_dir_str = self.output_dir.as_posix()
         if out_dir_str.endswith("/"):
-            out_dir_str = out_dir_str[-1]
+            out_dir_str = out_dir_str[:-1]
         self._collection.normalize_hrefs(root_href=out_dir_str, strategy=strategy, skip_unresolved=False)
 
     def validate_collection(self, collection: Collection):
@@ -552,7 +552,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
             self.output_dir.mkdir(parents=True)
 
         self._collection.save(catalog_type=CatalogType.SELF_CONTAINED)
-        logger.info("DONE: Saving collection.")
+        logger.info(f"DONE: Saved collection to {self.collection_file_path}")
 
     @property
     def providers(self):
@@ -642,8 +642,13 @@ class AssetMetadataPipeline:
         item_postprocessor: Optional[Callable] = None,
         single_asset_per_item: Optional[bool] = False,
     ) -> None:
-        if output_dir and not isinstance(output_dir, Path):
-            raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
+        if output_dir:
+            if not isinstance(output_dir, Path):
+                raise TypeError(f"Argument output_dir (if not None) should be of type Path, {type(output_dir)=}")
+            if len(output_dir.suffixes) > 0:
+                raise ValueError(
+                    f"Argument output_dir should be a directory, but it has suffixes: {output_dir.suffixes}"
+                )
 
         if collection_config is None:
             raise ValueError('Argument "collection_config" can not be None, must be a CollectionConfig instance.')
@@ -731,9 +736,16 @@ class AssetMetadataPipeline:
                 yield metadata
 
     def collect_stac_items(self):
-        """Generate the intermediate STAC Item objects."""
+        """
+        Collect the metadata from the metadata collector and convert it to STAC Items using the item builder. This is a generator that yields STAC Items one by one, so it can be used in a streaming fashion to avoid memory issues when dealing with large collections.
+
+        """
 
         def _item_from_assets(assets: List[AssetMetadata]) -> Item:
+            """
+            Helper function to create a STAC Item from a list of AssetMetadata objects and apply the post_processing. This is used in both the single-asset-per-item case and the multi-asset-per-item case.
+            The assets should all have the same item_id and consistent metadata.
+            """
             stac_item = self.item_builder.create_item(assets)
             if stac_item and self.item_postprocessor is not None:
                 stac_item = self.item_postprocessor(stac_item)

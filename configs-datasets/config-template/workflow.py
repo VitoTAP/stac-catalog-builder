@@ -15,7 +15,7 @@ from stacbuilder import (
 from stacbuilder.stacapi.config import AuthSettings, Settings
 
 # Collection configuration
-catalog_version = "v0.1"
+catalog_version = "v01"
 collection_config_path = Path("config-collection.json")
 
 # Input Paths

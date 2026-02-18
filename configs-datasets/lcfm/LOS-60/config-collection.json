@@ -1,7 +1,7 @@
 {
-    "collection_id": "LCFM_LOS-60_v100_TERRASCOPE",
-    "title": "LCFM LOS 60 v100",
-    "description": "LCFM LOS 60m V100",
+    "collection_id": "lcfm_los-60_v110_terrascope",
+    "title": "LCFM LOS 60m v110",
+    "description": "LCFM LOS 60m V110",
     "instruments": [],
     "keywords": [],
     "mission": [],
@@ -11,7 +11,7 @@
     "input_path_parser": {
         "classname": "DefaultInputPathParser",
         "parameters": {
-            "regex_pattern": ".LCFM_LOS_V100_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})T(?P<hour>\\d{2})(?P<minute>\\d{2})(?P<second>\\d{2})_\\d+T\\d+_(?P<tileId>\\w+)_PROBS_60M.tif$",
+            "regex_pattern": ".LCFM_LOS_V110_(?P<year>\\d{4})(?P<month>\\d{2})(?P<day>\\d{2})T(?P<hour>\\d{2})(?P<minute>\\d{2})(?P<second>\\d{2})_\\d+T\\d+_(?P<tileId>\\w+)_PROBS_60M.tif$",
             "period": "secondly",
             "fixed_values": {
                 "asset_type": "los"
@@ -20,7 +20,7 @@
     },
     "item_assets": {
         "los": {
-            "title": "LCFM LOS 60 v100",
+            "title": "LCFM LOS 60m v110",
             "description": "",
             "eo_bands": [
                 {

@@ -7,6 +7,7 @@ import pystac
 from loguru import logger
 from pystac import Collection, Item
 from requests.auth import AuthBase
+from upath import UPath
 from yarl import URL
 
 from stacbuilder.async_utils import AsyncTaskPoolMixin
@@ -159,6 +160,10 @@ class Uploader(AsyncTaskPoolMixin):
 
         if not item.get_links(pystac.RelType.COLLECTION):
             item.add_link(pystac.Link(rel=pystac.RelType.COLLECTION, target=item.collection_id))
+
+        # Ensure all hrefs in the item are uri's
+        for asset in item.assets.values():
+            asset.href = UPath(asset.href).as_uri()
 
     def _log_progress_message(self, message: str) -> None:
         calling_method_name = inspect.stack()[1][3]

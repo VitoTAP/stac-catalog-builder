@@ -1,9 +1,10 @@
-import warnings
+import threading
 from math import log10
 from pathlib import Path
-from typing import Optional, Union
+from typing import ClassVar, Optional, Union
 
 import rasterio
+from loguru import logger
 from openeo.util import normalize_crs
 from pystac.media_type import MediaType
 from rio_cogeo import cog_validate
@@ -51,6 +52,10 @@ class MapGeoTiffToAssetMetadata:
     """
     Class to extract AssetMetadata from GeoTIFF files.
     """
+
+    # Cache COG validation result per asset type to avoid repeated expensive checks across threads.
+    _media_type_cache: ClassVar[dict[str, MediaType]] = {}
+    _media_type_cache_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(
         self,
@@ -105,7 +110,10 @@ class MapGeoTiffToAssetMetadata:
         if not isinstance(asset_path, (Path, str)):
             raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
 
-        modified_href = self._href_modifier(asset_path) if self._href_modifier else str(asset_path)
+        if self._href_modifier:
+            modified_href = self._href_modifier(asset_path)
+        else:
+            modified_href = asset_path.as_posix()
 
         # check for s3 path and adjust the file path.
         if isinstance(asset_path, S3Path):
@@ -153,15 +161,9 @@ class MapGeoTiffToAssetMetadata:
         file_stat = asset_path.stat()
 
         href_info = self.process_href_info(str(asset_path))
+        asset_type = href_info.get("asset_type")
 
-        if cog_validate(_asset_path):
-            media_type = MediaType.COG
-        else:
-            warnings.warn(
-                f"Asset {asset_path} is not a valid COG. Consider converting it to a COG for better performance.",
-                category=UserWarning,
-            )
-            media_type = MediaType.GEOTIFF
+        media_type = self._resolve_media_type(asset_type=asset_type, asset_path=_asset_path)
 
         # Prepare the arguments for AssetMetadata, allowing href_info to override or add fields
         asset_metadata_args = dict(
@@ -184,3 +186,30 @@ class MapGeoTiffToAssetMetadata:
         asset_metadata = AssetMetadata(**asset_metadata_args)
 
         return asset_metadata
+
+    def _resolve_media_type(self, asset_type: Optional[str], asset_path: Union[Path, str]) -> MediaType:
+        """Return cached media type for an asset type or compute it once."""
+        cache_key = asset_type or Path(asset_path).suffix
+        cached = self._media_type_cache.get(cache_key)
+
+        # If we have a cached media type for this asset type, return it immediately to avoid redundant COG validation.
+        if cached:
+            return cached
+        with self._media_type_cache_lock:
+            # Double-check the cache after acquiring the lock to prevent redundant COG validation in concurrent scenarios.
+            cached = self._media_type_cache.get(cache_key)
+            if cached:
+                return cached
+
+            if cog_validate(asset_path):
+                media_type = MediaType.COG
+                logger.info(f"Asset type {asset_type} confirmed to be valid COG's. Checked with {asset_path}.")
+            else:
+                logger.warning(
+                    f"Asset {asset_path} of asset type {asset_type} is not a valid COG. Consider converting it to a COG for better performance.",
+                )
+                media_type = MediaType.GEOTIFF
+
+            self._media_type_cache[cache_key] = media_type
+
+            return media_type

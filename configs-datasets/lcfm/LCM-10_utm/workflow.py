@@ -15,7 +15,7 @@ from stacbuilder import (
 )
 
 # Collection configuration
-catalog_version = "v0.1"
+catalog_version = "v01"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths

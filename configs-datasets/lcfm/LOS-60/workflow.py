@@ -23,9 +23,10 @@ collection_config_path = workflow_base_path / "config-collection.json"
 
 # Input Paths
 year = "*"
-tiff_input_path = Path("/vitodata/vegteam_los/")
+tile_glob = "*/*/*"
+tiff_input_path = Path("/vitodata/vegteam_los/products/LCFM/LOS/v110/tiles_utm/")
 assert tiff_input_path.exists(), f"Path does not exist: {tiff_input_path}"
-tiffs_glob = f"{year}/products/LCFM/LOS/v100/tiles_utm/*/*/*/*/*/*_PROBS_60M.tif"
+tiffs_glob = f"{tile_glob}/{year}/*/*_PROBS_60M.tif"
 
 # Output Paths
 output_path = Path("/data/users/Private/victor.verhaert/stac-collections/LCFM/LOS")
@@ -36,7 +37,7 @@ def item_postprocessor(item: pystac.Item) -> pystac.Item:
     tileId = item.id.split("_")[-3]
     item.properties["tileId"] = tileId
 
-    item.properties["product_version"] = "v100"
+    item.properties["product_version"] = "v110"
     return item
 
 
