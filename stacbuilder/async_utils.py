@@ -18,6 +18,7 @@ Features:
 from __future__ import annotations
 
 import os
+import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from typing import Any, Callable, List, Optional
 
@@ -61,12 +62,15 @@ class AsyncTaskPoolMixin:
         logger.info(msg)
 
     def _ensure_executor(self):
+        """Create the ThreadPoolExecutor if it doesn't exist"""
         if self._executor is None:
             try:
                 max_workers = min(32, (os.cpu_count() or 4) * 2)
             except Exception:
                 max_workers = 8
-            self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="stac-save")
+            self._executor = ThreadPoolExecutor(
+                max_workers=max_workers, thread_name_prefix=f"{self.__class__.__name__}-worker"
+            )
 
     def _handle_finished_future(self, fut: Future) -> Optional[Exception]:
         """Process a finished future and return any exception that occurred.
@@ -88,19 +92,33 @@ class AsyncTaskPoolMixin:
                 return e
         return None
 
-    def _enforce_futures_cap(self):
+    def _wait_and_handle_next_finished_tasks(self) -> None:
+        """
+        Wait for the next future to complete and process it.
+        If a result callback is provided, it will be called with the result of the completed task.
+        Logs any exceptions that occur during task execution or result processing.
+        """
+        if not self._task_futures:
+            return None
+        done, _ = wait(self._task_futures, return_when=FIRST_COMPLETED)
+        for fut in done:
+            err = self._handle_finished_future(fut)
+            self._task_futures.remove(fut)
+            if err:
+                logger.error(f"Error in async task of {self.__class__.__name__}: {err}")
+
+    def _enforce_futures_cap(self) -> None:
+        """Wait until the number of outstanding futures is below the configured cap before allowing more tasks to be submitted."""
         if not self._task_futures:
             return
+        time_before_wait = time.time()
         while len(self._task_futures) >= self._max_outstanding_tasks:
-            done, not_done = wait(self._task_futures, return_when=FIRST_COMPLETED)
-            errors = [err for fut in done if (err := self._handle_finished_future(fut)) is not None]
-            self._task_futures = [f for f in not_done]
-            if errors:
-                raise RuntimeError(
-                    f"Error while executing async task (during throttling). First: {errors[0]}"
-                ) from errors[0]
+            self._wait_and_handle_next_finished_tasks()
+        time_waited = time.time() - time_before_wait
+        if time_waited > 1:
+            logger.debug(f"Throttled task submission for {time_waited:.2f} in {self.__class__.__name__}.")
 
-    def _submit_async_task(self, func, *args, **kwargs):
+    def _submit_async_task(self, func, *args, **kwargs) -> Future:
         """Submit a generic callable for asynchronous execution.
 
         Returns the Future instance.
@@ -111,7 +129,7 @@ class AsyncTaskPoolMixin:
         self._task_futures.append(fut)
         return fut
 
-    def _wait_for_tasks(self, shutdown: bool = True):
+    def _wait_for_tasks(self, shutdown: bool = True) -> None:
         """Wait for all outstanding tasks to complete.
 
         Args:
@@ -120,17 +138,15 @@ class AsyncTaskPoolMixin:
         if not self._task_futures:
             return
         self._log(f"Waiting for {len(self._task_futures)} asynchronous task(s) to complete ...")
-        wait(self._task_futures)
-        errors = [err for fut in self._task_futures if (err := self._handle_finished_future(fut)) is not None]
-        self._task_futures.clear()
+        time_before_wait = time.time()
+        while self._task_futures:
+            self._wait_and_handle_next_finished_tasks()
+        time_waited = time.time() - time_before_wait
+        logger.debug(f"Waited {time_waited:.2f} seconds for async tasks to complete in {self.__class__.__name__}.")
         if shutdown:
             self.shutdown_executor()
-        if errors:
-            raise RuntimeError(
-                f"{len(errors)} error(s) occurred while executing async tasks. First: {errors[0]}"
-            ) from errors[0]
 
-    def shutdown_executor(self):
+    def shutdown_executor(self) -> None:
         """Shutdown the executor if it exists."""
         if self._executor:
             self._executor.shutdown(wait=True, cancel_futures=False)

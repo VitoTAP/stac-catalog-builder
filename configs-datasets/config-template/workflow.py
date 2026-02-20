@@ -3,6 +3,7 @@ from getpass import getpass
 from pathlib import Path
 
 import pystac
+from loguru import logger
 
 from stacbuilder import (
     build_collection,
@@ -13,6 +14,11 @@ from stacbuilder import (
     validate_collection,
 )
 from stacbuilder.stacapi.config import AuthSettings, Settings
+
+logger.add(
+    Path(__file__).parent / "debug.log",
+    level="INFO",
+)
 
 # Collection configuration
 catalog_version = "v01"

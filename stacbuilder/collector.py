@@ -275,6 +275,7 @@ class MetadataCollector(IMetadataCollector, AsyncTaskPoolMixin):
             submitted_count += 1
 
             # Yield any completed results from the queue (non-blocking)
+            # TODO instead of yielding results, the queue could be exposed as an attribute, and the user of this class could decide when to yield results from it, and when to wait for more results to be added to the queue.
             while not result_queue.empty():
                 completed_count += 1
                 yield result_queue.get()
@@ -288,13 +289,14 @@ class MetadataCollector(IMetadataCollector, AsyncTaskPoolMixin):
 
         logger.info(f"All {submitted_count} files submitted. Collecting remaining results...")
 
-        # Wait for all remaining tasks to complete
-        self._wait_for_tasks(shutdown=True)
+        while self._task_futures:
+            # Wait for the next task(s) to complete
+            self._wait_and_handle_next_finished_tasks()
 
-        # Yield all remaining results from the queue
-        while not result_queue.empty():
-            completed_count += 1
-            yield result_queue.get()
+            # Yield all remaining results from the queue
+            while not result_queue.empty():
+                completed_count += 1
+                yield result_queue.get()
 
         logger.debug(f"DONE streaming collection. Total {completed_count} metadata items yielded.")
 

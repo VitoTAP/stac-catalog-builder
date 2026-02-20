@@ -56,6 +56,8 @@ __all__ = [
 
 
 def log_and_reraise(func):
+    """Decorator to log exceptions and re-raise them for better error handling in command functions."""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
