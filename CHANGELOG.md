@@ -5,17 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - in progress
+## [Unreleased] - 
 ### Added
-- 
 
 ### Changed
 
+### Removed
+
+### Fixed
+
+## [1.0.2] - 2026-02-19
+### Added
+
+- Streaming build path: `single_asset_per_item` mode lets metadata and STAC items flow without buffering everything in memory
+- Default loguru setup (console + suppression of noisy libs) and log file support for workflows
+- Pre-commit nbstripout hook for notebooks
+
+### Changed
+
+- Metadata collection uses streaming + throttled async pool (defaults to 10k outstanding tasks) with clearer progress logging ([#85](https://github.com/VitoTAP/stac-catalog-builder/issues/85))
+- COG validation is cached per asset type to avoid repeated checks; catalog version strings standardized (e.g., `v01`/`v02`) ([#80](https://github.com/VitoTAP/stac-catalog-builder/issues/80))
+- Uploading to a stac api now adjust asset href's to be uri's ([#97](https://github.com/VitoTAP/stac-catalog-builder/issues/97))
+
+### Removed
+
+### Fixed
+- Added exception for when output directory ends with a suffix. pystac does not support this and will cause unexpected saving behavior.
+
+## [1.0.1] - 2025-09-15
+### Added
+
+### Changed
+
+- **BREAKING**: Replaced Python's standard `logging` module with `loguru` throughout the package
+- Removed custom `_log_progress_message()` methods from classes (replaced with direct loguru calls)
 - Limit the number of concurrent futures to avoid memory issues during metadata collection. Current setting is 1000. 
 - Improve logging to show progress every 1000 files processed.
 
 ### Removed
-- 
 
 ### Fixed
 

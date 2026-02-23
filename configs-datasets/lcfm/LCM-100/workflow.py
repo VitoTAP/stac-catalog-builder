@@ -17,7 +17,7 @@ product = "LCM-100"
 version = "v005"
 postfix = "_V12C_C232"
 level = "30deg" if product == "LCM-100" else "3deg"
-catalog_version = "v0.1"
+catalog_version = "v01"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
