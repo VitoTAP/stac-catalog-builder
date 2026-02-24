@@ -119,7 +119,7 @@ class Uploader(AsyncTaskPoolMixin):
         items: Path | list[Item],
         limit: int = -1,
         offset: int = -1,
-        item_glob: str = "*/*/*/*/*.json",
+        item_glob: str = "**/*.json",
     ) -> None:
         if isinstance(collection, Path):
             collection = Collection.from_file(collection)
@@ -131,7 +131,7 @@ class Uploader(AsyncTaskPoolMixin):
         elif isinstance(items, Path):
             item_dir: Path = items
             logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
-            item_paths = list(item_dir.glob(item_glob))
+            item_paths = [item_path for item_path in item_dir.glob(item_glob) if item_path.stem != "collection"]
             logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 

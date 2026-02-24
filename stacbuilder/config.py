@@ -18,6 +18,7 @@ from pystac.extensions.eo import Band, EOExtension
 from pystac.extensions.item_assets import AssetDefinition
 from pystac.extensions.raster import RasterBand, RasterExtension
 from pystac.provider import Provider, ProviderRole
+from upath import UPath
 
 DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = [
     ProviderRole.PRODUCER,
@@ -238,7 +239,8 @@ class AssetConfig(BaseModel):
 
 
 class FileCollectorConfig(BaseModel):
-    input_dir: Path
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    input_dir: Union[Path, UPath]
     glob: Optional[str] = "*"
     max_files: int = -1
 

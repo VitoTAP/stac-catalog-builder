@@ -15,7 +15,7 @@ Rationale:
 import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import dateutil.parser
 import geopandas as gpd
@@ -24,6 +24,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, field_validator
 from pystac.media_type import MediaType
 from shapely.geometry import Polygon, mapping
+from upath import UPath
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.projections import project_polygon
@@ -93,7 +94,7 @@ class AssetMetadata(BaseModel):
     original_href: str = None
     """The original file path or URL before any modifications."""
 
-    asset_path: Path = None
+    asset_path: Union[Path, UPath] = None
     """Path object representing the asset location on the filesystem."""
 
     item_id: str = None

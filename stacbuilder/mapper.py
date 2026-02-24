@@ -8,7 +8,7 @@ from loguru import logger
 from openeo.util import normalize_crs
 from pystac.media_type import MediaType
 from rio_cogeo import cog_validate
-from upath.implementations.cloud import S3Path
+from upath import UPath
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.config import AssetHrefModifierConfig, CollectionConfig
@@ -107,8 +107,10 @@ class MapGeoTiffToAssetMetadata:
         if isinstance(asset_path, str):
             asset_path = Path(asset_path)
 
-        if not isinstance(asset_path, (Path, str)):
-            raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
+        if not isinstance(asset_path, (Path, str, UPath)):
+            raise TypeError(
+                f'Argument "asset_path" must be of type Path, UPath or str. {type(asset_path)=}, {asset_path=}'
+            )
 
         if self._href_modifier:
             modified_href = self._href_modifier(asset_path)
@@ -116,7 +118,7 @@ class MapGeoTiffToAssetMetadata:
             modified_href = asset_path.as_posix()
 
         # check for s3 path and adjust the file path.
-        if isinstance(asset_path, S3Path):
+        if isinstance(asset_path, UPath):
             _asset_path = asset_path.as_uri()
         else:
             _asset_path = asset_path
@@ -170,8 +172,8 @@ class MapGeoTiffToAssetMetadata:
             asset_path=asset_path,
             href=modified_href,
             original_href=str(asset_path),
-            asset_id=Path(asset_path).stem,
-            item_id=Path(asset_path).stem,
+            asset_id=asset_path.stem,
+            item_id=asset_path.stem,
             shape=shape,
             proj_epsg=proj_epsg,
             bbox_projected=bbox_projected,
