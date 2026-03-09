@@ -1,0 +1,82 @@
+{
+    "collection_id": "ndvi_archive",
+    "title": "VICI NDVI Archive",
+    "description": "Archival data required to compute the VICI drought index. The collection contains four layers with 36 timesteps each (one for each dekad in a year) covering Ethiopia, Mali, Mozambique, and Somalia. Layers include NDVI adjustments, 5th/15th percentiles, and seasonality masks.",
+    "instruments": [],
+    "keywords": [],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://remotesensing.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": "(?P<country>Ethiopia|Mali|Mozambique|Somalia)/(?P<asset_type>percentiles5|percentiles15|seasons_dekad|zone_adjust)_(?P<month>\\d{2})(?P<day>\\d{2})(?:\\.mpr)?\\.tif$",
+            "period": "daily",
+            "fixed_values": {
+                "year": 1970,
+                "item_id":  "{country}_{month}{day}"
+            }
+        }
+    },
+    "item_assets": {
+        "percentiles5": {
+            "title": "percentiles5",
+            "description": "5th percentiles computed on 2000-2019 adjusted NDVI timeseries",
+            "eo_bands": [
+                {
+                    "name": "percentiles5",
+                    "description": "5th percentiles computed on 2000-2019 adjusted NDVI timeseries",
+                    "data_type": "ubit8",
+                    "spatial_resolution": 100
+                }
+            ]
+        },
+        "percentiles15": {
+            "title": "percentiles15",
+            "description": "15th percentiles computed on 2000-2019 adjusted NDVI timeseries",
+            "eo_bands": [
+                {
+                    "name": "percentiles15",
+                    "description": "15th percentiles computed on 2000-2019 adjusted NDVI timeseries",
+                    "data_type": "ubit8",
+                    "spatial_resolution": 100
+                }
+            ]
+        },
+        "seasons_dekad": {
+            "title": "seasons_dekad",
+            "description": "Seasonality mask: 1 = in season, 0 = out of season",
+            "eo_bands": [
+                {
+                    "name": "seasons_dekad",
+                    "description": "Seasonality mask: 1 = in season, 0 = out of season",
+                    "data_type": "ubit8",
+                    "spatial_resolution": 100
+                }
+            ]
+        },
+        "zone_adjust": {
+            "title": "zone_adjust",
+            "description": "NDVI adjustments computed per zone",
+            "eo_bands": [
+                {
+                    "name": "zone_adjust",
+                    "description": "NDVI adjustments computed per zone",
+                    "data_type": "int16",
+                    "spatial_resolution": 100
+                }
+            ]
+        }
+    }
+}

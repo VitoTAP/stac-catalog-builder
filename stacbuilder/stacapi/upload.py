@@ -1,29 +1,28 @@
-import concurrent.futures
 import inspect
 import itertools
-import logging
 from pathlib import Path
-from time import sleep
 from typing import Iterable
 
 import pystac
+from loguru import logger
 from pystac import Collection, Item
 from requests.auth import AuthBase
+from upath import UPath
 from yarl import URL
 
+from stacbuilder.async_utils import AsyncTaskPoolMixin
 from stacbuilder.stacapi.auth import get_auth
 from stacbuilder.stacapi.config import Settings
 from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
 
-_logger = logging.getLogger(__name__)
 
-
-class Uploader:
+class Uploader(AsyncTaskPoolMixin):
     DEFAULT_BULK_SIZE = 20
 
     def __init__(
         self, collections_ep: CollectionsEndpoint, items_ep: ItemsEndpoint, bulk_size: int = DEFAULT_BULK_SIZE
     ) -> None:
+        self._init_async_task_pool(max_outstanding_tasks=100)
         self._collections_endpoint = collections_ep
         self._items_endpoint = items_ep
         self._bulk_size = bulk_size
@@ -87,30 +86,20 @@ class Uploader:
             chunk = list(itertools.islice(items_iter, chunk_size))
 
     def upload_items_bulk(self, collection_id: str, items: Iterable[Item]) -> None:
-        futures = []
+        for index, chunk in enumerate(Uploader.chunk_items(items, self.bulk_size)):
+            for item in chunk:
+                self._prepare_item(item, collection_id)
+            start_index = index * self.bulk_size
+            self._log_progress_message(f"Uploading bulk from item {start_index} to {start_index + len(chunk)}")
+            self._submit_async_task(self._items_endpoint.ingest_bulk, chunk.copy())
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            for index, chunk in enumerate(Uploader.chunk_items(items, self.bulk_size)):
-                for item in chunk:
-                    self._prepare_item(item, collection_id)
-                start_index = index * self.bulk_size
-                self._log_progress_message(f"Uploading bulk from item {start_index} to {start_index + len(chunk)}")
-                futures.append(executor.submit(self._items_endpoint.ingest_bulk, chunk.copy()))
-                sleep(1)
-
-            success = True
-            for future_result in concurrent.futures.as_completed(futures):
-                if future_result.exception():
-                    self._log_progress_message(f"Error uploading bulk: {future_result.exception()}")
-                    success = False
-                else:
-                    response = future_result.result()
-                    if not response:
-                        self._log_progress_message("Error uploading bulk: response was empty")
-                        success = False
-                    else:
-                        self._log_progress_message("Uploaded bulk")
-            logging.info("All items uploaded" if success else "Some items failed to upload")
+        # Wait for all uploads to complete
+        try:
+            self._wait_for_tasks()
+            self._log_progress_message("All items uploaded")
+        except RuntimeError as e:
+            self._log_progress_message(f"Some items failed to upload: {e}")
+            raise e
 
     def upload_collection_and_items(
         self,
@@ -120,7 +109,7 @@ class Uploader:
         offset: int = -1,
     ) -> None:
         collection_out = self.upload_collection(collection)
-        _logger.info(f"Uploaded collections, result={collection_out}")
+        logger.info(f"Uploaded collections, result={collection_out}")
 
         self.upload_items(collection, items, limit=limit, offset=offset)
 
@@ -137,23 +126,23 @@ class Uploader:
 
         items_out: list[Item] = items or []
         if not items:
-            _logger.info(f"Using STAC items linked to the collection: {collection.id=}")
+            logger.info(f"Using STAC items linked to the collection: {collection.id=}")
             items_out = collection.get_all_items()
         elif isinstance(items, Path):
             item_dir: Path = items
-            _logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
+            logger.info(f"Retrieving STAC items from JSON files in {item_dir=}")
             item_paths = list(item_dir.glob(item_glob))
-            _logger.info(f"Number of STAC item files found: {len(item_paths)}")
+            logger.info(f"Number of STAC item files found: {len(item_paths)}")
             items_out = (Item.from_file(path) for path in item_paths)
 
         start = None
         stop = None
         if offset > 0:
             start = offset
-            _logger.info(f"User requested to start item upload at offset {offset=}")
+            logger.info(f"User requested to start item upload at offset {offset=}")
 
         if limit > 0:
-            _logger.info(f"User requested to limit the number of items to {limit=}")
+            logger.info(f"User requested to limit the number of items to {limit=}")
             if offset > 0:
                 stop = offset + limit
             else:
@@ -172,6 +161,10 @@ class Uploader:
         if not item.get_links(pystac.RelType.COLLECTION):
             item.add_link(pystac.Link(rel=pystac.RelType.COLLECTION, target=item.collection_id))
 
+        # Ensure all hrefs in the item are uri's
+        for asset in item.assets.values():
+            asset.href = UPath(asset.href).as_uri()
+
     def _log_progress_message(self, message: str) -> None:
         calling_method_name = inspect.stack()[1][3]
-        _logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+        logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")

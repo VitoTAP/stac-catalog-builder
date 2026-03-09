@@ -3,6 +3,7 @@
 import dataclasses as dc
 from typing import Dict, List, Optional
 
+import numpy as np
 from shapely import to_wkt
 from shapely.geometry import Polygon, box, mapping
 
@@ -134,6 +135,28 @@ class BoundingBox:
         bbox = BoundingBox.create_empty()
         bbox.set_from_list(bbox_list, epsg=epsg)
         return bbox
+
+    @staticmethod
+    def from_any(value, default_epsg: int | None = None) -> "BoundingBox | None":
+        """Create a BoundingBox from either a dict or list representation.
+
+        :param value: dict with keys west,south,east,north,(epsg) OR list [w,s,e,n]
+        :param default_epsg: EPSG to use when value is list and contains no epsg info.
+        :return: BoundingBox or None if value is falsy.
+        """
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return BoundingBox.from_dict(value)
+        if isinstance(value, (list, tuple)):
+            if default_epsg is None:
+                raise ValueError("default_epsg must be provided when constructing from list")
+            return BoundingBox.from_list(list(value), epsg=default_epsg)
+        if isinstance(value, np.ndarray):
+            if default_epsg is None:
+                raise ValueError("default_epsg must be provided when constructing from numpy array")
+            return BoundingBox.from_list(value.tolist(), epsg=default_epsg)
+        raise TypeError(f"Unsupported type for BoundingBox.from_any: {type(value)}")
 
     def as_polygon(self) -> Polygon:
         """Returns a rectangular polygon representing the bounding box."""

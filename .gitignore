@@ -122,3 +122,5 @@ tmp/
 
 **/results/**
 *.conf
+
+*.log

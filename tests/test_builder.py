@@ -111,7 +111,7 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         asset_type=asset_type,
         item_id=asset_path_data["item_id"],
         asset_path=asset_path,
-        href=str(asset_path),
+        href=asset_path.as_posix(),
         original_href=str(asset_path),
         datetime=asset_path_data["datetime"],
         start_datetime=asset_path_data["start_datetime"],

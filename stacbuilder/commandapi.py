@@ -21,11 +21,12 @@ The module is organized into the following functional areas:
 - upload_items_to_stac_api: Upload only items to STAC API
 """
 
-import logging
+from functools import wraps
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from deprecated import deprecated
+from loguru import logger
 from pystac import Collection, Item
 
 from stacbuilder.builder import (
@@ -35,17 +36,6 @@ from stacbuilder.collector import FileCollector, MetadataCollector
 from stacbuilder.config import CollectionConfig, FileCollectorConfig
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.stacapi import Settings, Uploader
-
-log_level = logging.INFO
-# create console handler with a higher log level
-console_handler = logging.StreamHandler()
-console_handler.setLevel(log_level)
-# create formatter and add it to the handlers
-formatter = logging.Formatter("%(levelname)-7s | %(asctime)s | %(message)s")
-console_handler.setFormatter(formatter)
-logging.basicConfig(handlers=[console_handler], level=log_level)
-logging.getLogger("botocore").setLevel(logging.WARNING)
-logging.getLogger("boto3").setLevel(logging.WARNING)
 
 # Organized by functionality for better discoverability
 __all__ = [
@@ -65,6 +55,21 @@ __all__ = [
 ]
 
 
+def log_and_reraise(func):
+    """Decorator to log exceptions and re-raise them for better error handling in command functions."""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.exception(f"Error in {func.__name__}")
+            raise
+
+    return wrapper
+
+
+@log_and_reraise
 def build_collection(
     collection_config_path: Path,
     glob: str,
@@ -73,6 +78,7 @@ def build_collection(
     max_files: Optional[int] = -1,
     link_items: bool = True,
     item_postprocessor: Optional[Callable] = None,
+    single_asset_per_item: bool = False,
 ) -> None:
     """
     Build a STAC collection from a directory of files.
@@ -82,6 +88,9 @@ def build_collection(
     :param input_dir: Root directory where the files are located.
     :param output_dir: Directory where the STAC collection will be saved.
     :param max_files: Maximum number of files to process.
+    :param link_items: Whether to create links between collection and items.
+    :param item_postprocessor: Optional function to postprocess each STAC item.
+    :param single_asset_per_item: Whether each STAC item has only one asset. This can speed up processing.
     """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -101,12 +110,14 @@ def build_collection(
         output_dir=output_dir,
         link_items=link_items,
         item_postprocessor=item_postprocessor,
+        single_asset_per_item=single_asset_per_item,
     )
 
     pipeline.build_collection()
 
 
 @deprecated(reason="use build_collection instead")
+@log_and_reraise
 def build_grouped_collections(
     collection_config_path: Path,
     glob: str,
@@ -148,6 +159,7 @@ def build_grouped_collections(
     pipeline.build_grouped_collections()
 
 
+@log_and_reraise
 def list_input_files(
     glob: str,
     input_dir: Path,
@@ -174,6 +186,7 @@ def list_input_files(
     return collector.input_files
 
 
+@log_and_reraise
 def list_asset_metadata(
     collection_config_path: Path,
     glob: str,
@@ -203,6 +216,7 @@ def list_asset_metadata(
     return collector.metadata_list
 
 
+@log_and_reraise
 def list_stac_items(
     collection_config_path: Path,
     glob: str,
@@ -266,6 +280,7 @@ def validate_collection(
     collection.validate_all()
 
 
+@log_and_reraise
 def upload_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):
@@ -276,6 +291,7 @@ def upload_to_stac_api(collection_path: Path, settings: Settings, limit: int = -
     uploader.upload_collection_and_items(collection_path, items=collection_path.parent, limit=limit, offset=offset)
 
 
+@log_and_reraise
 def upload_items_to_stac_api(collection_path: Path, settings: Settings, limit: int = -1, offset: int = -1) -> None:
     """Upload a collection to the STAC API."""
     if not isinstance(collection_path, Path):

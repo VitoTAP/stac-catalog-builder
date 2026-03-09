@@ -18,7 +18,7 @@ version = "v100"
 target = "LCFM"
 terrascope_collection_id = None
 level = "30deg" if product == "LCM-100" else "3deg"
-catalog_version = "v0.1"
+catalog_version = "v01"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
