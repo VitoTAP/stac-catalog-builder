@@ -2,12 +2,13 @@ import pprint
 from pathlib import Path
 
 import pystac
+import rasterio
 
 # run pip install -e . in the root directory to install this package
 from stacbuilder import *
 
 # Collection configuration
-catalog_version = "v0.1"
+catalog_version = "v1"
 collection_config_path = Path(__file__).parent.resolve() / "config-collection.json"
 
 # Input Paths
@@ -37,16 +38,33 @@ for k in asset_metadata:
 
 
 def item_postprocessor(item: pystac.Item) -> pystac.Item:
-    # item.properties["proj:code"] = "EPSG:" + str(item.properties["proj:epsg"])
-    # del item.properties["proj:epsg"]
-    # item.stac_extensions[2] = "https://stac-extensions.github.io/projection/v2.0.0/schema.json"
-    # item.id = item.id.replace("_MAP_V12C_C232", "_MAP")
-
-    # item.properties["tileId"] = item.properties["product_tile"]
-    # del item.properties["product_tile"]
-
     item.collection_id = "lcfm-lcm-10"
 
+    # --- STAC v1.1: upgrade raster:bands to bands, move nodata/data_type to asset level ---
+    map_asset = item.assets["MAP"]
+    raster_bands = map_asset.extra_fields.pop("raster:bands", [])
+    if raster_bands:
+        band = raster_bands[0]
+        map_asset.extra_fields["nodata"] = band.get("nodata")
+        map_asset.extra_fields["data_type"] = band.get("data_type")
+    map_asset.extra_fields["bands"] = [{"name": "MAP"}]
+    # Remove the raster extension, add the new bands reference
+    item.stac_extensions = [ext for ext in item.stac_extensions if "raster" not in ext]
+
+    # --- Title and GSD ---
+    local_href = map_asset.href
+    item.properties["title"] = Path(local_href).stem
+    item.properties["gsd"] = 10
+
+    # --- Processing extension ---
+    with rasterio.open(local_href) as ds:
+        tags = ds.tags() or {}
+    creation_time = tags.get("creation_time")
+    item.properties["processing:datetime"] = creation_time
+    item.properties["processing:version"] = "v100"
+    item.stac_extensions.append("https://stac-extensions.github.io/processing/v1.2.0/schema.json")
+
+    # --- Authentication extension ---
     item.properties["auth:schemes"] = {
         "oidc": {
             "type": "openIdConnect",
@@ -55,12 +73,29 @@ def item_postprocessor(item: pystac.Item) -> pystac.Item:
         }
     }
     item.stac_extensions.append("https://stac-extensions.github.io/authentication/v1.1.0/schema.json")
+    map_asset.extra_fields["auth:refs"] = ["oidc"]
 
-    item.assets["MAP"].extra_fields["auth:refs"] = ["oidc"]
-
-    item.assets["MAP"].extra_fields["alternate"] = {"local": {"href": "file://" + item.assets["MAP"].href}}
+    # --- Alternate assets extension ---
+    map_asset.extra_fields["alternate"] = {"local": {"href": "file://" + local_href}}
     item.stac_extensions.append("https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json")
-    item.assets["MAP"].href = "https://services.terrascope.be/download/" + item.assets["MAP"].href[11:]
+    map_asset.href = "https://services.terrascope.be/download/" + local_href[11:]
+
+    # --- Preview asset ---
+    preview_url = (
+        f"https://titiler.terrascope.be/collections/lcfm-lcm-10/items/{item.id}"
+        f"/preview?assets=MAP&format=png&max_size=256&colormap_name=lcfm"
+    )
+    item.assets["preview"] = pystac.Asset(
+        href=preview_url,
+        media_type="image/png",
+        title="Preview",
+        extra_fields={
+            "description": "Preview image",
+            "proj:shape": [256, 256],
+            "proj:code": None,
+            "roles": ["thumbnail", "overview"],
+        },
+    )
 
     return item
 
