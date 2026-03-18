@@ -4,7 +4,7 @@ from pathlib import Path
 import pystac
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import *
+from stacbuilder import build_collection, list_asset_metadata, list_input_files, list_stac_items, validate_collection
 
 # Collection configuration
 catalog_version = "v01"
