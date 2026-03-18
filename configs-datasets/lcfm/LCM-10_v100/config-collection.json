@@ -23,6 +23,5 @@
             "title": "MAP",
             "description": "Per pixel land cover map at 10 m resolution"
         }
-    },
-    "overrides": {}
+    }
 }

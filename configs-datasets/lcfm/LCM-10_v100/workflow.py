@@ -5,7 +5,7 @@ import pystac
 import rasterio
 
 # run pip install -e . in the root directory to install this package
-from stacbuilder import *
+from stacbuilder import build_collection, list_asset_metadata, list_input_files, list_stac_items, validate_collection
 
 # Collection configuration
 catalog_version = "v1"
@@ -127,5 +127,5 @@ build_collection(
 
 # validate collection
 validate_collection(
-    collection_file=test_output_path / ".." / "collection.json",
+    collection_file=test_output_path / "collection.json",
 )
