@@ -6,6 +6,7 @@ from stacbuilder._version import __version__
 from stacbuilder.builder import AssetMetadataPipeline
 from stacbuilder.commandapi import (
     build_collection,
+    build_collection_to_stac_api,
     build_grouped_collections,
     list_asset_metadata,
     list_input_files,
@@ -25,6 +26,7 @@ from stacbuilder.stacapi import AuthSettings, Settings
 __all__ = [
     "__version__",
     "build_collection",
+    "build_collection_to_stac_api",
     "build_grouped_collections",
     "list_input_files",
     "list_asset_metadata",

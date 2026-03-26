@@ -9,7 +9,10 @@ import gc
 from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
-from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Generator, Hashable, Iterable, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from stacbuilder.stacapi.upload import Uploader
 
 # Third party libraries
 import deprecated
@@ -837,6 +840,38 @@ class AssetMetadataPipeline:
 
         # This passes the STAC Items to the collection builder to create a STAC Collection.
         self.collection = self.collection_builder.build_collection_from_items(item_generator, save_collection=True)
+
+    def build_and_upload_collection(self, uploader: "Uploader") -> None:
+        """Build the STAC collection and upload items directly to a STAC API.
+
+        Instead of saving items to disk, this method streams STAC items to the STAC API
+        using bulk uploads. It first checks whether the collection already exists on the
+        API and uses it if available; otherwise a new collection is created from the local
+        configuration. Items are uploaded in configurable bulk batches to minimise the
+        number of API calls.
+
+        :param uploader: The :class:`~stacbuilder.stacapi.upload.Uploader` instance
+            configured with the target STAC API connection details (URL, authentication,
+            and bulk size).
+        """
+        logger.debug("START: build_and_upload_collection")
+        self.reset()
+
+        # Build a collection object from the local configuration.
+        self.collection_builder.create_empty_collection()
+        collection = self.collection_builder.collection
+
+        # Get the existing collection from the STAC API if it already exists,
+        # or create a new one.  This avoids overwriting collection metadata that
+        # was previously published on the API.
+        collection = uploader.get_or_create_collection(collection)
+        self.collection = collection
+
+        # Stream items from the generator and upload them in bulk to the STAC API.
+        items_generator = self.collect_stac_items()
+        uploader.upload_items_bulk(collection.id, items_generator)
+
+        logger.debug("DONE: build_and_upload_collection")
 
     ####################################################
     # Code below is specific to the grouped collections.

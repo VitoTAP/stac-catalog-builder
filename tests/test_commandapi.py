@@ -8,6 +8,7 @@ from nested_lookup import nested_update
 
 from stacbuilder.commandapi import (
     build_collection,
+    build_collection_to_stac_api,
     build_grouped_collections,
     list_asset_metadata,
     list_input_files,
@@ -15,6 +16,7 @@ from stacbuilder.commandapi import (
     load_collection,
     validate_collection,
 )
+from stacbuilder.stacapi.config import AuthSettings, Settings
 
 
 def compare_json_outputs(output_dir: Path, reference_dir: Path):
@@ -189,3 +191,53 @@ class TestCommandAPI:
         )
         collection_file = output_dir / "collection.json"
         validate_collection(collection_file=collection_file)
+
+    def test_command_build_collection_to_stac_api(self, data_dir, requests_mock, mocker):
+        """build_collection_to_stac_api should create the collection on the API and
+        upload all generated items in bulk batches, without writing anything to disk."""
+        config_file = data_dir / "config/config-test-collection.json"
+        input_dir = data_dir / "geotiff/mock-geotiffs"
+        collection_id = "foo-2023-v01"
+        stac_api_url = "http://test.stacapi.local"
+
+        # Bypass STAC schema validation (requires network access)
+        mocker.patch("pystac.Collection.validate", return_value=[])
+
+        # Mock collection existence check → 404 (does not exist yet)
+        requests_mock.get(f"{stac_api_url}/collections/{collection_id}", status_code=404)
+        # Mock collection create → 201
+        requests_mock.post(
+            f"{stac_api_url}/collections",
+            json={"id": collection_id},
+            status_code=201,
+        )
+        # Mock bulk item upload → 200
+        bulk_mock = requests_mock.post(
+            f"{stac_api_url}/collections/{collection_id}/bulk_items",
+            json={"message": "ok"},
+            status_code=200,
+        )
+
+        settings = Settings(
+            auth=AuthSettings(enabled=False),
+            stac_api_url=stac_api_url,
+            bulk_size=5,
+            collection_auth_info=None,
+        )
+
+        build_collection_to_stac_api(
+            collection_config_path=config_file,
+            glob="*/*.tif",
+            input_dir=input_dir,
+            settings=settings,
+        )
+
+        # The test data produces 6 STAC items (2 asset types × 3 dates × 2 years
+        # reduces to 6 items after grouping by item_id).
+        # With bulk_size=5, items are uploaded in 2 batches: first 5, then 1.
+        expected_items = 6
+        expected_bulk_calls = (expected_items + settings.bulk_size - 1) // settings.bulk_size  # ceil division
+        assert bulk_mock.call_count == expected_bulk_calls, (
+            f"Expected {expected_bulk_calls} bulk upload call(s) for {expected_items} items "
+            f"with bulk_size={settings.bulk_size}, got {bulk_mock.call_count}"
+        )

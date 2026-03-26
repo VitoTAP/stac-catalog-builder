@@ -50,6 +50,7 @@ __all__ = [
     "load_collection",
     "validate_collection",
     # STAC API operations
+    "build_collection_to_stac_api",
     "upload_to_stac_api",
     "upload_items_to_stac_api",
 ]
@@ -114,6 +115,55 @@ def build_collection(
     )
 
     pipeline.build_collection()
+
+
+@log_and_reraise
+def build_collection_to_stac_api(
+    collection_config_path: Path,
+    glob: str,
+    input_dir: Path,
+    settings: Settings,
+    max_files: Optional[int] = -1,
+    item_postprocessor: Optional[Callable] = None,
+    single_asset_per_item: bool = False,
+) -> None:
+    """
+    Build a STAC collection and upload items directly to a STAC API.
+
+    Instead of saving STAC items to a local directory, this function streams items
+    directly to the target STAC API as they are generated.  If the collection already
+    exists on the API it will be used as-is; otherwise a new collection is created from
+    the provided configuration file.  Items are uploaded in configurable bulk batches
+    (controlled by :attr:`Settings.bulk_size`) to minimise the number of API calls.
+
+    :param collection_config_path: Path to the collection configuration file.
+    :param glob: Glob pattern to match the files within the input_dir.
+    :param input_dir: Root directory where the files are located.
+    :param settings: :class:`~stacbuilder.stacapi.config.Settings` object that
+        describes the STAC API URL, authentication, bulk-upload size, etc.
+    :param max_files: Maximum number of files to process. ``-1`` means no limit.
+    :param item_postprocessor: Optional callable applied to each STAC item before upload.
+    :param single_asset_per_item: When ``True``, each STAC item contains exactly one
+        asset.  This can speed up processing for large collections.
+    """
+    collection_config_path = Path(collection_config_path).expanduser().absolute()
+    coll_cfg = CollectionConfig.from_json_file(collection_config_path)
+    file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
+
+    metadata_collector = MetadataCollector.from_config(
+        collection_config=coll_cfg,
+        file_coll_cfg=file_coll_cfg,
+    )
+
+    pipeline = AssetMetadataPipeline(
+        collection_config=coll_cfg,
+        metadata_collector=metadata_collector,
+        item_postprocessor=item_postprocessor,
+        single_asset_per_item=single_asset_per_item,
+    )
+
+    uploader = Uploader.from_settings(settings)
+    pipeline.build_and_upload_collection(uploader)
 
 
 @deprecated(reason="use build_collection instead")

@@ -71,6 +71,35 @@ class Uploader(AsyncTaskPoolMixin):
         collection.validate()
         return self._collections_endpoint.create_or_update(collection)
 
+    def get_or_create_collection(self, collection: Path | Collection) -> Collection:
+        """Get the existing collection from the STAC API, or create a new one if it doesn't exist.
+
+        Unlike :meth:`upload_collection`, which always updates an existing collection, this method
+        preserves collections that already exist on the API and only creates the collection when
+        it is not found.
+
+        :param collection: The collection to look up or create.
+            Can be a :class:`pathlib.Path` pointing to a ``collection.json`` file,
+            or a :class:`pystac.Collection` object.
+        :raises TypeError: when ``collection`` is neither a Path nor a Collection.
+        :return: The collection as it exists on the STAC API
+            (either the pre-existing one or the newly created one).
+        """
+        if isinstance(collection, Path):
+            collection = Collection.from_file(collection)
+        elif not isinstance(collection, Collection):
+            raise TypeError('Type of argument "collection" must either pathlib.Path or pystac.Collection')
+
+        collection.validate()
+
+        if self._collections_endpoint.exists(collection.id):
+            logger.info(f"Collection '{collection.id}' already exists on the STAC API. Using existing collection.")
+            return self._collections_endpoint.get(collection.id)
+        else:
+            logger.info(f"Collection '{collection.id}' does not exist on the STAC API. Creating new collection.")
+            self._collections_endpoint.create(collection)
+            return collection
+
     def upload_item(self, item) -> dict:
         if not isinstance(item, Item):
             raise TypeError('Type of argument "item" must either pathlib.Path or pystac.Item')
