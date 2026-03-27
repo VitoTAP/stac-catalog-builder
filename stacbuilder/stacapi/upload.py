@@ -5,7 +5,7 @@ from typing import Iterable
 
 import pystac
 from loguru import logger
-from pystac import Collection, Item
+from pystac import Collection, Extent, Item, SpatialExtent, TemporalExtent
 from requests.auth import AuthBase
 from upath import UPath
 from yarl import URL
@@ -70,6 +70,41 @@ class Uploader(AsyncTaskPoolMixin):
             raise TypeError('Type of argument "collection" must either pathlib.Path or pystac.Collection')
         collection.validate()
         return self._collections_endpoint.create_or_update(collection)
+
+    def merge_and_upload_collection(self, new_collection: Path | Collection) -> Collection:
+        """Upload a collection to the STAC API, merging with the existing one if already present.
+
+        The ``new_collection`` is treated as the authoritative source of metadata (title,
+        description, keywords, providers, stac_extensions).  If a collection with the same
+        ID already exists on the API its spatial and temporal extents are loaded and merged
+        with the new collection's extents so that the published collection always covers all
+        previously-uploaded items as well as the new ones.
+
+        :param new_collection: The freshly-built collection to upload.
+            Can be a :class:`pathlib.Path` pointing to a ``collection.json`` file,
+            or a :class:`pystac.Collection` object.
+        :raises TypeError: when ``new_collection`` is neither a Path nor a Collection.
+        :return: The collection as it was uploaded to the STAC API.
+        """
+        if isinstance(new_collection, Path):
+            new_collection = Collection.from_file(new_collection)
+        elif not isinstance(new_collection, Collection):
+            raise TypeError('Type of argument "new_collection" must be a pathlib.Path or pystac.Collection')
+
+        if self._collections_endpoint.exists(new_collection.id):
+            logger.info(
+                f"Collection '{new_collection.id}' already exists on the STAC API. "
+                "Merging extents and updating."
+            )
+            existing = self._collections_endpoint.get(new_collection.id)
+            _merge_extents(new_collection, existing)
+            self._collections_endpoint.update(new_collection)
+        else:
+            logger.info(f"Collection '{new_collection.id}' does not exist on the STAC API. Creating.")
+            new_collection.validate()
+            self._collections_endpoint.create(new_collection)
+
+        return new_collection
 
     def upload_item(self, item) -> dict:
         if not isinstance(item, Item):
@@ -168,3 +203,53 @@ class Uploader(AsyncTaskPoolMixin):
     def _log_progress_message(self, message: str) -> None:
         calling_method_name = inspect.stack()[1][3]
         logger.info(f"PROGRESS: {self.__class__.__name__}.{calling_method_name}: {message}")
+
+
+def _merge_extents(target: Collection, source: Collection) -> None:
+    """Expand *target*'s spatial and temporal extents to also cover *source*'s extents.
+
+    Only *target* is modified in place.  *source* is not changed.
+
+    For temporal extents, ``None`` represents an open/unbounded boundary:
+    - A ``None`` start means "no lower bound (earliest possible time)".
+    - A ``None`` end means "no upper bound (ongoing)".
+    When merging, if either collection has an unbounded boundary the merged extent also
+    has an unbounded boundary on that side.
+
+    :param target: The collection whose extents will be expanded.
+    :param source: The collection whose extents are used as additional coverage.
+    """
+    import datetime as _dt
+
+    # --- Spatial extent ---
+    target_bbox = list(target.extent.spatial.bboxes[0])  # [west, south, east, north]
+    source_bbox = list(source.extent.spatial.bboxes[0])
+    merged_bbox = [
+        min(target_bbox[0], source_bbox[0]),  # west  – smaller is further west
+        min(target_bbox[1], source_bbox[1]),  # south – smaller is further south
+        max(target_bbox[2], source_bbox[2]),  # east  – larger is further east
+        max(target_bbox[3], source_bbox[3]),  # north – larger is further north
+    ]
+    target.extent.spatial = SpatialExtent([merged_bbox])
+
+    # --- Temporal extent ---
+    target_interval = target.extent.temporal.intervals[0]
+    source_interval = source.extent.temporal.intervals[0]
+
+    def _to_utc(value):
+        """Make a datetime timezone-aware (UTC) so it can be compared with other datetimes."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=_dt.timezone.utc)
+        return value
+
+    t_start = _to_utc(target_interval[0])
+    t_end = _to_utc(target_interval[1])
+    s_start = _to_utc(source_interval[0])
+    s_end = _to_utc(source_interval[1])
+
+    # None means unbounded: if either side is None (unbounded), the merged result is also None.
+    merged_start = None if (t_start is None or s_start is None) else min(t_start, s_start)
+    merged_end = None if (t_end is None or s_end is None) else max(t_end, s_end)
+    target.extent.temporal = TemporalExtent([[merged_start, merged_end]])
