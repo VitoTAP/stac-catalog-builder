@@ -4,8 +4,7 @@ This module provides the most important functions for building STAC collections 
 The module is organized into the following functional areas:
 
 **Collection Building:**
-- build_collection: Build STAC collections from input files
-- build_grouped_collections: Build multiple related STAC collections (deprecated)
+- build_collection: Build STAC collections from input files, optionally uploading to a STAC API
 
 **Data Exploration:**
 - list_input_files: List files that match the configuration
@@ -50,7 +49,6 @@ __all__ = [
     "load_collection",
     "validate_collection",
     # STAC API operations
-    "build_collection_to_stac_api",
     "upload_to_stac_api",
     "upload_items_to_stac_api",
 ]
@@ -75,23 +73,38 @@ def build_collection(
     collection_config_path: Path,
     glob: str,
     input_dir: Path,
-    output_dir: Path,
+    output_dir: Optional[Path] = None,
     max_files: Optional[int] = -1,
     link_items: bool = True,
     item_postprocessor: Optional[Callable] = None,
     single_asset_per_item: bool = False,
+    uploader: Optional[Uploader] = None,
 ) -> None:
     """
     Build a STAC collection from a directory of files.
+
+    By default the collection and its items are saved to *output_dir* on the local file
+    system.  When an *uploader* is provided the collection is instead uploaded directly
+    to the configured STAC API: items are never written to disk and *output_dir* is not
+    required.
+
+    If a collection with the same ID already exists on the STAC API, its extents are
+    merged (expanded) with the extents of the newly-built collection so that the
+    published collection always covers all historical as well as new items.
 
     :param collection_config_path: Path to the collection configuration file.
     :param glob: Glob pattern to match the files within the input_dir.
     :param input_dir: Root directory where the files are located.
     :param output_dir: Directory where the STAC collection will be saved.
+        Required when *uploader* is not provided.  Ignored when *uploader* is given.
     :param max_files: Maximum number of files to process.
     :param link_items: Whether to create links between collection and items.
+        Only used when saving to disk (*uploader* is ``None``).
     :param item_postprocessor: Optional function to postprocess each STAC item.
     :param single_asset_per_item: Whether each STAC item has only one asset. This can speed up processing.
+    :param uploader: Optional :class:`~stacbuilder.stacapi.upload.Uploader` instance.
+        When provided, items are uploaded directly to the STAC API instead of being
+        saved to disk.
     """
     collection_config_path = Path(collection_config_path).expanduser().absolute()
     coll_cfg = CollectionConfig.from_json_file(collection_config_path)
@@ -114,56 +127,7 @@ def build_collection(
         single_asset_per_item=single_asset_per_item,
     )
 
-    pipeline.build_collection()
-
-
-@log_and_reraise
-def build_collection_to_stac_api(
-    collection_config_path: Path,
-    glob: str,
-    input_dir: Path,
-    settings: Settings,
-    max_files: Optional[int] = -1,
-    item_postprocessor: Optional[Callable] = None,
-    single_asset_per_item: bool = False,
-) -> None:
-    """
-    Build a STAC collection and upload items directly to a STAC API.
-
-    Instead of saving STAC items to a local directory, this function streams items
-    directly to the target STAC API as they are generated.  If the collection already
-    exists on the API it will be used as-is; otherwise a new collection is created from
-    the provided configuration file.  Items are uploaded in configurable bulk batches
-    (controlled by :attr:`Settings.bulk_size`) to minimise the number of API calls.
-
-    :param collection_config_path: Path to the collection configuration file.
-    :param glob: Glob pattern to match the files within the input_dir.
-    :param input_dir: Root directory where the files are located.
-    :param settings: :class:`~stacbuilder.stacapi.config.Settings` object that
-        describes the STAC API URL, authentication, bulk-upload size, etc.
-    :param max_files: Maximum number of files to process. ``-1`` means no limit.
-    :param item_postprocessor: Optional callable applied to each STAC item before upload.
-    :param single_asset_per_item: When ``True``, each STAC item contains exactly one
-        asset.  This can speed up processing for large collections.
-    """
-    collection_config_path = Path(collection_config_path).expanduser().absolute()
-    coll_cfg = CollectionConfig.from_json_file(collection_config_path)
-    file_coll_cfg = FileCollectorConfig(input_dir=input_dir, glob=glob, max_files=max_files)
-
-    metadata_collector = MetadataCollector.from_config(
-        collection_config=coll_cfg,
-        file_coll_cfg=file_coll_cfg,
-    )
-
-    pipeline = AssetMetadataPipeline(
-        collection_config=coll_cfg,
-        metadata_collector=metadata_collector,
-        item_postprocessor=item_postprocessor,
-        single_asset_per_item=single_asset_per_item,
-    )
-
-    uploader = Uploader.from_settings(settings)
-    pipeline.build_and_upload_collection(uploader)
+    pipeline.build_collection(uploader=uploader)
 
 
 @deprecated(reason="use build_collection instead")

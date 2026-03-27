@@ -8,7 +8,6 @@ from nested_lookup import nested_update
 
 from stacbuilder.commandapi import (
     build_collection,
-    build_collection_to_stac_api,
     build_grouped_collections,
     list_asset_metadata,
     list_input_files,
@@ -16,7 +15,7 @@ from stacbuilder.commandapi import (
     load_collection,
     validate_collection,
 )
-from stacbuilder.stacapi.config import AuthSettings, Settings
+from stacbuilder.stacapi.upload import Uploader
 
 
 def compare_json_outputs(output_dir: Path, reference_dir: Path):
@@ -192,9 +191,9 @@ class TestCommandAPI:
         collection_file = output_dir / "collection.json"
         validate_collection(collection_file=collection_file)
 
-    def test_command_build_collection_to_stac_api(self, data_dir, requests_mock, mocker):
-        """build_collection_to_stac_api should create the collection on the API and
-        upload all generated items in bulk batches, without writing anything to disk."""
+    def test_command_build_collection_with_uploader(self, data_dir, requests_mock, mocker):
+        """build_collection with an uploader should create the collection on the STAC API
+        and upload all generated items in bulk batches, without writing anything to disk."""
         config_file = data_dir / "config/config-test-collection.json"
         input_dir = data_dir / "geotiff/mock-geotiffs"
         collection_id = "foo-2023-v01"
@@ -218,26 +217,75 @@ class TestCommandAPI:
             status_code=200,
         )
 
-        settings = Settings(
-            auth=AuthSettings(enabled=False),
-            stac_api_url=stac_api_url,
-            bulk_size=5,
-            collection_auth_info=None,
-        )
+        bulk_size = 5
+        uploader = Uploader.create_uploader(stac_api_url=stac_api_url, auth=None, bulk_size=bulk_size)
 
-        build_collection_to_stac_api(
+        build_collection(
             collection_config_path=config_file,
             glob="*/*.tif",
             input_dir=input_dir,
-            settings=settings,
+            uploader=uploader,
         )
 
-        # The test data produces 6 STAC items (2 asset types × 3 dates × 2 years
-        # reduces to 6 items after grouping by item_id).
+        # The test data produces 6 STAC items: 12 input files (2 asset types × 3 months
+        # × 2 years), grouped by item_id (one per unique date), giving 6 items each with
+        # 2 assets.
         # With bulk_size=5, items are uploaded in 2 batches: first 5, then 1.
         expected_items = 6
-        expected_bulk_calls = (expected_items + settings.bulk_size - 1) // settings.bulk_size  # ceil division
+        expected_bulk_calls = (expected_items + bulk_size - 1) // bulk_size  # ceil division
         assert bulk_mock.call_count == expected_bulk_calls, (
             f"Expected {expected_bulk_calls} bulk upload call(s) for {expected_items} items "
-            f"with bulk_size={settings.bulk_size}, got {bulk_mock.call_count}"
+            f"with bulk_size={bulk_size}, got {bulk_mock.call_count}"
         )
+
+    def test_command_build_collection_with_uploader_merges_extents(self, data_dir, requests_mock, mocker):
+        """When the collection already exists on the API, build_collection with uploader
+        should merge extents and call PUT (update) rather than POST (create)."""
+        import datetime as dt
+
+        from pystac import Collection, Extent, SpatialExtent, TemporalExtent
+
+        config_file = data_dir / "config/config-test-collection.json"
+        input_dir = data_dir / "geotiff/mock-geotiffs"
+        collection_id = "foo-2023-v01"
+        stac_api_url = "http://test.stacapi.local"
+
+        # Bypass STAC schema validation
+        mocker.patch("pystac.Collection.validate", return_value=[])
+
+        # Existing collection on API with a narrow extent
+        existing = Collection(
+            id=collection_id,
+            description="existing",
+            extent=Extent(
+                SpatialExtent([[-5.0, -5.0, 5.0, 5.0]]),
+                TemporalExtent([[dt.datetime(2019, 1, 1), dt.datetime(2019, 12, 31)]]),
+            ),
+        )
+        requests_mock.get(
+            f"{stac_api_url}/collections/{collection_id}", json=existing.to_dict(), status_code=200
+        )
+        put_mock = requests_mock.put(
+            f"{stac_api_url}/collections/{collection_id}",
+            json={"id": collection_id},
+            status_code=200,
+        )
+        post_mock = requests_mock.post(f"{stac_api_url}/collections", status_code=201)
+        requests_mock.post(
+            f"{stac_api_url}/collections/{collection_id}/bulk_items",
+            json={"message": "ok"},
+            status_code=200,
+        )
+
+        uploader = Uploader.create_uploader(stac_api_url=stac_api_url, auth=None, bulk_size=5)
+
+        build_collection(
+            collection_config_path=config_file,
+            glob="*/*.tif",
+            input_dir=input_dir,
+            uploader=uploader,
+        )
+
+        # Collection should have been updated (PUT), not created (POST)
+        assert put_mock.called
+        assert not post_mock.called

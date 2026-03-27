@@ -19,18 +19,27 @@ from yarl import URL
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.stacapi.endpoints import CollectionsEndpoint, ItemsEndpoint, RestApi
-from stacbuilder.stacapi.upload import Uploader
+from stacbuilder.stacapi.upload import Uploader, _merge_extents
 
 API_BASE_URL = URL("http://test.stacapi.local")
 API_BASE_URL_STR = str(API_BASE_URL)
 
 
+def _make_extent(bbox, start, end) -> Extent:
+    return Extent(
+        SpatialExtent([bbox]),
+        TemporalExtent([[start, end]]),
+    )
+
+
+def _utc(year, month, day) -> dt.datetime:
+    """Return a UTC-aware datetime for use in tests."""
+    return dt.datetime(year, month, day, tzinfo=dt.timezone.utc)
+
+
 @pytest.fixture
 def default_extent() -> Extent:
-    return Extent(
-        SpatialExtent([-180.0, -90.0, 180.0, 90.0]),
-        TemporalExtent([[dt.datetime(2020, 1, 1), dt.datetime(2021, 1, 1)]]),
-    )
+    return _make_extent([-180.0, -90.0, 180.0, 90.0], _utc(2020, 1, 1), _utc(2021, 1, 1))
 
 
 @pytest.fixture
@@ -90,67 +99,142 @@ def uploader() -> Uploader:
     return Uploader.create_uploader(stac_api_url=API_BASE_URL_STR, auth=None, bulk_size=2)
 
 
-class TestGetOrCreateCollection:
-    """Tests for Uploader.get_or_create_collection()."""
+class TestMergeExtents:
+    """Unit tests for the _merge_extents helper function."""
+
+    def test_spatial_extent_expanded(self):
+        """The target bbox should be expanded to cover both collections' bboxes."""
+        target = Collection(
+            id="t",
+            description="",
+            extent=_make_extent([-10.0, -10.0, 10.0, 10.0], _utc(2022, 1, 1), _utc(2022, 12, 31)),
+        )
+        source = Collection(
+            id="s",
+            description="",
+            extent=_make_extent([-20.0, -5.0, 30.0, 5.0], _utc(2021, 6, 1), _utc(2023, 6, 30)),
+        )
+        _merge_extents(target, source)
+
+        merged_bbox = target.extent.spatial.bboxes[0]
+        assert merged_bbox == [-20.0, -10.0, 30.0, 10.0]
+
+    def test_temporal_extent_expanded(self):
+        """The target temporal extent should be expanded to cover both intervals."""
+        target = Collection(
+            id="t",
+            description="",
+            extent=_make_extent([-180, -90, 180, 90], _utc(2022, 1, 1), _utc(2022, 12, 31)),
+        )
+        source = Collection(
+            id="s",
+            description="",
+            extent=_make_extent([-180, -90, 180, 90], _utc(2021, 6, 1), _utc(2023, 6, 30)),
+        )
+        _merge_extents(target, source)
+
+        start, end = target.extent.temporal.intervals[0]
+        assert start == _utc(2021, 6, 1)
+        assert end == _utc(2023, 6, 30)
+
+    def test_none_temporal_bounds_handled(self):
+        """None temporal bounds (open intervals) are handled without error.
+        When either side has an unbounded boundary (None), the merged result is also unbounded (None)."""
+        target = Collection(
+            id="t",
+            description="",
+            extent=_make_extent([-180, -90, 180, 90], _utc(2022, 1, 1), None),
+        )
+        source = Collection(
+            id="s",
+            description="",
+            extent=_make_extent([-180, -90, 180, 90], None, _utc(2023, 6, 30)),
+        )
+        _merge_extents(target, source)
+
+        start, end = target.extent.temporal.intervals[0]
+        # Both sides have a None boundary → merged is also None (open interval)
+        assert start is None
+        assert end is None
+
+
+class TestMergeAndUploadCollection:
+    """Tests for Uploader.merge_and_upload_collection()."""
 
     def test_creates_collection_when_not_exists(
         self, requests_mock, uploader: Uploader, empty_collection: Collection
     ):
-        """When the collection does not exist on the API, it should be created."""
+        """When the collection does not exist on the API, it should be created (POST)."""
         coll_id = empty_collection.id
 
-        # First call (exists check) returns 404
         requests_mock.get(str(API_BASE_URL / "collections" / coll_id), status_code=404)
-        # Second call (create) returns 201
-        requests_mock.post(
+        post_mock = requests_mock.post(
             str(API_BASE_URL / "collections"),
             json=empty_collection.to_dict(),
             status_code=201,
         )
 
-        result = uploader.get_or_create_collection(empty_collection)
+        result = uploader.merge_and_upload_collection(empty_collection)
 
         assert result.id == coll_id
+        assert post_mock.called
 
-    def test_returns_existing_collection_when_already_exists(
+    def test_merges_extents_and_updates_when_exists(
         self, requests_mock, uploader: Uploader, empty_collection: Collection
     ):
-        """When the collection already exists, the existing collection should be returned
-        and no create (POST) call should be made."""
+        """When the collection exists, extents are merged and the collection is updated (PUT)."""
         coll_id = empty_collection.id
 
-        # The existence check (GET) returns 200, and also serves the full collection dict
-        get_mock = requests_mock.get(
+        # Existing collection on API has a smaller extent
+        existing_extent = _make_extent(
+            [-10.0, -10.0, 10.0, 10.0], _utc(2019, 1, 1), _utc(2019, 12, 31)
+        )
+        existing = Collection(
+            id=coll_id,
+            title="old title",
+            description="old description",
+            extent=existing_extent,
+        )
+
+        requests_mock.get(str(API_BASE_URL / "collections" / coll_id), json=existing.to_dict(), status_code=200)
+        put_mock = requests_mock.put(
             str(API_BASE_URL / "collections" / coll_id),
             json=empty_collection.to_dict(),
             status_code=200,
         )
-        # POST should never be called
         post_mock = requests_mock.post(str(API_BASE_URL / "collections"), status_code=201)
 
-        result = uploader.get_or_create_collection(empty_collection)
+        result = uploader.merge_and_upload_collection(empty_collection)
 
         assert result.id == coll_id
-        # GET was called (at least the existence check + the fetch)
-        assert get_mock.called
-        # POST (create) must not have been called
+        # PUT (update) was called, POST (create) was not
+        assert put_mock.called
         assert not post_mock.called
 
+        # The new_collection's extents should have been expanded
+        merged_bbox = result.extent.spatial.bboxes[0]
+        assert merged_bbox[0] <= -10.0  # expanded west
+        assert merged_bbox[1] <= -10.0  # expanded south
+        assert merged_bbox[2] >= 10.0  # expanded east
+        assert merged_bbox[3] >= 10.0  # expanded north
+
+        merged_start, _ = result.extent.temporal.intervals[0]
+        assert merged_start <= _utc(2019, 1, 1)
+
     def test_raises_type_error_for_invalid_input(self, uploader: Uploader):
-        """A TypeError should be raised when something other than Path or Collection is passed."""
+        """A TypeError should be raised when the argument is not a Path or Collection."""
         with pytest.raises(TypeError):
-            uploader.get_or_create_collection("not-a-collection")  # type: ignore[arg-type]
+            uploader.merge_and_upload_collection("not-a-collection")  # type: ignore[arg-type]
 
     def test_accepts_path_input(
         self, requests_mock, uploader: Uploader, empty_collection: Collection, tmp_path: Path
     ):
         """A Path pointing to a collection.json file should be accepted."""
         coll_id = empty_collection.id
-        coll_path = tmp_path / "collection.json"
         empty_collection.normalize_hrefs(str(tmp_path))
         empty_collection.save(dest_href=str(tmp_path))
+        coll_path = tmp_path / "collection.json"
 
-        # Existence check returns 404 → will create
         requests_mock.get(str(API_BASE_URL / "collections" / coll_id), status_code=404)
         requests_mock.post(
             str(API_BASE_URL / "collections"),
@@ -158,7 +242,7 @@ class TestGetOrCreateCollection:
             status_code=201,
         )
 
-        result = uploader.get_or_create_collection(coll_path)
+        result = uploader.merge_and_upload_collection(coll_path)
 
         assert result.id == coll_id
 
@@ -196,3 +280,4 @@ class TestUploadItemsBulk:
         uploader.upload_items_bulk(coll_id, [])
 
         assert bulk_mock.call_count == 0
+

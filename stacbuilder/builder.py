@@ -522,6 +522,9 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         return self.stac_item_dir() / year / month / day / f"{item.id}.json"
 
     def normalize_hrefs(self):
+        if not self._output_dir:
+            logger.debug("Skipping href normalization: output_dir is not set.")
+            return
         layout_template = self._collection_config.layout_strategy_item_template
         strategy = TemplateLayoutStrategy(item_template=layout_template)
 
@@ -827,51 +830,62 @@ class AssetMetadataPipeline:
 
     def build_collection(
         self,
-    ):
-        """Build the entire STAC collection."""
-        logger.debug("START: build_collection")
+        uploader: Optional["Uploader"] = None,
+    ) -> None:
+        """Build the STAC collection and either save it to disk or upload it to a STAC API.
 
-        assert self._collection_dir, "Collection directory must be set before building the collection."
+        When *uploader* is ``None`` (the default), the collection and its items are written
+        to the local file system under :attr:`output_dir`.
 
-        self.reset()
+        When an *uploader* is provided the collection is built entirely in memory, its
+        extents are computed from the generated items, and the result is sent to the STAC
+        API.  If a collection with the same ID already exists on the API its extents are
+        merged (expanded) so that the published collection always covers all previously-
+        uploaded items as well as the current ones.  Items are then uploaded in bulk
+        according to :attr:`~stacbuilder.stacapi.upload.Uploader.bulk_size`.
 
-        # This calls the item builder to create STAC Items from AssetMetadata.
-        item_generator: Generator[Item] = self.collect_stac_items()
-
-        # This passes the STAC Items to the collection builder to create a STAC Collection.
-        self.collection = self.collection_builder.build_collection_from_items(item_generator, save_collection=True)
-
-    def build_and_upload_collection(self, uploader: "Uploader") -> None:
-        """Build the STAC collection and upload items directly to a STAC API.
-
-        Instead of saving items to disk, this method streams STAC items to the STAC API
-        using bulk uploads. It first checks whether the collection already exists on the
-        API and uses it if available; otherwise a new collection is created from the local
-        configuration. Items are uploaded in configurable bulk batches to minimise the
-        number of API calls.
-
-        :param uploader: The :class:`~stacbuilder.stacapi.upload.Uploader` instance
-            configured with the target STAC API connection details (URL, authentication,
-            and bulk size).
+        :param uploader: Optional :class:`~stacbuilder.stacapi.upload.Uploader` configured
+            with the target STAC API URL, authentication and bulk-upload size.  When
+            omitted the collection is saved to disk instead.
         """
-        logger.debug("START: build_and_upload_collection")
-        self.reset()
+        if uploader is None:
+            # --- Disk path (existing behaviour) ---
+            logger.debug("START: build_collection (disk)")
+            assert self._collection_dir, "output_dir must be set when no uploader is provided."
+            self.reset()
+            item_generator: Generator[Item] = self.collect_stac_items()
+            self.collection = self.collection_builder.build_collection_from_items(
+                item_generator, save_collection=True
+            )
+            logger.debug("DONE: build_collection (disk)")
+        else:
+            # --- API upload path ---
+            logger.debug("START: build_collection (API upload)")
+            self.reset()
 
-        # Build a collection object from the local configuration.
-        self.collection_builder.create_empty_collection()
-        collection = self.collection_builder.collection
+            # Build the collection in memory (with link_items=True so that extents are
+            # computed from all items and items remain accessible for bulk upload).
+            # A fresh CollectionBuilder is used instead of self.collection_builder because:
+            #  - self.collection_builder may have link_items=False (disk-only path)
+            #  - self.collection_builder may have output_dir set, causing normalize_hrefs
+            #    to write disk paths into item hrefs (inappropriate for API upload)
+            # Using a dedicated builder with link_items=True and no output_dir guarantees
+            # items stay in memory and hrefs are not rewritten to local disk paths.
+            api_builder = CollectionBuilder(
+                collection_config=self.collection_config,
+                output_dir=None,
+                link_items=True,
+            )
+            item_generator = self.collect_stac_items()
+            collection = api_builder.build_collection_from_items(item_generator, save_collection=False)
+            self.collection = collection
 
-        # Get the existing collection from the STAC API if it already exists,
-        # or create a new one.  This avoids overwriting collection metadata that
-        # was previously published on the API.
-        collection = uploader.get_or_create_collection(collection)
-        self.collection = collection
+            # Merge extents with existing collection on the API (if any) and upload.
+            uploader.merge_and_upload_collection(collection)
 
-        # Stream items from the generator and upload them in bulk to the STAC API.
-        items_generator = self.collect_stac_items()
-        uploader.upload_items_bulk(collection.id, items_generator)
-
-        logger.debug("DONE: build_and_upload_collection")
+            # Upload all items in configurable bulk batches.
+            uploader.upload_items_bulk(collection.id, collection.get_all_items())
+            logger.debug("DONE: build_collection (API upload)")
 
     ####################################################
     # Code below is specific to the grouped collections.
