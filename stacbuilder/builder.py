@@ -249,7 +249,10 @@ class ItemBuilder:
         asset_defs = self._get_assets_definitions()
         asset_def: AssetDefinition = asset_defs[metadata.asset_type]
         asset_config = self._get_assets_config_for(metadata.asset_type)
-        asset: Asset = asset_def.create_asset(metadata.href)
+        href = metadata.href
+        if "://" not in href and href.startswith("/"):
+            href = "file:/" + href
+        asset: Asset = asset_def.create_asset(href)
         asset.set_owner(item)
         asset.media_type = metadata.media_type
 
@@ -293,6 +296,7 @@ class ItemBuilder:
             # There is no information to fill in default values for raster:bands
             # Just fill in what we do have from asset metadata.
             raster_bands = []
+            asset.extra_fields["bands"] = []
             for band_md in metadata.bands:
                 new_band: RasterBand = RasterBand.create(
                     data_type=band_md.data_type,
@@ -300,7 +304,10 @@ class ItemBuilder:
                     unit=band_md.units,
                 )
                 raster_bands.append(new_band)
-            asset_raster.apply(raster_bands)
+                bands_dict = new_band.to_dict()
+                bands_dict["name"] = f"{len(raster_bands)-1}"
+                asset.extra_fields["bands"].append(bands_dict)
+            #asset_raster.apply(raster_bands)
         # Case 2: If the asset configuration specifies raster bands, we fill in the missing values from the metadata.
         else:
             raster_bands: List[RasterBand] = asset_raster.bands
