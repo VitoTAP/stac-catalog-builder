@@ -113,7 +113,7 @@
   ],
   "assets": {
     "tot-precip-monthly": {
-      "href": "/stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_tot-precip-monthly_2000-03-01.tif",
+      "href": "file:///stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_tot-precip-monthly_2000-03-01.tif",
       "type": "image/tiff; application=geotiff; profile=cloud-optimized",
       "title": "total precipitation",
       "description": "total precipitation per month (m)",
@@ -130,7 +130,7 @@
       ]
     },
     "2m-temp-monthly": {
-      "href": "/stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_2m-temp-monthly_2000-03-01.tif",
+      "href": "file:///stac-catalog-builder/tests/data/geotiff/mock-geotiffs/2000/observations_2m-temp-monthly_2000-03-01.tif",
       "type": "image/tiff; application=geotiff; profile=cloud-optimized",
       "title": "2m temperature",
       "description": "temperature 2m above ground (Kelvin)",
