@@ -24,8 +24,8 @@
             "regex_pattern": "",
             "period": "yearly",
             "fixed_values": {
-                "year" : 2015,
-                "asset_type" : "TCD"
+                "year": 2015,
+                "asset_type": "TCD"
             }
         }
     },
@@ -33,13 +33,13 @@
         "TCD": {
             "title": "Tree cover Density",
             "description": "tree cover density in a range from 0% to 100%",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "TCD",
                     "description": "tree cover density in a range from 0% to 100%",
                     "data_type": "uint8",
-                    "sampling": "area",
-                    "spatial_resolution": 20
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 20
                 }
             ]
         }

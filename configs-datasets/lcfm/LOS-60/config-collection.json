@@ -22,32 +22,34 @@
         "los": {
             "title": "LCFM LOS 60m v110",
             "description": "",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "PROB-SURFACE",
                     "description": "",
                     "data_type": "int8",
-                    "sampling": "area",
-                    "spatial_resolution": 60
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 60
                 },
                 {
                     "name": "PROB-CLOUDS",
                     "description": "",
                     "data_type": "int8",
-                    "sampling": "area",
-                    "spatial_resolution": 60
-                },{
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 60
+                },
+                {
                     "name": "PROB-SHADOWS",
                     "description": "",
                     "data_type": "int8",
-                    "sampling": "area",
-                    "spatial_resolution": 60
-                },{
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 60
+                },
+                {
                     "name": "PROB-SNOW",
                     "description": "",
                     "data_type": "int8",
-                    "sampling": "area",
-                    "spatial_resolution": 60
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 60
                 }
             ]
         }

@@ -19,7 +19,6 @@ from typing import Any, ClassVar, Dict, List, Optional
 
 import dateutil.parser
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, field_validator
 from pystac.media_type import MediaType
@@ -40,8 +39,8 @@ class BandMetadata:
     Probably will need to add a propery "bands" to AssetMetadata.
     """
 
-    data_type: np.dtype
-    """NumPy data type of the band (e.g., uint8, float32)."""
+    data_type: Optional[str]
+    """Band data type (e.g., uint8, float32)."""
 
     nodata: Any
     """Value representing no data/missing pixels in the band."""
@@ -52,15 +51,18 @@ class BandMetadata:
     units: Optional[str] = None
     """Physical units of the band values (e.g., 'meters', 'degrees')."""
 
+    name: Optional[str] = None
+    """Common band name for STAC 1.1 `bands` when available."""
+
     def to_dict(self) -> dict[str, Any]:
         result = {
-            "data_type": self.data_type,
-            "nodata": self.nodata,
-            "index": self.index,
+            "data_type": self.data_type if self.data_type is not None else None,
+            "nodata": self.nodata if self.nodata is not None else None,
+            "index": self.index if self.index is not None else None,
+            "units": self.units if self.units is not None else None,
+            "name": self.name if self.name is not None else None,
         }
-        if self.units:
-            result["units"] = self.units
-        return result
+        return {k: v for k, v in result.items() if v is not None}
 
 
 class AssetMetadata(BaseModel):
@@ -306,23 +308,11 @@ class AssetMetadata(BaseModel):
         :return: A dictionary that represents the same metadata.
         """
 
-        # IMPORTANT: Keep only parquet/arrow friendly primitive types in this dict.
-        # Complex objects (Path, Enum, numpy dtype, custom classes) are converted to str or
-        # a JSON-serialisable structure to avoid ArrowInvalid errors when persisting via pandas/geopandas.
-        def _serialise_band(band: BandMetadata) -> dict[str, Any]:
-            band_dict = band.to_dict()
-            # Convert numpy dtype to its name representation (e.g. 'uint16')
-            if isinstance(band_dict.get("data_type"), np.dtype):
-                band_dict["data_type"] = str(band_dict["data_type"].name)
-            else:
-                band_dict["data_type"] = str(band_dict.get("data_type"))
-            return band_dict
-
         # Prepare tags (avoid empty struct -> ArrowNotImplementedError)
         raw_tags = {str(k): (None if v is None else str(v)) for k, v in (self.tags or {}).items()}
         tags_value = raw_tags if raw_tags else {}
 
-        bands_list = [_serialise_band(b) for b in self.bands]
+        bands_list = [b.to_dict() for b in self.bands]
 
         data = {
             "asset_id": self.asset_id,

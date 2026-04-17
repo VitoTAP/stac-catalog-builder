@@ -24,8 +24,8 @@
             "regex_pattern": "",
             "period": "yearly",
             "fixed_values": {
-                "year" : 2015,
-                "asset_type" : "WAW"
+                "year": 2015,
+                "asset_type": "WAW"
             }
         }
     },
@@ -33,13 +33,13 @@
         "WAW": {
             "title": "Water and Wetness status",
             "description": "Water and Wetness status",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "WAW",
                     "description": "",
                     "data_type": "int8",
-                    "sampling": "area",
-                    "spatial_resolution": 20
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 20
                 }
             ]
         }

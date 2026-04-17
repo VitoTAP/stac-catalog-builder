@@ -33,7 +33,7 @@ dependencies = [
   "pyarrow==18.1.*",
   "pydantic==2.5.*",
   "pyproj",
-  "pystac[validation]==1.11.*",
+  "pystac[validation]==1.14.3",
   "rasterio==1.4.3",
   "requests==2.31.*",
   "requests_auth>=6.0, <8.0",

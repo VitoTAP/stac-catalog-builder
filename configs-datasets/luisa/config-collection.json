@@ -22,7 +22,7 @@
         "npp_pot": {
             "title": "Potential Net Primary Production",
             "description": "Potential Net Primary Production",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "npp_pot",
                     "description": "NPP Pot"

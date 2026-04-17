@@ -9,7 +9,17 @@ import gc
 from functools import partial
 from http.client import RemoteDisconnected
 from pathlib import Path
-from typing import Callable, Dict, Generator, Hashable, Iterable, List, Optional, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
 
 # Third party libraries
 import deprecated
@@ -21,15 +31,15 @@ from pystac import (
     Collection,
     Extent,
     Item,
+    ItemAssetDefinition,
     SpatialExtent,
     TemporalExtent,
 )
 from pystac.errors import STACValidationError
 from pystac.extensions.eo import EOExtension
 from pystac.extensions.file import FileExtension
-from pystac.extensions.item_assets import AssetDefinition, ItemAssetsExtension
 from pystac.extensions.projection import ItemProjectionExtension
-from pystac.extensions.raster import RasterBand, RasterExtension
+from pystac.extensions.raster import RasterExtension
 from pystac.layout import TemplateLayoutStrategy
 
 from stacbuilder.async_utils import AsyncTaskPoolMixin
@@ -191,7 +201,7 @@ class ItemBuilder:
                 + f"{[a.asset_type for a in assets]} not found in {list(self.item_assets_configs.keys())}"
             )
             logger.warning(error_msg)
-            return None
+            raise InvalidConfiguration(error_msg)
 
         first_asset = known_assets[0]  # The first asset is used to create the item.
 
@@ -243,7 +253,7 @@ class ItemBuilder:
 
     def _create_asset(self, metadata: AssetMetadata, item: Item) -> Asset:
         asset_defs = self._get_assets_definitions()
-        asset_def: AssetDefinition = asset_defs[metadata.asset_type]
+        asset_def: ItemAssetDefinition = asset_defs[metadata.asset_type]
         asset_config = self._get_assets_config_for(metadata.asset_type)
         asset: Asset = asset_def.create_asset(metadata.href)
         asset.set_owner(item)
@@ -257,9 +267,10 @@ class ItemBuilder:
         # raster extension
         self._add_raster_bands_to_asset(asset, metadata, asset_config)
 
-        # eo extension
-        # the fixed values are set in the AssetDefinition, so we only need to add the extension
-        if asset_config.eo_bands:
+        if asset_config.uses_raster_extension():
+            asset.ext.add("raster")
+        # Only add EO extension if there are EO fields in the asset config, to avoid unnecessary extensions.
+        if asset_config.uses_eo_extension():
             asset.ext.add("eo")
 
         # Add the alternate links for the Alternate-Asset extension
@@ -272,73 +283,75 @@ class ItemBuilder:
         return asset
 
     def _add_raster_bands_to_asset(self, asset: Asset, metadata: AssetMetadata, asset_config: AssetConfig) -> None:
-        """Add raster bands to the asset based on the metadata and asset configuration.
+        """Populate common `bands` on an asset from config and metadata.
 
-        There are two cases:
-        1. If the asset configuration does not specify raster bands, we create them based on the metadata.
-        2. If the asset configuration specifies raster bands, the extension is already added in the AssetDefinition,
-              and we fill in the missing values from the metadata.
+        Merge configured common bands and metadata-derived values by band index.
+        Configured values take precedence; missing common fields are filled from metadata.
+
+        Behavior:
+        1. No configured bands -> bands are created from metadata.
+        2. Configured bands present -> missing common values are filled from metadata.
+        3. Configured and metadata bands both present with different lengths -> invalid configuration.
         :param asset: The asset to which the raster bands should be added.
         :param metadata: The metadata containing the band information.
         :param asset_config: The asset configuration containing the band information.
         """
-        asset_raster = RasterExtension.ext(asset, add_if_missing=True)
+        existing_bands = asset.extra_fields.get("bands")
+        configured_bands = [dict(b) for b in existing_bands] if isinstance(existing_bands, list) else []
 
-        # Case 1: If the asset configuration does not specify raster bands, we create them based on the metadata.
-        if not asset_config.raster_bands:
-            # There is no information to fill in default values for raster:bands
-            # Just fill in what we do have from asset metadata.
-            raster_bands = []
-            for band_md in metadata.bands:
-                new_band: RasterBand = RasterBand.create(
-                    data_type=band_md.data_type,
-                    nodata=band_md.nodata,
-                    unit=band_md.units,
-                )
-                raster_bands.append(new_band)
-            asset_raster.apply(raster_bands)
-        # Case 2: If the asset configuration specifies raster bands, we fill in the missing values from the metadata.
-        else:
-            raster_bands: List[RasterBand] = asset_raster.bands
-            # assert len(raster_bands) == len(metadata.bands), (
-            #     f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
-            #     f"does not match the number of raster bands in asset config ({len(raster_bands)})"
-            # )
-            if len(raster_bands) == len(metadata.bands):
-                for i, raster_band in enumerate(raster_bands):
-                    band_md: BandMetadata = metadata.bands[i]
+        def _metadata_to_common_band(band_md: BandMetadata) -> Dict[str, Any]:
+            # Keep only STAC common band fields from internal metadata representation.
+            band_dict = band_md.to_dict()
+            result: Dict[str, Any] = {}
+            if band_dict.get("name") is not None:
+                result["name"] = band_dict["name"]
+            if band_dict.get("data_type") is not None:
+                result["data_type"] = band_dict["data_type"]
+            if band_dict.get("nodata") is not None:
+                result["nodata"] = band_dict["nodata"]
+            if band_dict.get("units") is not None:
+                result["unit"] = band_dict["units"]
+            return result
 
-                    if not isinstance(raster_band, RasterBand):
-                        raise InvalidConfiguration(
-                            f"Expected raster band to be of type RasterBand, got {type(raster_band)}"
-                        )
-                    raster_band.apply(
-                        data_type=raster_band.data_type or band_md.data_type,
-                        nodata=raster_band.nodata or band_md.nodata,
-                        unit=raster_band.unit or band_md.units,
-                    )
-            elif len(metadata.bands) == 0:
-                # No band metadata available, skip filling in raster band details
-                pass
-            else:
-                raise InvalidConfiguration(
-                    f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
-                    f"does not match the number of raster bands in asset config ({len(raster_bands)})"
-                )
+        metadata_bands = [_metadata_to_common_band(b) for b in metadata.bands]
 
-    def _get_assets_definitions(self) -> List[AssetDefinition]:
-        """Create AssetDefinitions, according to the config in self.item_assets_configs"""
+        if configured_bands and metadata_bands and len(configured_bands) != len(metadata_bands):
+            raise InvalidConfiguration(
+                f"Number of raster bands in asset metadata ({len(metadata.bands)}) "
+                f"does not match the number of configured bands in asset config ({len(configured_bands)})"
+            )
+
+        merged_bands = []
+        n_bands = max(len(configured_bands), len(metadata_bands))
+
+        for i in range(n_bands):
+            cfg_band = configured_bands[i] if i < len(configured_bands) else {}
+            md_band = metadata_bands[i] if i < len(metadata_bands) else {}
+
+            merged_band = dict(cfg_band)
+            for key, value in md_band.items():
+                if merged_band.get(key) is None:
+                    merged_band[key] = value
+            merged_bands.append(merged_band)
+
+        if merged_bands:
+            asset.extra_fields["bands"] = merged_bands
+
+    def _get_assets_definitions(self) -> Dict[str, ItemAssetDefinition]:
+        """Create ItemAssetDefinitions, according to the config in self.item_assets_configs"""
         asset_definitions = {}
         for band_name, asset_config in self.item_assets_configs.items():
-            asset_def: AssetDefinition = asset_config.to_asset_definition()
+            asset_def: ItemAssetDefinition = asset_config.to_asset_definition()
             asset_definitions[band_name] = asset_def
 
         return asset_definitions
 
     def _get_assets_config_for(self, asset_type: str) -> AssetConfig:
-        """Create AssetDefinitions, according to the config in self.item_assets_configs"""
+        """Create ItemAssetDefinitions, according to the config in self.item_assets_configs"""
         if asset_type not in self.item_assets_configs:
-            return None
+            raise InvalidConfiguration(
+                f"Asset type {asset_type} not found in collection configuration item_assets: {list(self.item_assets_configs.keys())}"
+            )
         return self.item_assets_configs[asset_type]
 
 
@@ -364,7 +377,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         self._link_items = bool(link_items)
 
         # The result
-        self._collection: Collection = None
+        self._collection: Optional[Collection] = None
 
         self._extent: Optional[Extent] = None
         # Initialize async task pool (only used when link_items is False)
@@ -387,12 +400,12 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         return self._link_items
 
     @link_items.setter
-    def link_items(self, value: bool) -> bool:
+    def link_items(self, value: bool) -> None:
         self._link_items = bool(value)
 
     @property
     def item_assets_configs(self) -> Dict[str, AssetConfig]:
-        return self.collection_config.item_assets or {}
+        return self._collection_config.item_assets or {}
 
     @property
     def collection_file_path(self) -> Path:
@@ -407,7 +420,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         stac_items: Iterable[Item],
         group: Optional[str | int] = None,
         save_collection: bool = True,
-    ) -> None:
+    ) -> Collection:
         """Create and save a STAC Collection from a list of STAC Items.
 
         The collection will be created with the ID and title from the collection configuration.
@@ -420,6 +433,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         :return: The created STAC Collection."""
         self.reset()
         self.create_empty_collection(group=group)
+        assert self._collection is not None, "Collection should have been created at this point."
 
         item_counter = 0
         for item in stac_items:
@@ -452,7 +466,7 @@ class CollectionBuilder(AsyncTaskPoolMixin):
 
         logger.info("DONE: build_collection")
         gc.collect()
-        return self.collection
+        return self._collection
 
     def _process_item(
         self,
@@ -584,11 +598,12 @@ class CollectionBuilder(AsyncTaskPoolMixin):
         #   In STAC these are singular but in fact there can be multiple.
         #   If there are multiple values we encode it as a string containing comma-separated values.
 
-        item_assets_ext = ItemAssetsExtension.ext(collection, add_if_missing=True)
-        item_assets_ext.item_assets = self._get_item_assets_definitions()
+        for asset_type, asset_def in self._get_item_assets_definitions().items():
+            collection.item_assets[asset_type] = asset_def
 
         RasterExtension.add_to(collection)
-        EOExtension.add_to(collection)
+        if any(asset_cfg.uses_eo_extension() for asset_cfg in self.item_assets_configs.values()):
+            EOExtension.add_to(collection)
 
         self._collection = collection
         logger.info(f"Created empty collection with ID: {id}")
@@ -610,12 +625,12 @@ class CollectionBuilder(AsyncTaskPoolMixin):
             ),
         )
 
-    def _get_item_assets_definitions(self) -> List[AssetDefinition]:
+    def _get_item_assets_definitions(self) -> Dict[str, ItemAssetDefinition]:
         asset_definitions = {}
         asset_configs = self._collection_config.item_assets
 
         for band_name, asset_config in asset_configs.items():
-            asset_def: AssetDefinition = asset_config.to_asset_definition()
+            asset_def: ItemAssetDefinition = asset_config.to_asset_definition()
             # TODO: check whether we do need to store the collection or the items as the asset owner here.
             #   see also pystac docs: https://pystac.readthedocs.io/en/stable/api/pystac.html#pystac.Asset.owner
             #   Looks like there are two situations: item_assets occurs both at the level of the STAC collection and

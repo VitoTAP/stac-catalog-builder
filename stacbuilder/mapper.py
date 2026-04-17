@@ -1,7 +1,7 @@
 import threading
 from math import log10
 from pathlib import Path
-from typing import ClassVar, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Union
 
 import rasterio
 from loguru import logger
@@ -61,11 +61,13 @@ class MapGeoTiffToAssetMetadata:
         self,
         path_parser: InputPathParser,
         href_modifier: Optional[CreateAssetUrlFromPath],
+        configured_band_names_per_asset: Optional[Dict[str, List[str]]] = None,
     ) -> None:
         # Store dependencies: components that have to be provided to constructor
         self._path_parser = path_parser
 
         self._href_modifier: Optional[CreateAssetUrlFromPath] = href_modifier
+        self._configured_band_names_per_asset_type: Dict[str, List[str]] = configured_band_names_per_asset or {}
 
     @classmethod
     def from_config(
@@ -78,8 +80,16 @@ class MapGeoTiffToAssetMetadata:
 
         path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
         href_modifier = CreateAssetUrlFromPath.from_config(config=collection_config.asset_href_modifier)
+        configured_band_names_per_asset = {
+            asset_type: [band.name for band in (asset_cfg.bands or [])]
+            for asset_type, asset_cfg in (collection_config.item_assets or {}).items()
+        }
 
-        return cls(path_parser=path_parser, href_modifier=href_modifier)
+        return cls(
+            path_parser=path_parser,
+            href_modifier=href_modifier,
+            configured_band_names_per_asset=configured_band_names_per_asset,
+        )
 
     def process_href_info(self, href: str) -> dict[str, str]:
         """Uses the path parser to extract information from the href.
@@ -114,6 +124,10 @@ class MapGeoTiffToAssetMetadata:
             modified_href = self._href_modifier(asset_path)
         else:
             modified_href = asset_path.as_posix()
+
+        href_info = self.process_href_info(str(asset_path))
+        asset_type = href_info.get("asset_type")
+        configured_band_names = self._configured_band_names_per_asset_type.get(asset_type) or []
 
         # check for s3 path and adjust the file path.
         if isinstance(asset_path, S3Path):
@@ -155,13 +169,17 @@ class MapGeoTiffToAssetMetadata:
             tags = dataset.tags() or {}
             units = tags.get("units")
             for i in range(dataset.count):
-                band_md = BandMetadata(data_type=dataset.dtypes[i], index=i, nodata=dataset.nodatavals[i], units=units)
+                band_name = configured_band_names[i] if i < len(configured_band_names) else None
+                band_md = BandMetadata(
+                    data_type=dataset.dtypes[i],
+                    index=i,
+                    nodata=dataset.nodatavals[i],
+                    units=units,
+                    name=band_name,
+                )
                 bands.append(band_md)
 
         file_stat = asset_path.stat()
-
-        href_info = self.process_href_info(str(asset_path))
-        asset_type = href_info.get("asset_type")
 
         media_type = self._resolve_media_type(asset_type=asset_type, asset_path=_asset_path)
 

@@ -32,13 +32,13 @@
         "CROP_MASK": {
             "title": "CROP_MASK",
             "description": "crop masks are based on two land use/land cover sources which are CCI LAND COVER - S2 PROTOTYPE LAND COVER 20M MAP OF AFRICA 2016 and GlobCover 2009 land cover map.",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "CROP_MASK",
                     "description": "crop masks are based on two land use/land cover sources which are CCI LAND COVER - S2 PROTOTYPE LAND COVER 20M MAP OF AFRICA 2016 and GlobCover 2009 land cover map.",
                     "data_type": "int16",
-                    "sampling": "area",
-                    "spatial_resolution": 300
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 300
                 }
             ]
         }

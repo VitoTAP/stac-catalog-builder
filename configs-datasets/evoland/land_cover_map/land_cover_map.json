@@ -4,7 +4,10 @@
     "description": "LCFM LCM-10 land cover map for the EVOLAND project",
     "instruments": [],
     "keywords": [
-	"LCFM", "Land Cover Map", "Forest Monitoring", "Copernicus"
+        "LCFM",
+        "Land Cover Map",
+        "Forest Monitoring",
+        "Copernicus"
     ],
     "mission": [],
     "platform": [],
@@ -17,7 +20,7 @@
             ],
             "url": "https://land.copernicus.eu/"
         },
-	{
+        {
             "name": "VITO",
             "roles": [
                 "processor"
@@ -29,23 +32,23 @@
     "input_path_parser": {
         "classname": "DefaultInputPathParser",
         "parameters": {
-	    "regex_pattern": ".*/.*/.*/.*/.*/LCFM_LCM-10_(.*)_(?P<item_id>(?P<year>\\d{4})_(?P<tile_id>(.*))_(.*))_(.*).tif$",
+            "regex_pattern": ".*/.*/.*/.*/.*/LCFM_LCM-10_(.*)_(?P<item_id>(?P<year>\\d{4})_(?P<tile_id>(.*))_(.*))_(.*).tif$",
             "period": "yearly",
             "fixed_values": {
-		"asset_type": "land_cover_map"
-	    }
-	}
+                "asset_type": "land_cover_map"
+            }
+        }
     },
     "item_assets": {
         "land_cover_map": {
             "title": "Land Cover Map",
             "description": "Land cover map.",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "Band 1",
                     "description": "Band 1"
-		}
-	    ]
-	}
+                }
+            ]
+        }
     }
 }

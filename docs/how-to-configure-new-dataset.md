@@ -94,18 +94,19 @@ Collection configuration file: corresponds to class `CollectionConfig`.
     //
     // if there is only on type of item, you can set the `asset_type` as a fixed value
     // in the `input_path_parser`.
+    // Bands are configured through the STAC 1.1 common bands list.
     // Extra fields like data_type, sampling, spatial_resolution are optional.
     "item_assets": {
         "some_item_type": {
             "title": "REPLACE_THIS--BAND_NAME",
             "description": "REPLACE_THIS--BAND_NAME",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "REPLACE_THIS--BAND_NAME",
                     "description": "REPLACE_THIS--BAND_DESCRIPTION",
                     "data_type": "float32", // optional
-                    "sampling": "area", // optional
-                    "spatial_resolution": 100 // optional
+                    "raster:sampling": "area", // optional
+                    "raster:spatial_resolution": 100 // optional
                 }
             ]
         }

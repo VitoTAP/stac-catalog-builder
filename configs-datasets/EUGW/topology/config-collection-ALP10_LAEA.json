@@ -22,7 +22,7 @@
         "ALP10": {
             "title": "Alpine Mask",
             "description": "Alpine mask",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "Alpine mask",
                     "description": "Alpine mask"

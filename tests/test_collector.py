@@ -35,3 +35,10 @@ class TestGeoTiffMetadataCollector:
 
         actual_asset_paths = [am.asset_path for am in geotiff_meta_collector.metadata_list]
         assert sorted(actual_asset_paths) == sorted(geotiff_paths)
+
+    def test_band_names_come_from_config_order(self, geotiff_meta_collector):
+        geotiff_meta_collector.collect()
+
+        by_asset_type = {md.asset_type: md for md in geotiff_meta_collector.metadata_list if md.asset_type is not None}
+        assert by_asset_type["2m-temp-monthly"].bands[0].name == "2m_temp"
+        assert by_asset_type["tot-precip-monthly"].bands[0].name == "tot_precip"
