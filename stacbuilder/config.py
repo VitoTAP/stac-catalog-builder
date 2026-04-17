@@ -286,11 +286,6 @@ class FileCollectorConfig(BaseModel):
     max_files: int = -1
 
 
-class AssetHrefModifierConfig(BaseModel):
-    url_template: str
-    data_root: str
-
-
 class AlternateHrefConfig(BaseModel):
     """Configuration for what alternate links we need to add.
 
@@ -341,7 +336,6 @@ class CollectionConfig(BaseModel):
     # Defines what assets items have, and what bands the assets contain.
     item_assets: Dict[str, AssetConfig] = {}
 
-    asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
 
     @classmethod

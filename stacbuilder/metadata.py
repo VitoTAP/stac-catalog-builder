@@ -20,9 +20,10 @@ from typing import Any, ClassVar, Dict, List, Optional
 import dateutil.parser
 import geopandas as gpd
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pystac.media_type import MediaType
 from shapely.geometry import Polygon, mapping
+from upath import UPath
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.projections import project_polygon
@@ -89,16 +90,16 @@ class AssetMetadata(BaseModel):
     asset_id: str
     """The unique identifier for the asset."""
 
-    href: str = None
+    href: Optional[str] = None
     """The file path or URL to the asset. At least one of href, original_href, or asset_path must be set."""
 
-    original_href: str = None
+    original_href: Optional[str] = None
     """The original file path or URL before any modifications."""
 
-    asset_path: Path = None
+    asset_path: Path | UPath | None = None
     """Path object representing the asset location on the filesystem."""
 
-    item_id: str = None
+    item_id: str
     """STAC item identifier that this asset belongs to.
 
     When a STAC item bundles multiple assets, the InputPathParser must provide
@@ -107,7 +108,7 @@ class AssetMetadata(BaseModel):
     to the same as asset_id.
     """
 
-    asset_type: Optional[str] = None
+    asset_type: str
     """Asset type used to find the corresponding asset definition in CollectionConfig."""
 
     datetime: dt.datetime
@@ -148,10 +149,10 @@ class AssetMetadata(BaseModel):
     file_size: Optional[int] = None
     """File size in bytes (corresponds to file:size from FileInfo STAC extension)."""
 
-    tags: dict[str, str] = {}
+    tags: dict[str, str] = Field(default_factory=dict)
     """Metadata tags extracted from the raster file."""
 
-    bands: List[BandMetadata] = []
+    bands: List[BandMetadata] = Field(default_factory=list)
     """Band information for multi-band raster files."""
 
     tile_id: Optional[str] = None
@@ -159,10 +160,6 @@ class AssetMetadata(BaseModel):
 
     media_type: Optional[MediaType] = None
     """MIME type of the asset file (e.g., image/tiff, application/json)."""
-
-    # platforms: Optional[List[str]] = None
-    # instruments: Optional[List[str]] = None
-    # missions: Optional[List[str]] = None
 
     @field_validator("geometry_lat_lon", "geometry_proj")
     @classmethod
@@ -186,12 +183,14 @@ class AssetMetadata(BaseModel):
         Run some checks on the properties that are set and infer some properties"""
         if not any([self.asset_id, self.item_id]):
             raise ValueError("At least one of asset_id or item_id must be set.")
+        if not any([self.href, self.original_href, self.asset_path]):
+            raise ValueError("At least one of href, original_href, or asset_path must be set.")
         if not self.asset_path:
-            self.asset_path = Path(self.original_href)
+            self.asset_path = UPath(self.original_href) if self.original_href else UPath(self.href)
         if not self.href:
-            self.href = str(self.asset_path)
+            self.href = self.asset_path.as_uri() if self.asset_path else self.original_href
         if not self.original_href:
-            self.original_href = str(self.href)
+            self.original_href = self.asset_path.as_posix() if self.asset_path else self.href
 
         if not self.item_id:
             self.item_id = self.asset_id

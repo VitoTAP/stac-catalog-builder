@@ -11,41 +11,9 @@ from rio_cogeo import cog_validate
 from upath.implementations.cloud import S3Path
 
 from stacbuilder.boundingbox import BoundingBox
-from stacbuilder.config import AssetHrefModifierConfig, CollectionConfig
+from stacbuilder.config import CollectionConfig
 from stacbuilder.metadata import AssetMetadata, BandMetadata
 from stacbuilder.pathparsers import InputPathParser, InputPathParserFactory
-
-
-class CreateAssetUrlFromPath:
-    """Implements stactools.core.io.ReadHrefModifier"""
-
-    def __init__(self, href_template: str, data_root: Path) -> None:
-        self.url_template = href_template
-        self.data_root = Path(data_root)
-
-    @classmethod
-    def from_config(cls, config: Optional[AssetHrefModifierConfig]) -> "CreateAssetUrlFromPath":
-        """
-        Create a CreateAssetUrlFromPath from a CollectionConfig.
-        returns None if no asset_href_modifier is configured.
-        """
-        if not config:
-            return None
-
-        return cls(
-            href_template=config.url_template,
-            data_root=Path(config.data_root),
-        )
-
-    def __call__(self, asset_path: Path) -> str:
-        """This method must match the signature of ReadHrefModifier.
-        ReadHrefModifier is a type alias for Callable[[str], str]
-        """
-        return self.get_url(asset_path)
-
-    def get_url(self, asset_path: Path):
-        rel_path: Path = asset_path.relative_to(self.data_root)
-        return self.url_template.format(str(rel_path))
 
 
 class MapGeoTiffToAssetMetadata:
@@ -60,13 +28,10 @@ class MapGeoTiffToAssetMetadata:
     def __init__(
         self,
         path_parser: InputPathParser,
-        href_modifier: Optional[CreateAssetUrlFromPath],
         configured_band_names_per_asset: Optional[Dict[str, List[str]]] = None,
     ) -> None:
         # Store dependencies: components that have to be provided to constructor
         self._path_parser = path_parser
-
-        self._href_modifier: Optional[CreateAssetUrlFromPath] = href_modifier
         self._configured_band_names_per_asset_type: Dict[str, List[str]] = configured_band_names_per_asset or {}
 
     @classmethod
@@ -79,7 +44,6 @@ class MapGeoTiffToAssetMetadata:
             raise ValueError("CollectionConfig must not be None")
 
         path_parser = InputPathParserFactory.from_config(collection_config.input_path_parser)
-        href_modifier = CreateAssetUrlFromPath.from_config(config=collection_config.asset_href_modifier)
         configured_band_names_per_asset = {
             asset_type: [band.name for band in (asset_cfg.bands or [])]
             for asset_type, asset_cfg in (collection_config.item_assets or {}).items()
@@ -87,7 +51,6 @@ class MapGeoTiffToAssetMetadata:
 
         return cls(
             path_parser=path_parser,
-            href_modifier=href_modifier,
             configured_band_names_per_asset=configured_band_names_per_asset,
         )
 
@@ -119,11 +82,6 @@ class MapGeoTiffToAssetMetadata:
 
         if not isinstance(asset_path, (Path, str)):
             raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
-
-        if self._href_modifier:
-            modified_href = self._href_modifier(asset_path)
-        else:
-            modified_href = asset_path.as_posix()
 
         href_info = self.process_href_info(str(asset_path))
         asset_type = href_info.get("asset_type")
@@ -186,8 +144,6 @@ class MapGeoTiffToAssetMetadata:
         # Prepare the arguments for AssetMetadata, allowing href_info to override or add fields
         asset_metadata_args = dict(
             asset_path=asset_path,
-            href=modified_href,
-            original_href=str(asset_path),
             asset_id=Path(asset_path).stem,
             item_id=Path(asset_path).stem,
             shape=shape,

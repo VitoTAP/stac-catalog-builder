@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+from pathlib import Path
 
 import pytest
 from dateutil.tz import tzoffset
@@ -12,21 +13,23 @@ from stacbuilder.metadata import AssetMetadata, check_datetime, convert_date_to_
 class TestAssetMetadata:
     @pytest.fixture
     def asset_metadata(self) -> AssetMetadata:
+        local_path = Path("/local/path/to/asset.tif")
         return AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
         )
 
     def test_constructor_sets_defaults(self, asset_metadata: AssetMetadata):
         assert asset_metadata.asset_id == "test_asset_id"
-        assert asset_metadata.item_id == "test_asset_id"
-        assert asset_metadata.asset_type is None
+        assert asset_metadata.item_id == "test_item_id"
+        assert asset_metadata.asset_type == "test-asset-type"
         assert asset_metadata.media_type is None
 
-        assert asset_metadata.href == "/local/path/to/asset.tif"
+        assert asset_metadata.href == "file:///local/path/to/asset.tif"
         assert asset_metadata.original_href == "/local/path/to/asset.tif"
 
         assert asset_metadata.shape is None
@@ -56,12 +59,12 @@ class TestAssetMetadata:
 
         expected_dict = {
             "asset_id": "test_asset_id",
-            "item_id": "test_asset_id",
+            "item_id": "test_item_id",
             "tile_id": None,
-            "href": "/local/path/to/asset.tif",
+            "href": "file:///local/path/to/asset.tif",
             "original_href": "/local/path/to/asset.tif",
             "asset_path": "/local/path/to/asset.tif",
-            "asset_type": None,
+            "asset_type": "test-asset-type",
             "media_type": None,
             "datetime": dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
             "start_datetime": None,
@@ -84,6 +87,41 @@ class TestAssetMetadata:
         expected_dt = dt.datetime(2024, 1, 21, 0, 0, 0, tzinfo=dt.UTC)
         actual_dt = convert_date_to_datetime(in_date)
         assert actual_dt == expected_dt
+
+    @pytest.mark.parametrize(
+        "location_kwargs, expected_href, expected_original",
+        [
+            (
+                {"asset_path": Path("/local/path/to/asset.tif")},
+                "file:///local/path/to/asset.tif",
+                "/local/path/to/asset.tif",
+            ),
+            (
+                {"original_href": "/local/path/to/asset.tif"},
+                "file:///local/path/to/asset.tif",
+                "/local/path/to/asset.tif",
+            ),
+            (
+                {"href": "file:///local/path/to/asset.tif"},
+                "file:///local/path/to/asset.tif",
+                "file:///local/path/to/asset.tif",
+            ),
+        ],
+    )
+    def test_constructor_accepts_single_location_source(self, location_kwargs, expected_href, expected_original):
+        meta = AssetMetadata(
+            asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
+            bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
+            **location_kwargs,
+        )
+
+        assert meta.href == expected_href
+        assert meta.original_href == expected_original
+        assert meta.asset_path is not None
+        assert meta.asset_path.as_uri() == "file:///local/path/to/asset.tif"
 
     @pytest.mark.parametrize(
         ["in_value", "expected"],
@@ -174,11 +212,13 @@ class TestAssetMetadata:
 
     def test_bbox_lat_lon(self, geometries):
         _, bbox_wgs84, _, _, epsg = geometries
+        local_path = Path("/local/path/to/asset.tif")
         meta = AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             bbox_lat_lon=bbox_wgs84,
             file_size=123456,
             proj_epsg=epsg,
@@ -206,11 +246,13 @@ class TestAssetMetadata:
 
     def test_bbox_projected(self):
         bbox_proj = BoundingBox(624651.02, 687947.46, 694307.66, 799081.79, 3812)
+        local_path = Path("/local/path/to/asset.tif")
         meta = AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             file_size=123456,
             bbox_projected=bbox_proj,
         )
@@ -220,11 +262,13 @@ class TestAssetMetadata:
         assert meta.proj_epsg == 3812
 
     def test_geometry_dict(self):
+        local_path = Path("/local/path/to/asset.tif")
         meta = AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             file_size=123456,
             bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
         )
@@ -238,11 +282,13 @@ class TestAssetMetadata:
         assert meta.geometry_lat_lon_as_dict == expected
 
     def proj_geometry_as_dict(self):
+        local_path = Path("/local/path/to/asset.tif")
         meta = AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             file_size=123456,
             bbox_projected=BoundingBox(624651.02, 687947.46, 694307.66, 799081.79, 3812),
         )
@@ -266,11 +312,13 @@ class TestAssetMetadata:
         min_y = 687947.46
         max_x = 694307.66
         max_y = 799081.79
+        local_path = Path("/local/path/to/asset.tif")
         meta = AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             file_size=123456,
             bbox_projected=BoundingBox(min_x, min_y, max_x, max_y, 3812),
         )
@@ -292,11 +340,13 @@ class TestAssetMetadata:
         min_y = 687947.46
         max_x = 694307.66
         max_y = 799081.79
+        local_path = Path("/local/path/to/asset.tif")
         meta = AssetMetadata(
             asset_id="test_asset_id",
+            item_id="test_item_id",
+            asset_type="test-asset-type",
+            asset_path=local_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
-            href="/local/path/to/asset.tif",
-            original_href="/local/path/to/asset.tif",
             file_size=123456,
             bbox_projected=BoundingBox(min_x, min_y, max_x, max_y, 3812),
         )

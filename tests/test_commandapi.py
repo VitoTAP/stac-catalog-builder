@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import pytest
 from nested_lookup import nested_update
@@ -27,8 +28,13 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
             if isinstance(obj, dict):
                 for key, value in obj.items():
                     if key == "href" and isinstance(value, str) and not value.startswith("http"):
-                        if Path(value).is_absolute():
-                            new_href = Path("/stac-catalog-builder/tests") / Path(value).relative_to(
+                        if value.startswith("file://"):
+                            normalized_path = Path(unquote(urlparse(value).path))
+                        else:
+                            normalized_path = Path(value)
+
+                        if normalized_path.is_absolute():
+                            new_href = Path("/stac-catalog-builder/tests") / normalized_path.relative_to(
                                 Path(__file__).parent
                             )
                             obj[key] = new_href.as_posix()

@@ -113,8 +113,6 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         asset_type=asset_type,
         item_id=asset_path_data["item_id"],
         asset_path=asset_path,
-        href=asset_path.as_posix(),
-        original_href=str(asset_path),
         datetime=asset_path_data["datetime"],
         start_datetime=asset_path_data["start_datetime"],
         end_datetime=asset_path_data["end_datetime"],
@@ -386,15 +384,15 @@ class TestAlternateLinksGenerator:
     @pytest.fixture
     def simple_asset_metadata(self) -> AssetMetadata:
         """A very simple AssetMetadata with minimal data"""
+        asset_path = Path("/data/collection789/item456/asset123.tif")
         asset_md = AssetMetadata(
             asset_id="asset123",
             item_id="item456",
             asset_type="test-asset-type",
-            asset_path=Path("/data/collection789/item456/asset123.tif"),
+            asset_path=asset_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
             bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
         )
-        asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
 
         return asset_md
 
