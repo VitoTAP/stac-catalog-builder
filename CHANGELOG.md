@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgrade to pystac 1.14.3, which includes support for STAC 1.1 common `bands` and deprecates `eo:bands` and `raster:bands`.
 - [breaking] Asset config now supports a new `bands` field instead of eo_bands and raster_bands. eo and raster fields can be passed in this bands field.
+- href's are now always stored as uri's. For files this means that they will be prefixed with `file://` and for s3 they will be prefixed with `s3://`. The original href is stored in the `original_href` field. This allows to keep the original path as it is, while still having a valid uri for pystac to work with.
 
 ### Removed
 
