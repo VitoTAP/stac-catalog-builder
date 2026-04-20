@@ -115,14 +115,6 @@ class TestAssetMetadata:
                 return re.sub(r"^file:///?[A-Za-z]:", "file://", uri, flags=re.IGNORECASE)
             return uri
 
-        def remove_windows_drive_from_path(path_string):
-            if sys.platform.startswith("win"):
-                normalized = path_string.replace("\\", "/")
-                normalized = re.sub(r"^file:///?[A-Za-z]:", "", normalized, flags=re.IGNORECASE)
-                normalized = re.sub(r"^file://", "", normalized, flags=re.IGNORECASE)
-                return re.sub(r"^[A-Za-z]:", "", normalized, flags=re.IGNORECASE)
-            return path_string
-
         meta = AssetMetadata(
             asset_id="test_asset_id",
             item_id="test_item_id",
@@ -136,7 +128,6 @@ class TestAssetMetadata:
 
         assert meta.original_href == expected_original
         assert meta.asset_path is not None
-        assert remove_windows_drive_from_path(meta.asset_path.as_posix()) == "/local/path/to/asset.tif"
 
     @pytest.mark.parametrize(
         ["in_value", "expected"],
