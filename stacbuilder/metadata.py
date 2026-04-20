@@ -94,7 +94,7 @@ class AssetMetadata(BaseModel):
     """The file path or URL to the asset. At least one of href, original_href, or asset_path must be set."""
 
     original_href: Optional[str] = None
-    """The original file path or URL before any modifications."""
+    """The original file path or URL before any modifications. This should not be set directly, but is inferred from href or asset_path."""
 
     asset_path: Path | UPath | None = None
     """Path object representing the asset location on the filesystem."""
@@ -183,14 +183,24 @@ class AssetMetadata(BaseModel):
         Run some checks on the properties that are set and infer some properties"""
         if not any([self.asset_id, self.item_id]):
             raise ValueError("At least one of asset_id or item_id must be set.")
-        if not any([self.href, self.original_href, self.asset_path]):
-            raise ValueError("At least one of href, original_href, or asset_path must be set.")
+        if not any([self.href, self.asset_path]):
+            raise ValueError("At least one of href, or asset_path must be set.")
+        if self.original_href is not None:
+            raise ValueError(
+                "original_href should not be set directly. It is inferred from href or asset_path if not provided."
+            )
+
+        self.original_href = self.href if self.href else (self.asset_path.as_posix() if self.asset_path else None)
+
         if not self.asset_path:
-            self.asset_path = UPath(self.original_href) if self.original_href else UPath(self.href)
-        if not self.href:
-            self.href = self.asset_path.as_uri() if self.asset_path else self.original_href
-        if not self.original_href:
-            self.original_href = self.asset_path.as_posix() if self.asset_path else self.href
+            if self.href:
+                self.asset_path = UPath(self.href)
+
+        # We replace href with the file URI scheme
+        if self.asset_path.is_absolute():
+            self.href = self.asset_path.as_uri()
+        else:
+            self.href = "file://" + self.asset_path.as_posix()
 
         if not self.item_id:
             self.item_id = self.asset_id

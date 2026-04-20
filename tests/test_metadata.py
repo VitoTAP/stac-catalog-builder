@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -97,7 +98,7 @@ class TestAssetMetadata:
                 "/local/path/to/asset.tif",
             ),
             (
-                {"original_href": "/local/path/to/asset.tif"},
+                {"href": "/local/path/to/asset.tif"},
                 "file:///local/path/to/asset.tif",
                 "/local/path/to/asset.tif",
             ),
@@ -109,6 +110,19 @@ class TestAssetMetadata:
         ],
     )
     def test_constructor_accepts_single_location_source(self, location_kwargs, expected_href, expected_original):
+        def remove_windows_drive_letter(uri):
+            if sys.platform.startswith("win"):
+                return re.sub(r"^file:///?[A-Za-z]:", "file://", uri, flags=re.IGNORECASE)
+            return uri
+
+        def remove_windows_drive_from_path(path_string):
+            if sys.platform.startswith("win"):
+                normalized = path_string.replace("\\", "/")
+                normalized = re.sub(r"^file:///?[A-Za-z]:", "", normalized, flags=re.IGNORECASE)
+                normalized = re.sub(r"^file://", "", normalized, flags=re.IGNORECASE)
+                return re.sub(r"^[A-Za-z]:", "", normalized, flags=re.IGNORECASE)
+            return path_string
+
         meta = AssetMetadata(
             asset_id="test_asset_id",
             item_id="test_item_id",
@@ -118,10 +132,11 @@ class TestAssetMetadata:
             **location_kwargs,
         )
 
-        assert meta.href == expected_href
+        assert remove_windows_drive_letter(meta.href) == expected_href
+
         assert meta.original_href == expected_original
         assert meta.asset_path is not None
-        assert meta.asset_path.as_uri() == "file:///local/path/to/asset.tif"
+        assert remove_windows_drive_from_path(meta.asset_path.as_posix()) == "/local/path/to/asset.tif"
 
     @pytest.mark.parametrize(
         ["in_value", "expected"],
