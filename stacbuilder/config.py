@@ -23,6 +23,7 @@ from pydantic import (
 )
 from pystac import ItemAssetDefinition, MediaType
 from pystac.provider import Provider, ProviderRole
+from upath import UPath
 
 DEFAULT_PROVIDER_ROLES: List[ProviderRole] = [
     ProviderRole.PRODUCER,
@@ -172,8 +173,8 @@ class AssetConfig(BaseModel):
 
     title: str
     description: str
-    media_type: Optional[MediaType] = MediaType.GEOTIFF
-    roles: Optional[List[str]] = ["data"]
+    media_type: MediaType = MediaType.GEOTIFF
+    roles: List[str] = ["data"]
 
     # The bands are not always electro-optical bands,
     # for example weather observation and climate data.
@@ -281,7 +282,7 @@ class AssetConfig(BaseModel):
 
 
 class FileCollectorConfig(BaseModel):
-    input_dir: Path
+    input_dir: Path | UPath
     glob: Optional[str] = "*"
     max_files: int = -1
 

@@ -8,6 +8,7 @@ from loguru import logger
 from openeo.util import normalize_crs
 from pystac.media_type import MediaType
 from rio_cogeo import cog_validate
+from upath import UPath
 from upath.implementations.cloud import S3Path
 
 from stacbuilder.boundingbox import BoundingBox
@@ -65,7 +66,7 @@ class MapGeoTiffToAssetMetadata:
 
     def to_metadata(
         self,
-        asset_path: Union[Path, str],
+        asset_path: Union[Path, UPath, str],
     ) -> AssetMetadata:
         """Extracts AssetMetadata from a GeoTIFF file.
         :param asset_path: Path to the GeoTIFF file, can be a string or a Path object.
@@ -80,8 +81,10 @@ class MapGeoTiffToAssetMetadata:
         if isinstance(asset_path, str):
             asset_path = Path(asset_path)
 
-        if not isinstance(asset_path, (Path, str)):
-            raise TypeError(f'Argument "asset_path" must be of type Path or str. {type(asset_path)=}, {asset_path=}')
+        if not isinstance(asset_path, (Path, str, UPath)):
+            raise TypeError(
+                f'Argument "asset_path" must be of type Path, UPath or str. {type(asset_path)=}, {asset_path=}'
+            )
 
         href_info = self.process_href_info(str(asset_path))
         asset_type = href_info.get("asset_type")
@@ -144,8 +147,8 @@ class MapGeoTiffToAssetMetadata:
         # Prepare the arguments for AssetMetadata, allowing href_info to override or add fields
         asset_metadata_args = dict(
             asset_path=asset_path,
-            asset_id=Path(asset_path).stem,
-            item_id=Path(asset_path).stem,
+            asset_id=asset_path.stem,
+            item_id=asset_path.stem,
             shape=shape,
             proj_epsg=proj_epsg,
             bbox_projected=bbox_projected,
@@ -161,9 +164,9 @@ class MapGeoTiffToAssetMetadata:
 
         return asset_metadata
 
-    def _resolve_media_type(self, asset_type: Optional[str], asset_path: Union[Path, str]) -> MediaType:
+    def _resolve_media_type(self, asset_type: Optional[str], asset_path: Union[Path, UPath]) -> MediaType:
         """Return cached media type for an asset type or compute it once."""
-        cache_key = asset_type or Path(asset_path).suffix
+        cache_key = asset_type or asset_path.suffix
         cached = self._media_type_cache.get(cache_key)
 
         # If we have a cached media type for this asset type, return it immediately to avoid redundant COG validation.
