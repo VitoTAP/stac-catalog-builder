@@ -122,5 +122,5 @@ tmp/
 
 **/results/**
 *.conf
-
+*.env
 *.log

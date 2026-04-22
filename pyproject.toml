@@ -37,6 +37,7 @@ dependencies = [
   "rasterio==1.4.3",
   "requests==2.31.*",
   "requests_auth>=6.0, <8.0",
+  "python-dotenv>=1.0, <2.0",
   "rio-stac==0.10",
   "shapely==2.0.*",
   "yarl==1.9.*",
@@ -47,9 +48,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-hrvpp = [
-  "terracatalogueclient==0.1.19",
-]
 dev = [
     "hatch>=1.14.1",
     "nested-lookup>=0.2.25",
@@ -58,10 +56,6 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-xdist",
     "requests-mock>=1.11.0",
-]
-notebooks = [
-  "ipykernel",
-  
 ]
 
 [project.urls]

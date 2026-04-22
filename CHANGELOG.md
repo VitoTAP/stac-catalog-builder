@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - href's are now always stored as uri's. For files this means that they will be prefixed with `file://` and for s3 they will be prefixed with `s3://`. The original href is stored in the `original_href` field. This allows to keep the original path as it is, while still having a valid uri for pystac to work with.
 
 ### Removed
+- Terracatalogueclient implementation and related dependency group. Running the stac builder on the source files has been added as a workflow.
 
 ### Fixed
 - Small fixes for type hints
