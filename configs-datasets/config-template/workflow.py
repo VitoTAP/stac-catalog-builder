@@ -10,15 +10,20 @@ from stacbuilder import (
     list_asset_metadata,
     list_input_files,
     list_stac_items,
+    load_env,
     upload_to_stac_api,
     validate_collection,
 )
 from stacbuilder.stacapi.config import AuthSettings, Settings
 
+# Configure logging to a file named "debug.log" in the current working directory
 logger.add(
     Path(__file__).parent / "debug.log",
-    level="INFO",
+    level="DEBUG",
 )
+
+# Optional: Load environment variables from .env file (e.g., for S3 credentials)
+load_env(Path(__file__).parent / ".env")
 
 # Collection configuration
 catalog_version = "v01"

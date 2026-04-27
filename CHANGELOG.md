@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 
+## [1.1.1]
+### Added
+- Added experimental agent skills for new STAC collection onboarding. These skills are wrappers that delegate to the canonical root skill document, which contains the detailed workflow for onboarding new STAC collections. The agent skills are located in the `.agents/skills/new-stac-collection/`, `.claude/skills/new-stac-collection/`, and `.github/skills/new-stac-collection/` directories.
+- load_env and .env.template have been added to the repository template for new dataset configurations. This allows for easier configuration of environment variables needed for building new STAC collections from S3. The workflow.py file in the repository template has also been updated to use load_env for loading environment variables from the .env file.
+### Changed
+
+### Removed
+- Terracatalogueclient implementation and related dependency group. Running the stac builder on the source files has been added as a workflow.
+
+### Fixed
+- Fixed issues with UPath handling in the library, ensuring compatibility with files on both local filesystems and S3. 
+
+## [1.1.0] - 2026-04-27
 ### Added
 - Support for STAC 1.1 common `bands` in collection `item_assets` and generated asset metadata.
 

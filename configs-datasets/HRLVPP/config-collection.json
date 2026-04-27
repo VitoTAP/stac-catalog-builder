@@ -1,0 +1,271 @@
+{
+    "collection_id": "copernicus_r_utm-wgs84_10_m_hrvpp-vpp_p_2017-now_v01_stac1_1",
+    "title": "Vegetation Phenology and Productivity parameters, yearly, UTM projection (Direct Access)",
+    "description": "This product includes a set of Vegetation Phenology and Productivity parameters, for up to two growing seasons, based on the filtered time series of the Plant Phenology Index Seasonal Trajectories product. The parameters include the start, end and length of the growing season, the dates when the vegetation index reaches its minimum and maximum values, the maximum value and its distance to the minimum (amplitude), the slopes of the green-up and green-down periods and the seasonal and total productivity. It is derived from Copernicus Sentinel-2 satellite observations and updated annually. This collection is a direct access version of the original collection.",
+    "instruments": [],
+    "keywords": [
+    "PPI",
+    "index",
+    "land",
+    "vegetation",
+    "plant",
+    "phenology",
+    "productivity",
+    "growing season",
+    "sentinel"
+    ],
+    "mission": [],
+    "platform": [],
+    "providers": [
+        {
+            "name": "VITO",
+            "roles": [
+                "licensor",
+                "processor",
+                "producer"
+            ],
+            "url": "https://www.vito.be/"
+        }
+    ],
+    "layout_strategy_item_template": "${collection}",
+    "input_path_parser": {
+        "classname": "DefaultInputPathParser",
+        "parameters": {
+            "regex_pattern": ".*/VPP_(?P<year>\\d{4})_S2_T(?P<tile_id>\\d{2}[A-Z]{3})-010m_V\\d+_(?P<season>s[12])_(?P<asset_type>SOSD|EOSD|MAXD|SOSV|EOSV|MINV|MAXV|AMPL|LENGTH|LSLOPE|RSLOPE|SPROD|TPROD|QFLAG)\\.tif$",
+            "period": "yearly",
+            "fixed_values": {
+                "item_id": "VPP_{year}_S2_T{tile_id}-010m_V101_{season}"
+            }
+        }
+    },
+    "item_assets": {
+        "SOSD": {
+            "type": "image/tiff; application=geotiff",
+            "title": "SOSD",
+            "description": "Date when the vegetation growing season starts in the Plant Phenology Index (PPI) profile; by definition when PPI reaches 25% of the season amplitude during the green-up period.",
+            "bands": [
+                {
+                    "name": "SOSD",
+                    "description": "Date when the vegetation growing season starts in the Plant Phenology Index (PPI) profile; by definition when PPI reaches 25% of the season amplitude during the green-up period.",
+                    "raster:sampling": "area",
+                    "data_type": "uint8",
+                    "raster:bits_per_sample": 8,
+                    "raster:spatial_resolution": 10
+                }
+            ]
+        },
+        "EOSD": {
+            "type": "image/tiff; application=geotiff",
+            "title": "EOSD",
+            "description": "Date when the vegetation growing season ends in the Plant Phenology Index (PPI) profile; by definition when PPI reaches 15% of the season amplitude during the green-down period.",
+            "bands": [
+                {
+                    "name": "EOSD",
+                    "description": "Date when the vegetation growing season ends in the Plant Phenology Index (PPI) profile; by definition when PPI reaches 15% of the season amplitude during the green-down period.",
+                    "raster:sampling": "area",
+                    "data_type": "uint8",
+                    "raster:bits_per_sample": 8,
+                    "raster:spatial_resolution": 10
+                }
+            ]
+        },
+        "MAXD": {
+            "type": "image/tiff; application=geotiff",
+            "title": "MAXD",
+            "description": "Date when the maximum Plant Phenology Index (PPI) value is reached during the vegetation growing season.",
+            "bands": [
+                {
+                    "name": "MAXD",
+                    "description": "Date when the maximum Plant Phenology Index (PPI) value is reached during the vegetation growing season.",
+                    "raster:sampling": "area",
+                    "data_type": "uint8",
+                    "raster:bits_per_sample": 8,
+                    "raster:spatial_resolution": 10
+                }
+            ]
+        },
+        "SOSV": {
+            "type": "image/tiff; application=geotiff",
+            "title": "SOSV",
+            "description": "Plant Phenology Index (PPI) value at the start of the vegetation growing season.",
+            "bands": [
+                {
+                    "name": "SOSV",
+                    "description": "Plant Phenology Index (PPI) value at the start of the vegetation growing season.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "EOSV": {
+            "type": "image/tiff; application=geotiff",
+            "title": "EOSV",
+            "description": "Plant Phenology Index (PPI) value at the end of the vegetation growing season.",
+            "bands": [
+                {
+                    "name": "EOSV",
+                    "description": "Plant Phenology Index (PPI) value at the end of the vegetation growing season.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "MINV": {
+            "type": "image/tiff; application=geotiff",
+            "title": "MINV",
+            "description": "Average Plant Phenology Index (PPI) value of the minima before the vegetation growing season.",
+            "bands": [
+                {
+                    "name": "MINV",
+                    "description": "Average Plant Phenology Index (PPI) value of the minima before the vegetation growing season.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "MAXV": {
+            "type": "image/tiff; application=geotiff",
+            "title": "MAXV",
+            "description": "Maximum (peak) Plant Phenology Index (PPI) value reached during the vegetation growing season.",
+            "bands": [
+                {
+                    "name": "MAXV",
+                    "description": "Maximum (peak) Plant Phenology Index (PPI) value reached during the vegetation growing season.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "AMPL": {
+            "type": "image/tiff; application=geotiff",
+            "title": "AMPL",
+            "description": "Difference between the maximum and minimum Plant Phenology Index (PPI) values reached during the season.",
+            "bands": [
+                {
+                    "name": "AMPL",
+                    "description": "Difference between the maximum and minimum Plant Phenology Index (PPI) values reached during the season.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "LENGTH": {
+            "type": "image/tiff; application=geotiff",
+            "title": "LENGTH",
+            "description": "Number of days between the start and end dates of the vegetation growing season in the Plant Phenology Index (PPI) profile.",
+            "bands": [
+                {
+                    "name": "LENGTH",
+                    "description": "Number of days between the start and end dates of the vegetation growing season in the Plant Phenology Index (PPI) profile.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10
+                }
+            ]
+        },
+        "LSLOPE": {
+            "type": "image/tiff; application=geotiff",
+            "title": "LSLOPE",
+            "description": "Rate of change of the Plant Phenology Index (PPI) at the day when the vegetation growing season starts (green-up slope).",
+            "bands": [
+                {
+                    "name": "LSLOPE",
+                    "description": "Rate of change of the Plant Phenology Index (PPI) at the day when the vegetation growing season starts (green-up slope).",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "RSLOPE": {
+            "type": "image/tiff; application=geotiff",
+            "title": "RSLOPE",
+            "description": "Rate of change of the Plant Phenology Index (PPI) at the day when the vegetation growing season ends (green-down slope).",
+            "bands": [
+                {
+                    "name": "RSLOPE",
+                    "description": "Rate of change of the Plant Phenology Index (PPI) at the day when the vegetation growing season ends (green-down slope).",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.0001,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "SPROD": {
+            "type": "image/tiff; application=geotiff",
+            "title": "SPROD",
+            "description": "Growing season integral computed as the sum of all daily Plant Phenology Index (PPI) values between season start and end, minus their base level value.",
+            "bands": [
+                {
+                    "name": "SPROD",
+                    "description": "Growing season integral computed as the sum of all daily Plant Phenology Index (PPI) values between season start and end, minus their base level value.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.02,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "TPROD": {
+            "type": "image/tiff; application=geotiff",
+            "title": "TPROD",
+            "description": "Growing season integral computed as the sum of all daily Plant Phenology Index (PPI) values between season start and end.",
+            "bands": [
+                {
+                    "name": "TPROD",
+                    "description": "Growing season integral computed as the sum of all daily Plant Phenology Index (PPI) values between season start and end.",
+                    "raster:sampling": "area",
+                    "data_type": "uint16",
+                    "raster:bits_per_sample": 16,
+                    "raster:spatial_resolution": 10,
+                    "raster:scale": 0.02,
+                    "raster:offset": 0
+                }
+            ]
+        },
+        "QFLAG": {
+            "type": "image/tiff; application=geotiff",
+            "title": "QFLAG",
+            "description": "Confidence-level quality flag indicating the quality of the Vegetation Phenology and Productivity Parameters.",
+            "bands": [
+                {
+                    "name": "QFLAG",
+                    "description": "Confidence-level quality flag indicating the quality of the Vegetation Phenology and Productivity Parameters.",
+                    "raster:sampling": "area",
+                    "data_type": "uint8",
+                    "raster:bits_per_sample": 8,
+                    "raster:spatial_resolution": 10
+                }
+            ]
+        }
+    }
+}
