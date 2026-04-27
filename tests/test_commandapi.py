@@ -21,32 +21,23 @@ from stacbuilder.commandapi import (
 def compare_json_outputs(output_dir: Path, reference_dir: Path):
     """Compare JSON files in output_dir with those in reference_dir."""
 
-    def is_absolute_non_uri_href(value: str) -> bool:
-        normalized = value.replace("\\", "/")
-        is_windows_abs = len(normalized) >= 3 and normalized[1] == ":" and normalized[0].isalpha()
-        return not value.startswith("file://") and (Path(normalized).is_absolute() or is_windows_abs)
-
     def normalize_absolute_test_href(value: str) -> str | None:
         """Normalize absolute file hrefs to a stable cross-platform snapshot form."""
-        prefix = ""
-        if value.startswith("file://"):
+        is_file_uri = value.startswith("file://")
+        if is_file_uri:
             parsed = urlparse(value)
+            assert parsed.netloc in ("", "localhost"), f"Expected canonical local file URI, got: {value}"
             raw_path = unquote(parsed.path or "")
-            if parsed.netloc and parsed.netloc != "localhost":
-                raw_path = f"//{parsed.netloc}{raw_path}"
-            prefix = "file://"
         else:
             raw_path = value
 
         normalized = raw_path.replace("\\", "/")
 
-        # file:// URIs on non-Windows can parse as /D:/path...; normalize to /path...
-        if len(normalized) >= 4 and normalized[0] == "/" and normalized[2] == ":" and normalized[1].isalpha():
-            normalized = normalized[1:]
-
-        # Strip Windows drive prefix (D:/...) so comparisons are OS-independent.
-        if len(normalized) >= 3 and normalized[1] == ":" and normalized[0].isalpha():
-            normalized = normalized[2:]
+        # Strip Windows drive prefix from C:/... and /C:/... forms.
+        drive_candidate = normalized[1:] if normalized.startswith("/") else normalized
+        drive = Path(drive_candidate).drive
+        if drive:
+            normalized = drive_candidate.removeprefix(drive)
 
         marker = "/tests/"
         marker_index = normalized.lower().find(marker)
@@ -54,6 +45,7 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
             return None
 
         rel_from_tests = normalized[marker_index + 1 :]
+        prefix = "file://" if is_file_uri else ""
         return f"{prefix}/stac-catalog-builder/{rel_from_tests}"
 
     for file in output_dir.glob("**/*.json"):
@@ -64,8 +56,8 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
             if isinstance(obj, dict):
                 for key, value in obj.items():
                     if key == "href" and isinstance(value, str) and not value.startswith("http"):
-                        if is_absolute_non_uri_href(value):
-                            raise AssertionError(
+                        if Path(value).is_absolute():
+                            assert value.startswith("file://"), (
                                 f"Absolute hrefs must be URIs (expected file:// for local files), got: {value}"
                             )
                         normalized_href = normalize_absolute_test_href(value)
