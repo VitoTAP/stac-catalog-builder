@@ -5,14 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 
+## [1.1.0] - 
 ### Added
+- Support for STAC 1.1 common `bands` in collection `item_assets` and generated asset metadata.
 
 ### Changed
+- Upgrade to pystac 1.14.3, which includes support for STAC 1.1 common `bands` and deprecates `eo:bands` and `raster:bands`.
+- [breaking] Asset config now supports a new `bands` field instead of eo_bands and raster_bands. eo and raster fields can be passed in this bands field.
+- href's are now always stored as uri's. For files this means that they will be prefixed with `file://` and for s3 they will be prefixed with `s3://`. The original href is stored in the `original_href` field. This allows to keep the original path as it is, while still having a valid uri for pystac to work with.
 
 ### Removed
 
 ### Fixed
+- Small fixes for type hints
 
 ## [1.0.2] - 2026-02-19
 ### Added

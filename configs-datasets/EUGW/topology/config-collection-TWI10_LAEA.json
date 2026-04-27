@@ -23,7 +23,7 @@
         "TWI10": {
             "title": "Topographic Wetness Index",
             "description": "Topographic Wetness Index",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "Topographic Wetness Index",
                     "description": "Topographic Wetness Index"

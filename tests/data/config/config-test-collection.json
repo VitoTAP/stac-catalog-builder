@@ -36,7 +36,7 @@
         "2m-temp-monthly": {
             "title": "2m temperature",
             "description": "temperature 2m above ground (Kelvin)",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "2m_temp",
                     "description": "temperature 2m above ground (Kelvin)",
@@ -47,7 +47,7 @@
         "tot-precip-monthly": {
             "title": "total precipitation",
             "description": "total precipitation per month (m)",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "tot_precip",
                     "description": "total precipitation per month (m)",

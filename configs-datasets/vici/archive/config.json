@@ -25,7 +25,7 @@
             "period": "daily",
             "fixed_values": {
                 "year": 1970,
-                "item_id":  "{country}_{month}{day}"
+                "item_id": "{country}_{month}{day}"
             }
         }
     },
@@ -33,48 +33,48 @@
         "percentiles5": {
             "title": "percentiles5",
             "description": "5th percentiles computed on 2000-2019 adjusted NDVI timeseries",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "percentiles5",
                     "description": "5th percentiles computed on 2000-2019 adjusted NDVI timeseries",
                     "data_type": "ubit8",
-                    "spatial_resolution": 100
+                    "raster:spatial_resolution": 100
                 }
             ]
         },
         "percentiles15": {
             "title": "percentiles15",
             "description": "15th percentiles computed on 2000-2019 adjusted NDVI timeseries",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "percentiles15",
                     "description": "15th percentiles computed on 2000-2019 adjusted NDVI timeseries",
                     "data_type": "ubit8",
-                    "spatial_resolution": 100
+                    "raster:spatial_resolution": 100
                 }
             ]
         },
         "seasons_dekad": {
             "title": "seasons_dekad",
             "description": "Seasonality mask: 1 = in season, 0 = out of season",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "seasons_dekad",
                     "description": "Seasonality mask: 1 = in season, 0 = out of season",
                     "data_type": "ubit8",
-                    "spatial_resolution": 100
+                    "raster:spatial_resolution": 100
                 }
             ]
         },
         "zone_adjust": {
             "title": "zone_adjust",
             "description": "NDVI adjustments computed per zone",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "zone_adjust",
                     "description": "NDVI adjustments computed per zone",
                     "data_type": "int16",
-                    "spatial_resolution": 100
+                    "raster:spatial_resolution": 100
                 }
             ]
         }

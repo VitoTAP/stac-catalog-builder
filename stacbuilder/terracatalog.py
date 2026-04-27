@@ -32,10 +32,9 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.collector import IMetadataCollector
 from stacbuilder.config import (
     AssetConfig,
+    BandConfig,
     CollectionConfig,
-    EOBandConfig,
     ProviderModel,
-    RasterBandConfig,
 )
 from stacbuilder.metadata import AssetMetadata
 from stacbuilder.projections import reproject_bounding_box
@@ -180,24 +179,20 @@ class CollectionConfigBuilder:
             spatial_resolution = band.get("resolution")
             data_type = self.guess_datatype(bit_per_value)
 
-            raster_cfg = RasterBandConfig(
+            band_cfg = BandConfig(
                 name=title,
-                offset=offset,
-                scale=scale_factor,
-                spatial_resolution=spatial_resolution,
-                bits_per_sample=bit_per_value,
+                raster_offset=offset,
+                raster_scale=scale_factor,
+                raster_spatial_resolution=spatial_resolution,
+                raster_bits_per_sample=bit_per_value,
                 data_type=data_type,
-            )
-            eobands_cfg = EOBandConfig(
-                name=title,
                 description=title,
             )
             asset_cfg = AssetConfig(
                 title=title,
                 description=title,
                 media_type=media_type,
-                raster_bands=[raster_cfg],
-                eo_bands=[eobands_cfg],
+                bands=[band_cfg],
             )
             asset_configs[title] = asset_cfg
 

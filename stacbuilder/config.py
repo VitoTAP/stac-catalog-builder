@@ -8,18 +8,23 @@ That idea didn't go very far and is likely to be removed at this point.
 """
 
 import enum
+import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, ClassVar, Dict, List, Optional, Set, Union
 
 from openeo.util import dict_no_none
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-from pystac import MediaType
-from pystac.extensions.eo import Band, EOExtension
-from pystac.extensions.item_assets import AssetDefinition
-from pystac.extensions.raster import RasterBand, RasterExtension
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
+from pystac import ItemAssetDefinition, MediaType
 from pystac.provider import Provider, ProviderRole
 
-DEFAULT_PROVIDER_ROLES: Set[ProviderRole] = [
+DEFAULT_PROVIDER_ROLES: List[ProviderRole] = [
     ProviderRole.PRODUCER,
     ProviderRole.LICENSOR,
     ProviderRole.PROCESSOR,
@@ -59,140 +64,105 @@ class ItemConfig(BaseModel):
     description: str
 
 
-class EOBandConfig(BaseModel):
-    """Configuration for fields of the eo:bands element from the Electro-Optical STAC Extension.
-
-    These fields have fixed values.
-
-    See also Electro-Optical Extension Specification, band object:
-    https://github.com/stac-extensions/eo#band-object
-    """
-
-    model_config = ConfigDict(from_attributes=True)
-
-    name: str = Field(description="common_name of the band.")
-
-    description: str = Field(description="Description of the band.")
-    common_name: Optional[str] = Field(
-        default=None, description="Common name of the band, such as 'red', 'green', 'blue', etc."
-    )
-    wavelength: Optional[float] = Field(
-        default=None,
-        description=("Wavelength of the band in nanometers. " + "This is a float value, e.g. 665.0 for the red band."),
-    )
-
-    def populate_asset_extension(self, ext: EOExtension) -> None:
-        """Populate the EOExtension with the values from this configuration."""
-        if not ext:
-            return None
-        eo_band = Band.create(
-            name=self.name,
-            common_name=self.common_name,
-            description=self.description,
-            center_wavelength=self.wavelength,
-        )
-        if not ext.bands:
-            ext.apply(bands=[eo_band])
-        else:
-            ext.bands = ext.bands + [eo_band]
-
-
 class SamplingType(enum.StrEnum):
     """Choices for the value of `sampling` in the RasterBand object of the Raster STAC extension
 
-    This is used in `RasterBandConfig`, the configuration class for raster:band values.
+    This is used in `BandConfig`, for the raster:sampling field.
     """
 
     AREA = "area"
     POINT = "point"
 
 
-class RasterBandConfig(BaseModel):
-    """Default values for the Raster Band Object from the Raster extension,
-    i.e. the raster:band section in a STAC asset.
+class BandConfig(BaseModel):
+    """Configuration model for common band objects."""
 
-    See also: https://github.com/stac-extensions/raster
-    """
+    model_config = ConfigDict(populate_by_name=True)
 
-    # not part of the extension but we need a a way to identify the band
+    ALLOWED_DATA_TYPES: ClassVar[Set[str]] = {
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+        "float16",
+        "float32",
+        "float64",
+        "cint16",
+        "cint32",
+        "cfloat32",
+        "cfloat64",
+        "other",
+    }
+
     name: str
+    description: Optional[str] = None
 
-    # TODO: how do we store NaN in JSON?
-    nodata: Optional[Union[int, float, str]] = Field(
-        default=None,
-        description=(
-            "Pixel values used to identify pixels that are nodata in the band "
-            + "either by the pixel value as a number or nan, inf or -inf (all strings).",
-        ),
-    )
-    # TODO: maybe use a numpy type or make an Enum for data_type
-    data_type: Optional[str] = Field(
-        default=None,
-        description=(
-            "The data type of the pixels in the band. "
-            + "One of the data types as described in this section of the "
-            + "Raster Extension's README : "
-            + "https://github.com/stac-extensions/raster#data-types"
-        ),
-    )
+    nodata: Optional[Union[int, float, str]] = None
+    data_type: Optional[str] = None
+    unit: Optional[str] = None
 
-    sampling: Optional[str] = Field(
-        default=SamplingType.AREA,
-        description=(
-            "One of area or point. "
-            + "Indicates whether a pixel value should be assumed to represent a sampling "
-            + "over the region of the pixel or a point sample at the center of the pixel."
-        ),
-        type=SamplingType,
-    )
+    eo_common_name: Optional[str] = Field(default=None, alias="eo:common_name")
+    eo_center_wavelength: Optional[float] = Field(default=None, alias="eo:center_wavelength")
 
-    bits_per_sample: Optional[int] = Field(
-        default=None,
-        description=(
-            "The actual number of bits used for this band. "
-            + "Normally only present when the number of bits is non-standard for "
-            + "the datatype, such as when a 1 bit TIFF is represented as byte."
-        ),
-    )
+    raster_sampling: Optional[str] = Field(default=None, alias="raster:sampling", type=SamplingType)
+    raster_bits_per_sample: Optional[int] = Field(default=None, alias="raster:bits_per_sample")
+    raster_spatial_resolution: Optional[int] = Field(default=None, alias="raster:spatial_resolution")
+    raster_scale: Optional[Union[float, int]] = Field(default=None, alias="raster:scale")
+    raster_offset: Optional[Union[float, int]] = Field(default=None, alias="raster:offset")
 
-    spatial_resolution: Optional[int] = Field(
-        default=None, description="Average spatial resolution (in meters) of the pixels in the band."
-    )
+    @field_validator("data_type")
+    @classmethod
+    def _validate_data_type(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
 
-    unit: Optional[str] = Field(default=None, description="Unit denomination of the pixel value.")
-    scale: Optional[Union[float, int]] = Field(
-        default=None,
-        description=(
-            "Multiplicator factor of the pixel value to transform into the value "
-            + "(i.e. translate digital number to reflectance)."
-        ),
-    )
-    offset: Optional[Union[float, int]] = Field(
-        default=None,
-        description=(
-            "Number to be added to the pixel value (after scaling) to transform "
-            + "into the value (i.e. translate digital number to reflectance)."
-        ),
-    )
+        data_type = value.strip().lower()
+        if data_type not in cls.ALLOWED_DATA_TYPES:
+            allowed = ", ".join(sorted(cls.ALLOWED_DATA_TYPES))
+            warnings.warn(
+                f"Invalid data_type '{value}'. Falling back to 'other'. Expected one of: {allowed}",
+                UserWarning,
+                stacklevel=2,
+            )
+            return "other"
+        return data_type
 
-    def populate_asset_extension(self, ext: RasterExtension) -> None:
-        """Populate the RasterExtension with the values from this configuration."""
-        if not ext:
-            return None
-        raster_band = RasterBand.create(
-            nodata=self.nodata,
-            data_type=self.data_type,
-            sampling=self.sampling,
-            bits_per_sample=self.bits_per_sample,
-            spatial_resolution=self.spatial_resolution,
-            unit=self.unit,
-            scale=self.scale,
-            offset=self.offset,
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_common_field_prefixes(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        invalid_keys = {"eo:name", "raster:name", "eo:description", "raster:description"}
+        found = sorted(k for k in invalid_keys if k in data)
+        if found:
+            raise ValueError(
+                "Band common fields must be unprefixed: use 'name' and 'description', not " + ", ".join(found)
+            )
+        return data
+
+    def to_common_band_dict(self) -> Dict[str, Any]:
+        """Convert to a STAC 1.1 common band dictionary."""
+        return dict_no_none(
+            {
+                "name": self.name,
+                "description": self.description,
+                "nodata": self.nodata,
+                "data_type": self.data_type,
+                "unit": self.unit,
+                "eo:common_name": self.eo_common_name,
+                "eo:center_wavelength": self.eo_center_wavelength,
+                "raster:sampling": self.raster_sampling,
+                "raster:bits_per_sample": self.raster_bits_per_sample,
+                "raster:spatial_resolution": self.raster_spatial_resolution,
+                "raster:scale": self.raster_scale,
+                "raster:offset": self.raster_offset,
+            }
         )
-        if not ext.bands:
-            ext.apply(bands=[raster_band])
-        else:
-            ext.bands = ext.bands + [raster_band]
 
 
 class AssetConfig(BaseModel):
@@ -207,32 +177,105 @@ class AssetConfig(BaseModel):
 
     # The bands are not always electro-optical bands,
     # for example weather observation and climate data.
-    eo_bands: Optional[List[EOBandConfig]] = None
+    bands: Optional[List[BandConfig]] = None
 
-    raster_bands: Optional[List[RasterBandConfig]] = None
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_band_blocks(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
 
-    def to_asset_definition(self) -> AssetDefinition:
-        """Create an AssetDefinition object from this configuration."""
-        if self.raster_bands:
-            raster_bands = [dict_no_none(b.model_dump()) for b in self.raster_bands]
-        else:
-            raster_bands = None
+        if "eo_bands" not in data and "raster_bands" not in data:
+            return data
+
+        migrated = dict(data)
+        merged_by_name: Dict[str, Dict[str, Any]] = {}
+
+        for band in migrated.get("bands") or []:
+            if not isinstance(band, dict):
+                continue
+            band_name = band.get("name")
+            if band_name:
+                merged_by_name[band_name] = dict(band)
+
+        for eo_band in migrated.get("eo_bands") or []:
+            if not isinstance(eo_band, dict):
+                continue
+            band_name = eo_band.get("name")
+            if not band_name:
+                continue
+            current = merged_by_name.get(band_name, {"name": band_name})
+            updated = {
+                **current,
+                "name": band_name,
+                "description": eo_band.get("description", current.get("description")),
+                "eo:common_name": eo_band.get("common_name", current.get("eo:common_name")),
+                "eo:center_wavelength": eo_band.get("wavelength", current.get("eo:center_wavelength")),
+            }
+            merged_by_name[band_name] = updated
+
+        for raster_band in migrated.get("raster_bands") or []:
+            if not isinstance(raster_band, dict):
+                continue
+            band_name = raster_band.get("name")
+            if not band_name:
+                continue
+            current = merged_by_name.get(band_name, {"name": band_name})
+            updated = {
+                **current,
+                "name": band_name,
+                "nodata": raster_band.get("nodata", current.get("nodata")),
+                "data_type": raster_band.get("data_type", current.get("data_type")),
+                "unit": raster_band.get("unit", current.get("unit")),
+                "raster:sampling": raster_band.get("sampling", current.get("raster:sampling")),
+                "raster:bits_per_sample": raster_band.get("bits_per_sample", current.get("raster:bits_per_sample")),
+                "raster:spatial_resolution": raster_band.get(
+                    "spatial_resolution", current.get("raster:spatial_resolution")
+                ),
+                "raster:scale": raster_band.get("scale", current.get("raster:scale")),
+                "raster:offset": raster_band.get("offset", current.get("raster:offset")),
+            }
+            merged_by_name[band_name] = updated
+
+        migrated["bands"] = list(merged_by_name.values())
+        migrated.pop("eo_bands", None)
+        migrated.pop("raster_bands", None)
+        return migrated
+
+    def get_common_bands(self) -> Optional[List[Dict[str, Any]]]:
+        """Return STAC 1.1 common bands from the unified `bands` config."""
+        if not self.bands:
+            return None
+        return [band.to_common_band_dict() for band in self.bands]
+
+    def uses_raster_extension(self) -> bool:
+        """Check if this config uses raster-prefixed band fields."""
+        for band in self.bands or []:
+            band_dict = band.to_common_band_dict()
+            if any(key.startswith("raster:") for key in band_dict):
+                return True
+        return False
+
+    def uses_eo_extension(self) -> bool:
+        """Check if this config uses eo-prefixed band fields."""
+        for band in self.bands or []:
+            band_dict = band.to_common_band_dict()
+            if any(key.startswith("eo:") for key in band_dict):
+                return True
+        return False
+
+    def to_asset_definition(self) -> ItemAssetDefinition:
+        """Create an ItemAssetDefinition object from this configuration."""
+        common_bands = self.get_common_bands()
         properties = {
             "type": self.media_type,
             "title": self.title,
             "description": self.description,
             "roles": self.roles,
         }
-        asset_definition = AssetDefinition(properties=properties)
-        if self.eo_bands:
-            eo_ext = EOExtension.ext(asset_definition, add_if_missing=False)
-            for eo_band in self.eo_bands:
-                eo_band.populate_asset_extension(eo_ext)
-
-        if raster_bands:
-            raster_ext = RasterExtension.ext(asset_definition, add_if_missing=False)
-            for raster_band in self.raster_bands:
-                raster_band.populate_asset_extension(raster_ext)
+        if common_bands:
+            properties["bands"] = common_bands
+        asset_definition = ItemAssetDefinition(properties=properties)
 
         return asset_definition
 
@@ -241,11 +284,6 @@ class FileCollectorConfig(BaseModel):
     input_dir: Path
     glob: Optional[str] = "*"
     max_files: int = -1
-
-
-class AssetHrefModifierConfig(BaseModel):
-    url_template: str
-    data_root: str
 
 
 class AlternateHrefConfig(BaseModel):
@@ -296,9 +334,8 @@ class CollectionConfig(BaseModel):
     media_type: Optional[MediaType] = MediaType.GEOTIFF
 
     # Defines what assets items have, and what bands the assets contain.
-    item_assets: Optional[Dict[str, AssetConfig]] = {}
+    item_assets: Dict[str, AssetConfig] = {}
 
-    asset_href_modifier: Optional[AssetHrefModifierConfig] = None
     alternate_links: Optional[AlternateHrefConfig] = None
 
     @classmethod

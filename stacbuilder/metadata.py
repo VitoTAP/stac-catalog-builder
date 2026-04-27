@@ -19,11 +19,11 @@ from typing import Any, ClassVar, Dict, List, Optional
 
 import dateutil.parser
 import geopandas as gpd
-import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pystac.media_type import MediaType
 from shapely.geometry import Polygon, mapping
+from upath import UPath
 
 from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.projections import project_polygon
@@ -40,8 +40,8 @@ class BandMetadata:
     Probably will need to add a propery "bands" to AssetMetadata.
     """
 
-    data_type: np.dtype
-    """NumPy data type of the band (e.g., uint8, float32)."""
+    data_type: Optional[str]
+    """Band data type (e.g., uint8, float32)."""
 
     nodata: Any
     """Value representing no data/missing pixels in the band."""
@@ -52,15 +52,18 @@ class BandMetadata:
     units: Optional[str] = None
     """Physical units of the band values (e.g., 'meters', 'degrees')."""
 
+    name: Optional[str] = None
+    """Common band name for STAC 1.1 `bands` when available."""
+
     def to_dict(self) -> dict[str, Any]:
         result = {
-            "data_type": self.data_type,
-            "nodata": self.nodata,
-            "index": self.index,
+            "data_type": self.data_type if self.data_type is not None else None,
+            "nodata": self.nodata if self.nodata is not None else None,
+            "index": self.index if self.index is not None else None,
+            "units": self.units if self.units is not None else None,
+            "name": self.name if self.name is not None else None,
         }
-        if self.units:
-            result["units"] = self.units
-        return result
+        return {k: v for k, v in result.items() if v is not None}
 
 
 class AssetMetadata(BaseModel):
@@ -87,16 +90,16 @@ class AssetMetadata(BaseModel):
     asset_id: str
     """The unique identifier for the asset."""
 
-    href: str = None
+    href: Optional[str] = None
     """The file path or URL to the asset. At least one of href, original_href, or asset_path must be set."""
 
-    original_href: str = None
-    """The original file path or URL before any modifications."""
+    original_href: Optional[str] = None
+    """The original file path or URL before any modifications. This should not be set directly, but is inferred from href or asset_path."""
 
-    asset_path: Path = None
+    asset_path: Path | UPath | None = None
     """Path object representing the asset location on the filesystem."""
 
-    item_id: str = None
+    item_id: str
     """STAC item identifier that this asset belongs to.
 
     When a STAC item bundles multiple assets, the InputPathParser must provide
@@ -105,7 +108,7 @@ class AssetMetadata(BaseModel):
     to the same as asset_id.
     """
 
-    asset_type: Optional[str] = None
+    asset_type: str
     """Asset type used to find the corresponding asset definition in CollectionConfig."""
 
     datetime: dt.datetime
@@ -146,10 +149,10 @@ class AssetMetadata(BaseModel):
     file_size: Optional[int] = None
     """File size in bytes (corresponds to file:size from FileInfo STAC extension)."""
 
-    tags: dict[str, str] = {}
+    tags: dict[str, str] = Field(default_factory=dict)
     """Metadata tags extracted from the raster file."""
 
-    bands: List[BandMetadata] = []
+    bands: List[BandMetadata] = Field(default_factory=list)
     """Band information for multi-band raster files."""
 
     tile_id: Optional[str] = None
@@ -157,10 +160,6 @@ class AssetMetadata(BaseModel):
 
     media_type: Optional[MediaType] = None
     """MIME type of the asset file (e.g., image/tiff, application/json)."""
-
-    # platforms: Optional[List[str]] = None
-    # instruments: Optional[List[str]] = None
-    # missions: Optional[List[str]] = None
 
     @field_validator("geometry_lat_lon", "geometry_proj")
     @classmethod
@@ -184,12 +183,24 @@ class AssetMetadata(BaseModel):
         Run some checks on the properties that are set and infer some properties"""
         if not any([self.asset_id, self.item_id]):
             raise ValueError("At least one of asset_id or item_id must be set.")
+        if not any([self.href, self.asset_path]):
+            raise ValueError("At least one of href, or asset_path must be set.")
+        if self.original_href is not None:
+            raise ValueError(
+                "original_href should not be set directly. It is inferred from href or asset_path if not provided."
+            )
+
+        self.original_href = self.href if self.href else (self.asset_path.as_posix() if self.asset_path else None)
+
         if not self.asset_path:
-            self.asset_path = Path(self.original_href)
-        if not self.href:
-            self.href = str(self.asset_path)
-        if not self.original_href:
-            self.original_href = str(self.href)
+            if self.href:
+                self.asset_path = UPath(self.href)
+
+        # We replace href with the file URI scheme
+        if self.asset_path.is_absolute():
+            self.href = self.asset_path.as_uri()
+        else:
+            self.href = "file://" + self.asset_path.as_posix()
 
         if not self.item_id:
             self.item_id = self.asset_id
@@ -306,23 +317,11 @@ class AssetMetadata(BaseModel):
         :return: A dictionary that represents the same metadata.
         """
 
-        # IMPORTANT: Keep only parquet/arrow friendly primitive types in this dict.
-        # Complex objects (Path, Enum, numpy dtype, custom classes) are converted to str or
-        # a JSON-serialisable structure to avoid ArrowInvalid errors when persisting via pandas/geopandas.
-        def _serialise_band(band: BandMetadata) -> dict[str, Any]:
-            band_dict = band.to_dict()
-            # Convert numpy dtype to its name representation (e.g. 'uint16')
-            if isinstance(band_dict.get("data_type"), np.dtype):
-                band_dict["data_type"] = str(band_dict["data_type"].name)
-            else:
-                band_dict["data_type"] = str(band_dict.get("data_type"))
-            return band_dict
-
         # Prepare tags (avoid empty struct -> ArrowNotImplementedError)
         raw_tags = {str(k): (None if v is None else str(v)) for k, v in (self.tags or {}).items()}
         tags_value = raw_tags if raw_tags else {}
 
-        bands_list = [_serialise_band(b) for b in self.bands]
+        bands_list = [b.to_dict() for b in self.bands]
 
         data = {
             "asset_id": self.asset_id,

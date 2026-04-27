@@ -29,26 +29,26 @@
         "MAX": {
             "title": "Max NVDI",
             "description": "Max Normalized Difference Vegetation Index",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "NDVI_MAX",
                     "description": "Max Normalized Difference Vegetation Index",
                     "data_type": "float32",
-                    "sampling": "area",
-                    "spatial_resolution": 300
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 300
                 }
             ]
         },
         "MIN": {
             "title": "Min NVDI",
             "description": "Min normalized Difference Vegetation Index",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "NDVI_MIN",
                     "description": "Min Normalized Difference Vegetation Index",
                     "data_type": "float32",
-                    "sampling": "area",
-                    "spatial_resolution": 300
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 300
                 }
             ]
         }

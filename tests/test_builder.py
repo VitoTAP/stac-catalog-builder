@@ -25,10 +25,12 @@ from stacbuilder.boundingbox import BoundingBox
 from stacbuilder.builder import (
     AlternateHrefGenerator,
     AssetMetadataPipeline,
+    ItemBuilder,
 )
 from stacbuilder.collector import MetadataCollector
 from stacbuilder.config import (
     AlternateHrefConfig,
+    AssetConfig,
     CollectionConfig,
     InputPathParserConfig,
 )
@@ -67,14 +69,14 @@ def collection_test_config() -> CollectionConfig:
             "2m-temp-monthly": {
                 "title": "2m temperature",
                 "description": "temperature 2m above ground (Kelvin)",
-                "eo_bands": [
+                "bands": [
                     {"name": "2m_temp", "description": "temperature 2m above ground (Kelvin)", "data_type": "uint16"}
                 ],
             },
             "tot-precip-monthly": {
                 "title": "total precipitation",
                 "description": "total precipitation per month (m)",
-                "eo_bands": [
+                "bands": [
                     {"name": "tot_precip", "description": "total precipitation per month (m)", "data_type": "uint16"}
                 ],
             },
@@ -111,8 +113,6 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         asset_type=asset_type,
         item_id=asset_path_data["item_id"],
         asset_path=asset_path,
-        href=asset_path.as_posix(),
-        original_href=str(asset_path),
         datetime=asset_path_data["datetime"],
         start_datetime=asset_path_data["start_datetime"],
         end_datetime=asset_path_data["end_datetime"],
@@ -121,7 +121,17 @@ def create_basic_asset_metadata(asset_path: Path) -> AssetMetadata:
         file_size=asset_path.stat().st_size,
         bbox_projected=BoundingBox.from_dict(bbox_dict),
         transform=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-        bands=[BandMetadata(data_type="float64", index=0, nodata=None)],
+        bands=[
+            BandMetadata(
+                data_type="float64",
+                index=0,
+                nodata=None,
+                name={
+                    "2m-temp-monthly": "2m_temp",
+                    "tot-precip-monthly": "tot_precip",
+                }.get(asset_type),
+            )
+        ],
         media_type="image/tiff; application=geotiff; profile=cloud-optimized",
     )
     return md
@@ -280,19 +290,109 @@ class TestAssetMetadataPipeline:
             collection = Collection.from_file(coll_path)
             collection.validate_all()
 
+    def test_item_builder_adds_extensions_when_common_bands_use_eo_or_raster_fields(self, geotiff_paths: List[Path]):
+        md = create_basic_asset_metadata(geotiff_paths[0]).model_copy(deep=True)
+        md.asset_type = "2m-temp-monthly"
+        md.bands[0].name = "B01"
+
+        asset_config = AssetConfig(
+            title="Band 1",
+            description="Band 1",
+            bands=[{"name": "B01", "raster:spatial_resolution": 10, "eo:common_name": "red"}],
+        )
+
+        item_builder = ItemBuilder(item_assets_configs={"2m-temp-monthly": asset_config})
+        item = item_builder.create_item([md])
+
+        assert any("raster" in ext for ext in item.stac_extensions)
+        assert any("eo" in ext for ext in item.stac_extensions)
+
+        asset_bands = item.assets["2m-temp-monthly"].extra_fields["bands"]
+        assert asset_bands[0]["raster:spatial_resolution"] == 10
+        assert asset_bands[0]["eo:common_name"] == "red"
+
+    def test_item_builder_fills_missing_common_fields_when_config_has_no_raster_fields(self, geotiff_paths: List[Path]):
+        md = create_basic_asset_metadata(geotiff_paths[0]).model_copy(deep=True)
+        md.asset_type = "2m-temp-monthly"
+        md.bands = [BandMetadata(name="B01", data_type="uint16", nodata=-9999, units="K", index=0)]
+
+        asset_config = AssetConfig(
+            title="Band 1",
+            description="Band 1",
+            bands=[{"name": "B01", "description": "Band 1"}],
+        )
+
+        item_builder = ItemBuilder(item_assets_configs={"2m-temp-monthly": asset_config})
+        item = item_builder.create_item([md])
+
+        band = item.assets["2m-temp-monthly"].extra_fields["bands"][0]
+        assert band["name"] == "B01"
+        assert band["description"] == "Band 1"
+        assert band["data_type"] == "uint16"
+        assert band["nodata"] == -9999
+        assert band["unit"] == "K"
+        assert "index" not in band
+
+    def test_item_builder_preserves_configured_raster_fields_and_merges_metadata(self, geotiff_paths: List[Path]):
+        md = create_basic_asset_metadata(geotiff_paths[0]).model_copy(deep=True)
+        md.asset_type = "2m-temp-monthly"
+        md.bands = [BandMetadata(name="B01", data_type="uint16", nodata=-32768, units="K", index=0)]
+
+        asset_config = AssetConfig(
+            title="Band 1",
+            description="Band 1",
+            bands=[
+                {
+                    "name": "B01",
+                    "description": "Band 1",
+                    "data_type": "int16",
+                    "raster:sampling": "area",
+                }
+            ],
+        )
+
+        item_builder = ItemBuilder(item_assets_configs={"2m-temp-monthly": asset_config})
+        item = item_builder.create_item([md])
+
+        band = item.assets["2m-temp-monthly"].extra_fields["bands"][0]
+        assert band["data_type"] == "int16"
+        assert band["raster:sampling"] == "area"
+        assert band["nodata"] == -32768
+        assert band["unit"] == "K"
+
+    def test_item_builder_raises_when_configured_and_metadata_band_counts_differ(self, geotiff_paths: List[Path]):
+        md = create_basic_asset_metadata(geotiff_paths[0]).model_copy(deep=True)
+        md.asset_type = "2m-temp-monthly"
+        md.bands = [
+            BandMetadata(name="B01", data_type="uint16", nodata=None, units="K", index=0),
+            BandMetadata(name="B02", data_type="uint16", nodata=None, units="K", index=1),
+        ]
+
+        asset_config = AssetConfig(
+            title="Band 1",
+            description="Band 1",
+            bands=[{"name": "B01", "description": "Band 1"}],
+        )
+
+        item_builder = ItemBuilder(item_assets_configs={"2m-temp-monthly": asset_config})
+
+        with pytest.raises(InvalidConfiguration, match="Number of raster bands in asset metadata"):
+            item_builder.create_item([md])
+
 
 class TestAlternateLinksGenerator:
     @pytest.fixture
     def simple_asset_metadata(self) -> AssetMetadata:
         """A very simple AssetMetadata with minimal data"""
+        asset_path = Path("/data/collection789/item456/asset123.tif")
         asset_md = AssetMetadata(
             asset_id="asset123",
             item_id="item456",
-            asset_path=Path("/data/collection789/item456/asset123.tif"),
+            asset_type="test-asset-type",
+            asset_path=asset_path,
             datetime=dt.datetime(2023, 10, 1, 12, 0, 0, tzinfo=dt.UTC),
             bbox_projected=BoundingBox(4.0, 51.0, 5.0, 52.0, 4326),
         )
-        asset_md.asset_path = Path("/data/collection789/item456/asset123.tif")
 
         return asset_md
 

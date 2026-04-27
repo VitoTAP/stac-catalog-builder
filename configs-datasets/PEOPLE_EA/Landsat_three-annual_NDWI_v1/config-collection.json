@@ -3,7 +3,9 @@
     "title": "Landsat_three-annual_NDWI_v1",
     "description": "Landsat three-annual NDWI v1",
     "instruments": [],
-    "keywords": ["PEOPLE_EA"],
+    "keywords": [
+        "PEOPLE_EA"
+    ],
     "mission": [],
     "platform": [],
     "providers": [
@@ -31,7 +33,7 @@
         "NDWI": {
             "title": "Landsat NDWI",
             "description": "Landsat NDWI",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "NDWI",
                     "description": "NDWI",

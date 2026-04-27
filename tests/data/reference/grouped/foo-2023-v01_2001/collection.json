@@ -1,23 +1,23 @@
 {
   "type": "Collection",
   "id": "foo-2023-v01_2001",
-  "stac_version": "1.0.0",
+  "stac_version": "1.1.0",
   "description": "Description of Foo",
   "links": [
     {
       "rel": "item",
       "href": "./foo-2023-v01_2001/2001/observations_2001-01-01.json",
-      "type": "application/json"
+      "type": "application/geo+json"
     },
     {
       "rel": "item",
       "href": "./foo-2023-v01_2001/2001/observations_2001-02-01.json",
-      "type": "application/json"
+      "type": "application/geo+json"
     },
     {
       "rel": "item",
       "href": "./foo-2023-v01_2001/2001/observations_2001-03-01.json",
-      "type": "application/json"
+      "type": "application/geo+json"
     },
     {
       "rel": "parent",
@@ -33,9 +33,7 @@
     }
   ],
   "stac_extensions": [
-    "https://stac-extensions.github.io/item-assets/v1.0.0/schema.json",
-    "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
-    "https://stac-extensions.github.io/eo/v1.1.0/schema.json"
+    "https://stac-extensions.github.io/raster/v1.1.0/schema.json"
   ],
   "item_assets": {
     "2m-temp-monthly": {
@@ -45,10 +43,11 @@
       "roles": [
         "data"
       ],
-      "eo:bands": [
+      "bands": [
         {
           "name": "2m_temp",
-          "description": "temperature 2m above ground (Kelvin)"
+          "description": "temperature 2m above ground (Kelvin)",
+          "data_type": "uint16"
         }
       ]
     },
@@ -59,10 +58,11 @@
       "roles": [
         "data"
       ],
-      "eo:bands": [
+      "bands": [
         {
           "name": "tot_precip",
-          "description": "total precipitation per month (m)"
+          "description": "total precipitation per month (m)",
+          "data_type": "uint16"
         }
       ]
     }
@@ -88,7 +88,7 @@
       ]
     }
   },
-  "license": "proprietary",
+  "license": "other",
   "keywords": [
     "foo",
     "bar",

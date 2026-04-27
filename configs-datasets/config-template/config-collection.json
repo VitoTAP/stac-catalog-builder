@@ -31,13 +31,13 @@
         "REPLACE_THIS--BAND_NAME": {
             "title": "REPLACE_THIS--BAND_NAME",
             "description": "REPLACE_THIS--BAND_DESCRIPTIOn",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "REPLACE_THIS--BAND_NAME",
                     "description": "REPLACE_THIS--BAND_DESCRIPTION",
                     "data_type": "float32",
-                    "sampling": "area",
-                    "spatial_resolution": 100
+                    "raster:sampling": "area",
+                    "raster:spatial_resolution": 100
                 }
             ]
         }

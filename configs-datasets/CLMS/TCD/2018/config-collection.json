@@ -2,7 +2,9 @@
     "collection_id": "tree_cover_density_2018",
     "title": "Tree Cover Density 2018 (raster 10m), Europe, 3-yearly",
     "description": "Provides at pan-European level in the spatial resolution of 10 m the level of tree cover density in a range from 0% to100% for the 2018 reference year.",
-    "instruments": ["Sentinel-2A/2B"],
+    "instruments": [
+        "Sentinel-2A/2B"
+    ],
     "keywords": [],
     "mission": [],
     "platform": [],
@@ -22,7 +24,7 @@
         "TCD": {
             "title": "Tree Cover Density (TCD)",
             "description": "Tree Cover Density",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "TCD",
                     "description": "Tree Cover Density"

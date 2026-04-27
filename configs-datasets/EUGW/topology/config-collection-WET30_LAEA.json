@@ -22,7 +22,7 @@
         "WET30": {
             "title": "Wetness",
             "description": "Wetness",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "Wetness",
                     "description": "Wetness"

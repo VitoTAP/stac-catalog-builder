@@ -22,7 +22,7 @@
         "mask": {
             "title": "Cloud Mask",
             "description": "Cloud Mask",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "cloud_mask",
                     "description": "Cloud Mask"

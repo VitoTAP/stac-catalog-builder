@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import pytest
 from nested_lookup import nested_update
@@ -19,6 +20,34 @@ from stacbuilder.commandapi import (
 
 def compare_json_outputs(output_dir: Path, reference_dir: Path):
     """Compare JSON files in output_dir with those in reference_dir."""
+
+    def normalize_absolute_test_href(value: str) -> str | None:
+        """Normalize absolute file hrefs to a stable cross-platform snapshot form."""
+        is_file_uri = value.startswith("file://")
+        if is_file_uri:
+            parsed = urlparse(value)
+            assert parsed.netloc in ("", "localhost"), f"Expected canonical local file URI, got: {value}"
+            raw_path = unquote(parsed.path or "")
+        else:
+            raw_path = value
+
+        normalized = raw_path.replace("\\", "/")
+
+        # Strip Windows drive prefix from C:/... and /C:/... forms.
+        drive_candidate = normalized[1:] if normalized.startswith("/") else normalized
+        drive = Path(drive_candidate).drive
+        if drive:
+            normalized = drive_candidate.removeprefix(drive)
+
+        marker = "/tests/"
+        marker_index = normalized.lower().find(marker)
+        if marker_index == -1:
+            return None
+
+        rel_from_tests = normalized[marker_index + 1 :]
+        prefix = "file://" if is_file_uri else ""
+        return f"{prefix}/stac-catalog-builder/{rel_from_tests}"
+
     for file in output_dir.glob("**/*.json"):
         output_json = json.loads(file.read_text())
         output_json = nested_update(output_json, "created", "")
@@ -28,10 +57,12 @@ def compare_json_outputs(output_dir: Path, reference_dir: Path):
                 for key, value in obj.items():
                     if key == "href" and isinstance(value, str) and not value.startswith("http"):
                         if Path(value).is_absolute():
-                            new_href = Path("/stac-catalog-builder/tests") / Path(value).relative_to(
-                                Path(__file__).parent
+                            assert value.startswith("file://"), (
+                                f"Absolute hrefs must be URIs (expected file:// for local files), got: {value}"
                             )
-                            obj[key] = new_href.as_posix()
+                        normalized_href = normalize_absolute_test_href(value)
+                        if normalized_href is not None:
+                            obj[key] = normalized_href
                     else:
                         update_href(value)
             elif isinstance(obj, list):

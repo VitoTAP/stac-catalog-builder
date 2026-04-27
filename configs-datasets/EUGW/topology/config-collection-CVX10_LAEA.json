@@ -23,7 +23,7 @@
         "CVX10": {
             "title": "Convexity",
             "description": "Convexity",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "Convexity",
                     "description": "Convexity"

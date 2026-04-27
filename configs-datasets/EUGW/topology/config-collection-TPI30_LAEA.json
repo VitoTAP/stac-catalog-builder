@@ -23,7 +23,7 @@
         "TPI30": {
             "title": "Topographic Position Index",
             "description": "Topographic Position Index",
-            "eo_bands": [
+            "bands": [
                 {
                     "name": "Topographic Position Index",
                     "description": "Topographic Position Index"
