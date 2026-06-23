@@ -1,0 +1,37 @@
+{
+  "collection_id": "feature_cube",
+  "title": "Ecosystem characteristics cube",
+  "description": "data cube providing information on ecosystem types, combined of earth observation data indicators from Sentinel1 and Sentinel2 plus additional ecological variables from soil, climate, typology, etc..",
+  "instruments": [],
+  "keywords": [],
+  "mission": [],
+  "platform": [],
+  "providers": [
+    {
+      "name": "VITO",
+      "roles": [
+        "processor"
+      ],
+      "url": "https://www.vito.be/"
+    }
+  ],
+  "layout_strategy_item_template": "${collection}/{year}",
+  "input_path_parser": {
+    "classname": "DefaultInputPathParser",
+    "parameters": {
+      "regex_pattern": "^s3://ecdc-waw4-1-[a-z0-9]+/results/alpha2/feature_cube/v101/(?P<year>\\d{4})/\\d+/(?P<item_id>WEED_v101_features-cube_year2024_[^/]+)\\.tif$",
+      "period": "yearly",
+      "fixed_values": {
+          "asset_type": "feature-cube"
+      }      
+    }
+  },
+
+  "item_assets": {
+    "feature-cube": {
+      "title": "Feature Cube Asset",
+      "description": "Multi-band statistical features computed per pixel from EO bands."
+    }},
+
+  "overrides": {}
+}
